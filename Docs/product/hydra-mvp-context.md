@@ -771,6 +771,28 @@ hydra destroy <name>
 
 La gerarchia `hydra head ...` resta però più chiara e lascia spazio a future entità.
 
+### Convenzioni UX della CLI
+
+Hydra si rivolge a utenti Git e adotta, dove il modello delle Head lo consente,
+la stessa grammatica concettuale e lo stesso tono operativo di Git:
+
+- comandi e opzioni usano termini Git esistenti come `HEAD`, ref, commit e
+  branch locale;
+- l’help di ogni comando documenta scopo, sintassi, argomenti, default
+  significativi ed esempi copiabili;
+- i messaggi restano concisi, dichiarativi e orientati all’esito;
+- una creazione riuscita mostra il percorso concreto della nuova Head e, su un
+  terminale interattivo compatibile, lo rende apribile come collegamento locale;
+- un riepilogo informativo non richiede conferma;
+- la conferma è riservata a un fallback o a un’azione con un costo o rischio
+  materiale che Hydra ha rilevato concretamente.
+
+Per gli overlay, Hydra mostra sempre numero di file e peso logico. Se la prova
+copy-on-write dalla sorgente reale al volume delle Head riesce, procede senza
+prompt. Se uno o più file richiedono la duplicazione completa dei byte, mostra
+numero e peso del sottoinsieme interessato e chiede conferma prima di creare
+branch, worktree o stato.
+
 ---
 
 ## 9. Stato locale e fonte della verità

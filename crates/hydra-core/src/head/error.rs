@@ -25,7 +25,7 @@ pub enum HeadError {
     BranchAlreadyExists(String),
     InvalidRef(String),
     TargetRequired,
-    OverlayConfirmationRequired {
+    OverlayFullCopyConfirmationRequired {
         files: usize,
         bytes: u64,
     },
@@ -100,7 +100,7 @@ impl fmt::Display for HeadError {
                 formatter,
                 "--target is required when --from does not resolve to a local branch"
             ),
-            Self::OverlayConfirmationRequired { files, bytes } => write!(
+            Self::OverlayFullCopyConfirmationRequired { files, bytes } => write!(
                 formatter,
                 "copying {files} overlay file(s) ({bytes} byte(s)) requires confirmation"
             ),

@@ -20,7 +20,7 @@ pub struct CreateHeadOptions {
     pub name: String,
     pub from: Option<String>,
     pub target: Option<String>,
-    pub confirmed_overlays: bool,
+    pub confirmed_full_copy: bool,
 }
 
 #[derive(Debug)]
@@ -29,6 +29,8 @@ pub struct CreatedHead {
     pub path: PathBuf,
     pub branch: String,
     pub storage_backend: StorageBackend,
+    pub overlay_files: usize,
+    pub overlay_bytes: u64,
 }
 
 /// Creates an isolated Git worktree and records it as a Hydra Head.
@@ -62,6 +64,7 @@ pub fn create_head(
         &prepared.branch,
         &prepared.base_commit,
         &prepared.overlay_plan,
+        options.confirmed_full_copy,
     );
     let storage_backend = match creation {
         Ok(backend) => backend,
@@ -104,6 +107,8 @@ pub fn create_head(
         path: prepared.head_path,
         branch: prepared.branch,
         storage_backend,
+        overlay_files: prepared.overlay_plan.file_count(),
+        overlay_bytes: prepared.overlay_plan.total_bytes(),
     })
 }
 
@@ -141,13 +146,14 @@ fn prepare_head(
     let tracked_entries = git::tracked_entries(repository, &base_commit)?;
     let overlay_plan = plan_overlays(
         &repository.root,
+        &heads_directory,
         transaction.overlay_rules(),
         &tracked_entries,
     )?;
-    if !overlay_plan.is_empty() && !options.confirmed_overlays {
-        return Err(HeadError::OverlayConfirmationRequired {
-            files: overlay_plan.file_count(),
-            bytes: overlay_plan.total_bytes(),
+    if overlay_plan.full_copy_file_count() > 0 && !options.confirmed_full_copy {
+        return Err(HeadError::OverlayFullCopyConfirmationRequired {
+            files: overlay_plan.full_copy_file_count(),
+            bytes: overlay_plan.full_copy_bytes(),
         });
     }
 
@@ -169,12 +175,15 @@ fn create_worktree(
     branch: &str,
     base_commit: &str,
     overlay_plan: &OverlayPlan,
+    confirmed_full_copy: bool,
 ) -> Result<StorageBackend, HeadError> {
     git::add_worktree(repository, head_path, branch)?;
     git::initialize_index(head_path, base_commit)?;
     let mut backend =
         materialize_tracked_files(repository, heads_directory, head_path, base_commit)?;
-    if materialize_overlays(repository, overlay_plan, head_path)? == StorageBackend::FullCopy {
+    if materialize_overlays(repository, overlay_plan, head_path, confirmed_full_copy)?
+        == StorageBackend::FullCopy
+    {
         backend = StorageBackend::FullCopy;
     }
     git::verify_clean_worktree(head_path)?;

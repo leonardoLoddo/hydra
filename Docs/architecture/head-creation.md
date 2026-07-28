@@ -27,30 +27,58 @@ path and effective aggregate storage backend. The CLI prints them only after
 the worktree and local state have been committed:
 
 ```text
-Created Head <name> at <absolute-path>
+New Head successfully created at <absolute-path>
 Storage backend: copy-on-write
 ```
+
+When `stdout` is an interactive Unix terminal, only the path is wrapped in an
+OSC 8 hyperlink targeting a `file://` URI. Bytes that are unsafe in a URI are
+percent-encoded, and control characters in the visible label are rendered as
+textual escapes. A terminal without OSC 8 support still displays the label.
+When `stdout` is a pipe or file, Hydra emits no control sequences and preserves
+the plain-text message exactly.
 
 The backend line is `Storage backend: full copy` when any materialized regular
 file required the safe copy fallback.
 
-The CLI owns terminal interaction. When the core reports a non-empty overlay
-plan, the CLI prints its logical size and file count and requests confirmation:
+For every non-empty overlay plan, successful creation also prints its logical
+size and file count:
 
 ```text
 Overlay: <count> file(s), <bytes> byte(s)
-Copy these overlay files? [y/N]
+```
+
+This summary is informational and never causes a prompt by itself. During
+planning, the core attempts a temporary reflink from each real overlay source
+into the Heads directory. It removes the exact probe immediately. When every
+probe succeeds, creation proceeds without terminal input.
+
+The CLI owns terminal interaction. When the core reports that one or more
+overlay files require full-copy fallback, it prints only that fallback
+subset's logical cost and requests confirmation:
+
+```text
+Full copy required: <count> file(s), <bytes> byte(s)
+Continue? [y/N]
 ```
 
 Only `y` and `yes`, compared case-insensitively after trimming whitespace,
-confirm the operation. EOF, an empty response, and every other value cancel it
+confirm the fallback. EOF, an empty response, and every other value cancel it
 with a non-zero exit status. Cancellation occurs before branch, worktree, or
 state creation.
 
 The core API remains independent of stdin, stdout, and process exit status. A
-caller confirms a previously presented overlay plan through
-`CreateHeadOptions::confirmed_overlays`; the core recomputes the plan on the
-confirmed call rather than trusting stale counts.
+caller confirms a previously presented full-copy fallback through
+`CreateHeadOptions::confirmed_full_copy`; the core recomputes the plan on the
+confirmed call rather than trusting stale counts. If a reflink unexpectedly
+fails after a successful probe, the unconfirmed operation rolls back and
+returns the same confirmation requirement instead of silently duplicating the
+file.
+
+Command help follows Git's concise vocabulary and structure: it identifies the
+outcome, displays usage and argument semantics, states meaningful defaults such
+as `HEAD`, and includes copyable examples. Help only advertises behavior
+implemented by the current binary.
 
 ---
 
@@ -196,7 +224,9 @@ The planner:
 3. applies Gitignore matching semantics, including negation and precedence;
 4. walks only existing entries below the repository root;
 5. calculates each selected file's logical size and Git object hash;
-6. sorts selected relative paths for deterministic materialization.
+6. sorts selected relative paths for deterministic materialization;
+7. probes whether each source can be reflinked to the Heads volume and records
+   the files that need full-copy fallback.
 
 An absent expanded rules file contributes no rules. An existing expanded file
 must be a regular file at a safe relative path.
@@ -210,10 +240,11 @@ Overlay protection rejects:
 - a source that no longer resolves inside the repository at materialization
   time.
 
-Each confirmed source is revalidated immediately before copying. Hydra uses the
-same CoW-first, exclusive-copy fallback as tracked regular files, preserves
-permissions, then hashes both source and destination. A concurrent content
-change aborts instead of publishing a partial Head.
+Each source is revalidated immediately before materialization. Hydra uses the
+same CoW-first, exclusive-copy fallback as tracked regular files, but performs
+the fallback only after explicit confirmation. It preserves permissions, then
+hashes both source and destination. A concurrent content change aborts instead
+of publishing a partial Head.
 
 The final `git status --porcelain` must be empty. This proves that tracked
 materialization matches the index and that selected overlays remain ignored by
@@ -263,12 +294,13 @@ repositories. Current coverage proves:
 - tracked content comes from `baseCommit`, not uncommitted source edits;
 - independent worktree, index, private branch, and writable files;
 - metadata fields and clean Git status;
-- Gitignore overlay expansion, negation, confirmation, copy, and isolation;
+- Gitignore overlay expansion, negation, conditional fallback confirmation,
+  copy, and isolation;
 - rejection of unsafe names, unknown refs, missing targets, duplicates,
   existing branches, and existing destinations;
 - rejection of tracked-file overlay collisions and selected symlinks;
 - rejection of malformed, newer, or unsupported configuration/state;
-- lock release on pre-commit failures and cancellation;
+- lock release on pre-commit failures;
 - preservation of committed artifacts when only post-commit lock cleanup
   fails.
 
@@ -278,26 +310,23 @@ Tests that mutate Git or the filesystem use only their disposable fixture.
 
 ## Known Implementation Gaps
 
-1. **Overlay safety thresholds.** The product requires confirmation only beyond
-   defined safety thresholds, but no numeric thresholds are specified yet. The
-   current conservative behavior confirms every non-empty overlay plan.
-2. **Content-source reuse.** Tracked files currently clone from temporary Git
+1. **Content-source reuse.** Tracked files currently clone from temporary Git
    blob files and overlays clone from the current workspace. Hydra does not yet
    search existing Heads for another source with the same content identity.
-3. **Forced fallback coverage in Head creation.** Initialization directly
+2. **Forced fallback coverage in Head creation.** Initialization directly
    verifies both CoW and full-copy behavior. Head-creation tests accept either
    detected backend but do not yet force the per-file fallback path.
-4. **Crash reconciliation.** Atomic state publication and rollback protect
+3. **Crash reconciliation.** Atomic state publication and rollback protect
    ordinary errors, but process termination between Git/filesystem steps is not
    yet reconciled automatically. A stale state lock is reported and preserved
    for later repair rather than removed heuristically.
-5. **Complete configured-directory ownership validation.** The current check
+4. **Complete configured-directory ownership validation.** The current check
    rejects symlinked and repository-internal Heads directories. It does not yet
    prove that a manually changed external directory is owned by the configured
    `projectId` or is outside every other Hydra Head.
-6. **Cross-platform tracked symlinks and durability.** Tracked symlink
+5. **Cross-platform tracked symlinks and durability.** Tracked symlink
    materialization is implemented only on Unix. Direct runtime evidence for
    this workflow currently comes from the development platform and does not
    establish macOS-and-Linux completion by itself.
-7. **Submodule population.** Gitlink entries receive an empty directory only;
+6. **Submodule population.** Gitlink entries receive an empty directory only;
    submodule initialization and network access are intentionally not implicit.

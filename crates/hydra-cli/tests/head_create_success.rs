@@ -1,6 +1,6 @@
 mod common;
 
-use std::{fs, io::Write, process::Stdio};
+use std::{fs, process::Stdio};
 
 use common::{TestDirectory, create_initialized_project, hydra_command, run_git};
 
@@ -24,8 +24,10 @@ fn head_create_builds_an_isolated_worktree_and_records_its_metadata() {
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8(output.stdout).expect("success output should be UTF-8");
-    assert!(stdout.contains("Created Head payment"));
-    assert!(stdout.contains(&head_path.display().to_string()));
+    assert!(stdout.contains(&format!(
+        "New Head successfully created at {}",
+        head_path.display()
+    )));
     assert!(
         stdout.contains("Storage backend: copy-on-write")
             || stdout.contains("Storage backend: full copy")
@@ -149,7 +151,7 @@ fn head_create_materializes_tracked_content_from_the_resolved_commit() {
 }
 
 #[test]
-fn head_create_materializes_confirmed_gitignore_overlays_with_isolation() {
+fn head_create_materializes_cow_gitignore_overlays_without_confirmation() {
     let directory = TestDirectory::new("head-create-overlay");
     let repository = create_initialized_project(&directory);
     fs::write(
@@ -181,30 +183,24 @@ fn head_create_materializes_confirmed_gitignore_overlays_with_isolation() {
     fs::write(repository.join("cache/logs/skip.log"), b"skip\n")
         .expect("excluded overlay should be written");
 
-    let mut child = hydra_command()
+    let output = hydra_command()
         .args(["head", "create", "overlay"])
         .current_dir(&repository)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+        .stdin(Stdio::null())
+        .output()
         .expect("Hydra CLI should start");
-    child
-        .stdin
-        .take()
-        .expect("Hydra stdin should be piped")
-        .write_all(b"y\n")
-        .expect("confirmation should be written");
-    let output = child.wait_with_output().expect("Hydra should finish");
 
     assert!(
         output.status.success(),
-        "confirmed overlay should succeed, stderr: {}",
+        "copy-on-write overlay should succeed without input, stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8(output.stdout).expect("output should be UTF-8");
     assert!(stdout.contains("Overlay: 2 file(s), 13 byte(s)"));
-    assert!(stdout.contains("Copy these overlay files? [y/N]"));
+    assert!(
+        !stdout.contains("[y/N]"),
+        "copy-on-write overlays should not prompt, got: {stdout:?}"
+    );
 
     let head_path = directory.path().join("SampleProject.heads/overlay");
     assert_eq!(

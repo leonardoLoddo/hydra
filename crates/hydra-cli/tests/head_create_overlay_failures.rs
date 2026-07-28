@@ -1,40 +1,50 @@
 mod common;
 
-use std::{fs, io::Write, process::Stdio};
+use std::{fs, process::Stdio};
 
 use common::{
     TestDirectory, assert_no_head_creation_artifacts, create_initialized_project, hydra_command,
+    run_git,
 };
 
 #[test]
-fn head_create_cancels_cleanly_when_overlays_are_not_confirmed() {
-    let directory = TestDirectory::new("head-overlay-declined");
+fn head_create_does_not_prompt_only_because_overlays_are_present() {
+    let directory = TestDirectory::new("head-overlay-no-prompt");
     let repository = create_initialized_project(&directory);
     fs::write(repository.join(".gitignore"), b".env\n").expect("overlay rules should be written");
+    let output = run_git(&repository, &["add", ".gitignore"]);
+    assert!(output.status.success());
+    let output = run_git(
+        &repository,
+        &[
+            "-c",
+            "user.name=Hydra Tests",
+            "-c",
+            "user.email=hydra-tests@example.invalid",
+            "commit",
+            "--quiet",
+            "-m",
+            "add overlay rules",
+        ],
+    );
+    assert!(output.status.success());
     fs::write(repository.join(".env"), b"secret\n").expect("overlay should be written");
 
-    let mut child = hydra_command()
+    let output = hydra_command()
         .args(["head", "create", "payment"])
         .current_dir(&repository)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+        .stdin(Stdio::null())
+        .output()
         .expect("Hydra CLI should start");
-    child
-        .stdin
-        .take()
-        .expect("Hydra stdin should be piped")
-        .write_all(b"n\n")
-        .expect("decline response should be written");
-    let output = child.wait_with_output().expect("Hydra should finish");
 
-    assert!(!output.status.success());
+    assert!(
+        output.status.success(),
+        "copy-on-write overlay should not need confirmation, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8(output.stdout).expect("output should be UTF-8");
     assert!(stdout.contains("Overlay: 1 file(s), 7 byte(s)"));
-    assert!(stdout.contains("Copy these overlay files? [y/N]"));
-    assert!(String::from_utf8_lossy(&output.stderr).contains("cancelled"));
-    assert_no_head_creation_artifacts(&repository, "payment");
+    assert!(!stdout.contains("[y/N]"));
 }
 
 #[test]

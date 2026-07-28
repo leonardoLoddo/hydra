@@ -7,6 +7,7 @@ use std::{
 };
 
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
+use uuid::Uuid;
 
 use super::{
     HeadError,
@@ -20,6 +21,7 @@ struct OverlayFile {
     relative: PathBuf,
     size: u64,
     identity: String,
+    requires_full_copy: bool,
 }
 
 #[derive(Debug)]
@@ -29,10 +31,6 @@ pub(super) struct OverlayPlan {
 }
 
 impl OverlayPlan {
-    pub(super) fn is_empty(&self) -> bool {
-        self.files.is_empty()
-    }
-
     pub(super) fn file_count(&self) -> usize {
         self.files.len()
     }
@@ -40,10 +38,26 @@ impl OverlayPlan {
     pub(super) fn total_bytes(&self) -> u64 {
         self.total_bytes
     }
+
+    pub(super) fn full_copy_file_count(&self) -> usize {
+        self.files
+            .iter()
+            .filter(|file| file.requires_full_copy)
+            .count()
+    }
+
+    pub(super) fn full_copy_bytes(&self) -> u64 {
+        self.files
+            .iter()
+            .filter(|file| file.requires_full_copy)
+            .map(|file| file.size)
+            .sum()
+    }
 }
 
 pub(super) fn plan_overlays(
     source_root: &Path,
+    heads_directory: &Path,
     rules: &[String],
     tracked_entries: &[TrackedEntry],
 ) -> Result<OverlayPlan, HeadError> {
@@ -55,6 +69,9 @@ pub(super) fn plan_overlays(
     let mut files = Vec::new();
     visit_directory(source_root, source_root, &matcher, &tracked, &mut files)?;
     files.sort_by(|left, right| left.relative.cmp(&right.relative));
+    classify_copy_fallbacks_with(&mut files, |source| {
+        probe_copy_on_write_to(source, heads_directory)
+    })?;
     let total_bytes = files.iter().try_fold(0_u64, |total, file| {
         total
             .checked_add(file.size)
@@ -67,6 +84,7 @@ pub(super) fn materialize_overlays(
     repository: &Repository,
     plan: &OverlayPlan,
     head_path: &Path,
+    confirmed_full_copy: bool,
 ) -> Result<StorageBackend, HeadError> {
     let mut backend = StorageBackend::CopyOnWrite;
     for file in &plan.files {
@@ -84,6 +102,13 @@ pub(super) fn materialize_overlays(
         let file_backend = if reflink_copy::reflink(&file.source, &destination).is_ok() {
             StorageBackend::CopyOnWrite
         } else {
+            remove_failed_reflink_destination(&destination)?;
+            if !confirmed_full_copy {
+                return Err(HeadError::OverlayFullCopyConfirmationRequired {
+                    files: 1,
+                    bytes: file.size,
+                });
+            }
             copy_exclusive(&file.source, &destination).map_err(|source| HeadError::FileSystem {
                 action: "copy overlay file",
                 path: destination.clone(),
@@ -210,10 +235,48 @@ fn visit_directory(
                 source,
                 relative,
                 size: metadata.len(),
+                requires_full_copy: false,
             });
         }
     }
     Ok(())
+}
+
+fn classify_copy_fallbacks_with(
+    files: &mut [OverlayFile],
+    mut can_copy_on_write: impl FnMut(&Path) -> Result<bool, HeadError>,
+) -> Result<(), HeadError> {
+    for file in files {
+        file.requires_full_copy = !can_copy_on_write(&file.source)?;
+    }
+    Ok(())
+}
+
+fn probe_copy_on_write_to(source: &Path, heads_directory: &Path) -> Result<bool, HeadError> {
+    let destination =
+        heads_directory.join(format!(".hydra-overlay-probe-{}", Uuid::new_v4().simple()));
+    let cloned = reflink_copy::reflink(source, &destination).is_ok();
+    match fs::remove_file(&destination) {
+        Ok(()) => Ok(cloned),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
+        Err(source) => Err(HeadError::FileSystem {
+            action: "remove temporary overlay probe",
+            path: destination,
+            source,
+        }),
+    }
+}
+
+fn remove_failed_reflink_destination(destination: &Path) -> Result<(), HeadError> {
+    match fs::remove_file(destination) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(source) => Err(HeadError::FileSystem {
+            action: "remove failed overlay reflink",
+            path: destination.to_path_buf(),
+            source,
+        }),
+    }
 }
 
 fn validate_relative_path(path: &Path) -> Result<(), HeadError> {
@@ -290,4 +353,45 @@ fn copy_exclusive(source: &Path, destination: &Path) -> io::Result<()> {
     io::copy(&mut source, &mut destination)?;
     destination.flush()?;
     destination.sync_all()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::{OverlayFile, classify_copy_fallbacks_with};
+
+    fn overlay_file(name: &str, size: u64) -> OverlayFile {
+        OverlayFile {
+            source: PathBuf::from(name),
+            relative: PathBuf::from(name),
+            size,
+            identity: "identity".to_owned(),
+            requires_full_copy: false,
+        }
+    }
+
+    #[test]
+    fn copy_on_write_overlays_do_not_require_confirmation() {
+        let mut files = vec![overlay_file(".env", 7), overlay_file("cache.bin", 11)];
+
+        classify_copy_fallbacks_with(&mut files, |_| Ok(true))
+            .expect("copy-on-write assessment should succeed");
+
+        assert!(files.iter().all(|file| !file.requires_full_copy));
+    }
+
+    #[test]
+    fn only_overlays_that_need_full_copy_are_marked_for_confirmation() {
+        let mut files = vec![overlay_file(".env", 7), overlay_file("cache.bin", 11)];
+        let mut assessments = [true, false].into_iter();
+
+        classify_copy_fallbacks_with(&mut files, |_| {
+            Ok(assessments.next().expect("one assessment per overlay"))
+        })
+        .expect("fallback assessment should succeed");
+
+        assert!(!files[0].requires_full_copy);
+        assert!(files[1].requires_full_copy);
+    }
 }
