@@ -1,0 +1,921 @@
+# Hydra
+
+> **One repository. Many heads.**
+
+Hydra è un workspace manager Git-native e local-first che materializza più copie operative isolate dello stesso repository come directory complete e indipendenti.
+
+Permette a sviluppatori e agenti AI di lavorare contemporaneamente su più attività senza condividere working tree, index o diff, continuando a usare normalmente Git, l’IDE e gli strumenti già presenti sul computer.
+
+---
+
+## 1. Contesto
+
+Con l’avvento della programmazione agentica, una parte crescente della codifica può essere delegata a strumenti come Codex, Claude Code, Gemini CLI, Aider o agli agenti integrati negli IDE.
+
+Il ruolo dello sviluppatore si sposta verso:
+
+- definizione dei requisiti;
+- decisioni architetturali;
+- coordinamento di più attività;
+- revisione delle modifiche;
+- controllo del versionamento;
+- integrazione del lavoro prodotto.
+
+Questo rende concretamente possibile lavorare su più feature nello stesso momento. Il limite non è più soltanto la velocità con cui viene scritto il codice, ma la capacità di mantenere separati e comprensibili i diversi flussi di lavoro.
+
+In un unico working tree, attività parallele producono facilmente:
+
+- una sola diff composta da modifiche non correlate;
+- cambi di branch continui;
+- file temporanei condivisi;
+- agenti che intervengono sugli stessi file;
+- difficoltà nel capire quale attività abbia introdotto una modifica;
+- commit meno atomici e più difficili da revisionare;
+- perdita di controllo sullo stato complessivo del progetto.
+
+## 2. Obiettivo
+
+Hydra deve permettere di lavorare a più feature dello stesso progetto in parallelo, mantenendo ogni attività fisicamente e logicamente isolata.
+
+Dal punto di vista dell’utente, ogni **Head** deve apparire come un progetto completo sul filesystem. Può quindi essere aperta con qualsiasi IDE, terminale, agente o altro software senza richiedere integrazioni specifiche con Hydra.
+
+Dal punto di vista dell’implementazione, Hydra deve condividere tutto ciò che Git può condividere in sicurezza e conservare separato ciò che determina lo stato operativo di ogni attività.
+
+Hydra virtualizza quindi gli aspetti utili di un team che lavora su più computer:
+
+- directory di lavoro;
+- `HEAD`;
+- index;
+- modifiche non committate;
+- diff;
+- branch operativo;
+- contesto aperto nell’IDE o nell’agente.
+
+Non virtualizza necessariamente, almeno nell’MVP:
+
+- sistema operativo;
+- database;
+- cache;
+- container;
+- servizi esterni;
+- dipendenze installate.
+
+## 3. Definizione del prodotto
+
+> **Hydra è un workspace manager Git-native che materializza più Head isolate dello stesso repository come directory complete e indipendenti, consentendo a persone e agenti di sviluppare in parallelo senza condividere working tree o diff.**
+
+Hydra non è:
+
+- un IDE;
+- un agente AI;
+- un’alternativa a Git;
+- un ambiente cloud;
+- un sistema di virtualizzazione completo;
+- un process manager, almeno nel suo nucleo.
+
+Hydra coordina e rende accessibili workspace isolati. Gli strumenti esterni continuano a lavorare direttamente sui normali file del progetto.
+
+---
+
+## 4. Principi fondamentali
+
+### Local-first
+
+Il codice e i metadati operativi rimangono sul computer dello sviluppatore. Il funzionamento fondamentale non dipende da un servizio cloud.
+
+### Git-native
+
+Hydra utilizza Git come fonte primaria della verità. Branch, commit, merge, rebase e diff rimangono standard e accessibili anche senza Hydra.
+
+### Tool-agnostic
+
+Ogni Head è una directory reale. Può essere aperta con VS Code, Cursor, Windsurf, Zed, JetBrains, Vim o qualsiasi altro strumento capace di lavorare su una directory.
+
+Lo stesso principio vale per Codex, Claude Code, Gemini CLI, Aider e agenti custom.
+
+### Isolamento esplicito
+
+Ogni Head possiede un working tree, un index e una ref Git indipendenti. Una modifica in una Head non deve alterare il filesystem operativo delle altre.
+
+### Efficienza
+
+Hydra non riclona l’intero repository per ogni Head. Condivide l’object database di Git e, quando il volume lo consente, usa primitive copy-on-write per condividere anche i blocchi fisici dei file materializzati.
+
+L’obiettivo è che ogni Head occupi inizialmente soprattutto lo spazio delle proprie differenze, pur continuando ad apparire come una directory completa a qualunque programma.
+
+### Nessuna sincronizzazione implicita
+
+Una Head nasce da un commit preciso e non cambia automaticamente quando il branch sorgente avanza. Aggiornamento, rebase e integrazione devono essere azioni esplicite.
+
+### Recuperabilità
+
+La perdita o corruzione dei metadati di Hydra non deve rendere irrecuperabili branch o working tree. Lo stato deve poter essere riconciliato a partire da Git.
+
+---
+
+## 5. Modello tecnico
+
+La primitiva fondamentale è `git worktree`.
+
+Ogni Head è un worktree Git completo sul filesystem, mentre repository e Head condividono l’object database. Un livello di materializzazione separato determina come i file visibili vengono creati:
+
+```text
+Repository Git
+├── object database condiviso
+├── workspace originale
+└── Hydra
+    ├── Git worktree metadata
+    ├── Materializer
+    │   ├── native CoW backend
+    │   └── full-copy fallback
+    ├── Head payment
+    ├── Head auth
+    └── Head refactor
+```
+
+Ogni Head conserva comunque:
+
+- un branch privato;
+- un `HEAD` indipendente;
+- un index indipendente;
+- un working tree indipendente;
+- file normali e direttamente accessibili sul filesystem.
+
+### Collocazione delle Head
+
+Per default, le Head di un progetto vengono create in una directory sorella del repository:
+
+```text
+<directory-genitore>/
+├── Heimdall/
+│   ├── .git/
+│   ├── .hydra.json
+│   └── ...
+└── Heimdall.heads/
+    ├── chatbot/
+    ├── report-kpi/
+    └── refactor/
+```
+
+La relazione rimane immediatamente visibile:
+
+```text
+Heimdall/        → progetto principale
+Heimdall.heads/  → Head appartenenti a Heimdall
+```
+
+Le Head devono rimanere esterne al working tree principale perché una collocazione interna:
+
+- potrebbe essere inclusa accidentalmente nei file tracciati o negli overlay;
+- introdurrebbe il rischio di materializzazioni ricorsive;
+- farebbe indicizzare tutte le Head ai watcher, all’IDE e agli strumenti del progetto principale;
+- renderebbe più facile creare una Head dentro un’altra Head;
+- confonderebbe la dimensione e lo stato operativo del repository principale.
+
+Hydra non usa invece un contenitore globale del tipo `.hydra-heads/<progetto>/` come default. Quel layout renderebbe possibile raccogliere più progetti nello stesso namespace, ma aggiungerebbe un livello che non serve al ciclo di vita di una singola repository e renderebbe meno evidente la relazione tra progetto e Head.
+
+Più progetti collocati nella stessa directory avranno quindi directory sorelle indipendenti:
+
+```text
+WorkingArea/
+├── Heimdall/
+├── Heimdall.heads/
+│   ├── chatbot/
+│   └── report-kpi/
+├── AltroProgetto/
+└── AltroProgetto.heads/
+    └── autenticazione/
+```
+
+Il percorso rimane configurabile. Hydra salva in `.hydra.json` il percorso concreto, preferibilmente relativo alla root del progetto, e non deriva nuovamente la destinazione a ogni comando.
+
+Se la directory predefinita esiste già ma non appartiene al progetto corrente, `hydra init` deve interrompersi senza riutilizzarla e richiedere una destinazione differente. Una directory delle Head già inizializzata può essere riconosciuta tramite i metadati Git e Hydra.
+
+### Separazione tra isolamento Git e materializzazione
+
+`git worktree` risolve l’isolamento Git, ma da solo scrive una copia completa dei file visibili per ogni working tree.
+
+Il **Materializer** risolve invece l’efficienza fisica:
+
+- cerca un file già materializzato con lo stesso contenuto;
+- crea un clone copy-on-write quando il filesystem lo supporta;
+- usa una copia normale quando il clone non è disponibile;
+- tratta con lo stesso modello sia i file tracciati sia gli overlay;
+- non cambia il modo in cui IDE, agenti, compilatori e Git vedono i file.
+
+L’agnosticità è quindi garantita verso gli strumenti che usano le Head. I backend di storage possono essere specifici per piattaforma, ma rimangono un dettaglio interno.
+
+### Perché non semplici copie, clone o hard link
+
+| Soluzione | File normali | Scritture isolate | Git standard | Spazio efficiente | Scelta |
+|---|---:|---:|---:|---:|---|
+| Copia integrale | Sì | Sì | Sì | No | Fallback |
+| Clone Git per Head | Sì | Sì | Sì | Parzialmente | No |
+| Hard link | Sì | **No** | Fragile | Sì | **Mai per file modificabili** |
+| Filesystem virtuale Hydra | Dipende | Sì | Dipende | Sì | Fuori dall’MVP |
+| Worktree + clone CoW | Sì | Sì | Sì | Sì | **Preferito** |
+
+Un hard link non implementa il copy-on-write. Due path collegati puntano allo stesso inode e una scrittura in-place effettuata in una Head può alterare immediatamente le altre. Un watcher riceverebbe normalmente l’evento troppo tardi per impedire la propagazione.
+
+Gli hard link possono essere valutati in futuro soltanto per contenuti dichiarati immutabili e protetti in sola lettura. Non sono un backend generale di Hydra.
+
+### Copy-on-write nativo
+
+Con un clone copy-on-write, i path sono file logicamente indipendenti ma inizialmente condividono gli stessi blocchi fisici:
+
+```text
+Base/app.php ──────┬──── blocchi condivisi
+Head A/app.php ────┤
+Head B/app.php ────┘
+
+Dopo una modifica in Head A:
+
+Base/app.php ─────────── blocchi originali
+Head B/app.php ───────── blocchi originali
+Head A/app.php ───────── blocchi modificati propri
+```
+
+La separazione avviene prima della scrittura ed è garantita dal filesystem. Hydra non deve intercettare gli editor né mantenere una copia logica delle patch per ricostruire i file.
+
+Backend iniziali:
+
+| Piattaforma/filesystem | Primitiva preferita |
+|---|---|
+| macOS su APFS | clone file nativo |
+| Linux su Btrfs/XFS e volumi compatibili | reflink (`FICLONE`) |
+| Altri volumi | copia completa |
+
+Il supporto va rilevato sul volume effettivo che conterrà le Head, non soltanto in base al sistema operativo. Una primitiva disponibile sulla piattaforma può fallire tra volumi diversi o su un filesystem che non la implementa.
+
+### Sorgenti basate sul contenuto
+
+Hydra non deve collegare una Head a un particolare path sorgente. Per ogni file cerca una sorgente esistente con contenuto identico:
+
+- per i file tracciati, l’identità primaria è il blob Git atteso dal `baseCommit`;
+- per gli overlay, l’identità è un hash del contenuto letto dalla sorgente;
+- se esiste già una copia compatibile in un’altra Head o nel workspace, può essere usata come origine del clone CoW;
+- se non esiste, il contenuto viene materializzato da Git o copiato dalla sorgente.
+
+Una sorgente può essere modificata dopo la clonazione senza compromettere le Head già create: il filesystem separa automaticamente i blocchi.
+
+Hydra non deve fidarsi soltanto di nome, dimensione o timestamp. Prima del riuso deve verificare che il contenuto corrisponda all’identità attesa.
+
+### Garanzia e ottimizzazione
+
+La proprietà fondamentale è:
+
+> Modificare un file in una Head non altera mai le altre Head.
+
+Il risparmio fisico è invece una capacità negoziata:
+
+- `cow`: blocchi condivisi fino alla prima modifica;
+- `copy`: file completamente duplicati ma ugualmente isolati.
+
+Se CoW non è disponibile, Hydra deve continuare a funzionare in modo corretto e dichiarare chiaramente il fallback. Non deve mai sostituirlo silenziosamente con hard link mutabili.
+
+### Un branch privato per ogni Head
+
+Due Head non devono lavorare contemporaneamente sulla stessa ref Git.
+
+Hydra permette invece di:
+
+- creare più Head dallo stesso branch;
+- creare più Head dallo stesso commit;
+- integrare successivamente più Head nello stesso branch di destinazione.
+
+Esempio:
+
+```text
+Base: beta
+
+payment  → hydra/payment
+auth     → hydra/auth
+refactor → hydra/refactor
+```
+
+Tutte le Head possono nascere dallo stesso commit di `beta`, ma ognuna avanza sul proprio branch.
+
+### Metadati di una Head
+
+| Campo | Significato |
+|---|---|
+| `name` | Identificatore Hydra leggibile |
+| `worktreePath` | Directory completa della Head |
+| `headRef` | Branch privato della Head |
+| `baseRef` | Ref indicata come origine |
+| `baseCommit` | Commit esatto usato alla creazione |
+| `targetRef` | Branch previsto per l’integrazione |
+| `materializationBackend` | Backend effettivamente usato (`cow` o `copy`) |
+| `createdAt` | Data di creazione |
+
+`baseRef` descrive l’intenzione; `baseCommit` rende deterministico lo stato effettivo di partenza.
+
+---
+
+## 6. Configurazione del progetto
+
+Hydra usa due livelli distinti.
+
+| Posizione | Funzione | Versionabile |
+|---|---|---:|
+| `<project-root>/.hydra.json` | Politica condivisa per creare le Head | Sì |
+| `<git-common-dir>/hydra/heads.json` | Stato locale delle Head | No |
+
+La configurazione nel progetto descrive come quel progetto deve essere materializzato. Lo stato locale registra invece quali Head esistono sulla singola macchina.
+
+### Configurazione iniziale
+
+`hydra init` genera:
+
+```json
+{
+  "version": 1,
+  "projectId": "heimdall-a84f2c",
+  "headsDirectory": "../Heimdall.heads",
+  "branchPrefix": "hydra/",
+  "storage": {
+    "mode": "auto"
+  },
+  "overlay": {
+    "copy": [
+      "... .gitignore"
+    ]
+  }
+}
+```
+
+`projectId` è un identificatore stabile del progetto e non dipende soltanto dal nome della directory. Permette a Hydra di distinguere repository omonimi nei metadati e nelle future operazioni globali.
+
+`headsDirectory` indica dove materializzare le Head. Il valore predefinito è la directory sorella `<nome-progetto>.heads`; può essere modificato esplicitamente, purché la destinazione rispetti i vincoli di sicurezza e non si trovi dentro il working tree del progetto o di un’altra Head.
+
+Con `storage.mode: "auto"`, Hydra prova il clone CoW sul volume di destinazione e usa la copia completa se non è supportato. Modalità più rigide potranno essere esposte per test e automazioni, ma il default deve privilegiare compatibilità e sicurezza.
+
+La direttiva:
+
+```text
+... .gitignore
+```
+
+espande le regole contenute in `.gitignore` esattamente in quella posizione dell’array.
+
+Il `.gitignore` rimane quindi la sorgente viva predefinita degli overlay: Hydra non ne duplica il contenuto nella configurazione.
+
+### Sintassi degli overlay
+
+Le regole usano la stessa sintassi di `.gitignore`:
+
+- `*`, `?` e `**`;
+- slash iniziale per ancorare alla root;
+- slash finale per indicare una directory;
+- negazione con `!`;
+- commenti con `#` nei file espansi;
+- escaping di `!`, `#` e spazi;
+- ordine delle regole;
+- comportamento **last matching rule wins**.
+
+L’unica estensione di Hydra è:
+
+```text
+... <path-del-file>
+```
+
+che include le regole del file indicato nel punto esatto in cui compare.
+
+Esempio:
+
+```json
+{
+  "version": 1,
+  "projectId": "heimdall-a84f2c",
+  "headsDirectory": "../Heimdall.heads",
+  "branchPrefix": "hydra/",
+  "overlay": {
+    "copy": [
+      "... .gitignore",
+      "!node_modules/",
+      "!vendor/",
+      "!storage/logs/",
+      ".env.hydra"
+    ]
+  }
+}
+```
+
+La semantica è quella di una lista di selezione per la copia:
+
+| Regola | In `.gitignore` | Nell’overlay Hydra |
+|---|---|---|
+| `.env` | Ignora il file | Copia il file |
+| `storage/` | Ignora la directory | Copia la directory |
+| `!storage/logs/` | Non ignorare il percorso | Non copiarlo |
+
+In questo esempio:
+
+- le voci di `.gitignore` formano la selezione predefinita;
+- `node_modules`, `vendor` e i log vengono esclusi dalla copia;
+- `.env.hydra` viene aggiunto esplicitamente.
+
+### Origine degli overlay
+
+Il codice versionato deriva dal commit indicato da `--from`.
+
+I file locali selezionati dagli overlay derivano invece dalla Head o dal workspace da cui viene eseguito il comando:
+
+```bash
+hydra head create payment --from beta
+```
+
+significa:
+
+- codice versionato dal commit risolto da `beta`;
+- overlay dal workspace corrente;
+- nuovo branch privato `hydra/payment`.
+
+### Algoritmo di risoluzione
+
+Durante la creazione di una Head, Hydra:
+
+1. legge `overlay.copy`;
+2. espande le direttive `... <file>`;
+3. valuta tutte le regole in ordine;
+4. considera soltanto i percorsi esistenti nella sorgente;
+5. calcola quantità, dimensione logica e identità dei contenuti;
+6. mostra un riepilogo e gli eventuali avvisi;
+7. affida i file selezionati al Materializer;
+8. usa CoW o copia completa secondo le capacità del volume.
+
+Hydra deve rispettare la semantica dei pattern Git e non interpretarli come semplici glob del filesystem.
+
+### Protezioni obbligatorie
+
+Indipendentemente dalla configurazione, Hydra non deve:
+
+- copiare `.git`;
+- copiare la directory che contiene le Head;
+- collocare la directory delle Head dentro il working tree principale o dentro un’altra Head;
+- seguire symlink che escono dalla root del progetto;
+- copiare socket, pipe o altri file speciali;
+- sovrascrivere con un overlay un file già tracciato da Git;
+- creare una Head dentro un’altra Head;
+- entrare in ricorsione durante l’espansione dei file di regole.
+
+Poiché `.gitignore` può includere directory molto grandi come `node_modules` o `vendor`, Hydra deve mostrare quantità e dimensione della copia e richiedere conferma oltre soglie di sicurezza. Non deve tuttavia modificare implicitamente le regole scelte dall’utente.
+
+---
+
+## 7. MVP v0.1
+
+La prima versione deve validare il ciclo di vita delle Head. È una CLI, senza dashboard web e senza gestione dei runtime.
+
+### 7.1 Inizializzazione
+
+```bash
+hydra init .
+```
+
+Hydra:
+
+1. verifica che il percorso appartenga a un repository Git;
+2. risolve repository root e Git common directory;
+3. genera un `projectId` stabile;
+4. determina come default la directory sorella `<nome-progetto>.heads`;
+5. verifica che la destinazione sia esterna al working tree e non appartenga a un altro progetto;
+6. genera `.hydra.json` con il percorso concreto delle Head;
+7. inizializza lo stato locale;
+8. verifica le capacità di materializzazione del volume;
+9. non modifica i file applicativi del progetto.
+
+### 7.2 Creazione di una Head
+
+```bash
+hydra head create payment
+hydra head create payment --from beta
+hydra head create payment --from beta --target beta
+```
+
+Se `--from` non è specificato, Hydra usa l’`HEAD` corrente come origine.
+
+Hydra:
+
+1. valida il nome;
+2. risolve la ref di origine nel relativo commit;
+3. genera un branch dedicato;
+4. crea la struttura amministrativa del worktree;
+5. inizializza l’index sul commit di base;
+6. materializza i file tracciati con il backend selezionato;
+7. risolve e materializza gli overlay con lo stesso backend;
+8. verifica che il worktree risultante corrisponda allo stato atteso;
+9. registra i metadati;
+10. restituisce percorso e backend effettivamente usato.
+
+L’implementazione preferita evita che il checkout standard di Git scriva inutilmente tutti i file prima della materializzazione. Può creare il worktree senza checkout, inizializzare separatamente l’index e delegare la scrittura dei file al Materializer. Se una piattaforma richiede un flusso differente, il risultato Git osservabile deve rimanere equivalente.
+
+Per l’MVP, la sorgente degli overlay deve avere uno stato sufficientemente stabile durante la copia. Hydra rileva eventuali cambiamenti concorrenti e fallisce in modo sicuro anziché produrre una Head parziale non dichiarata.
+
+### 7.3 Elenco e stato
+
+```bash
+hydra status
+hydra head list
+hydra head status payment
+hydra head path payment
+```
+
+Lo stato mostra almeno:
+
+- nome;
+- percorso;
+- branch;
+- commit corrente;
+- base ref e base commit;
+- target ref;
+- file modificati, aggiunti, eliminati e untracked;
+- commit ahead/behind rispetto alla base;
+- presenza o assenza del worktree;
+- eventuali incoerenze tra Git e i metadati Hydra.
+
+### 7.4 Apertura
+
+```bash
+hydra head open payment
+```
+
+Hydra può eseguire un comando configurabile, per esempio:
+
+```json
+{
+  "openCommand": "code {path}"
+}
+```
+
+Si tratta di un adapter generico a comando, non di un’integrazione specifica con VS Code.
+
+### 7.5 Rimozione sicura
+
+```bash
+hydra head remove payment
+hydra head remove payment --force
+```
+
+Senza `--force`, Hydra rifiuta la rimozione se:
+
+- esistono modifiche non committate;
+- esistono file untracked;
+- il branch contiene commit non integrati nel target;
+- il percorso o lo stato Git non corrispondono ai metadati;
+- Git richiederebbe una rimozione forzata.
+
+Worktree e branch sono entità separate. La rimozione ordinaria elimina il worktree secondo una politica esplicita e non deve cancellare automaticamente un branch che contiene lavoro recuperabile.
+
+### 7.6 Repair e riconciliazione
+
+```bash
+hydra repair
+```
+
+Hydra confronta i propri metadati con:
+
+```bash
+git worktree list --porcelain
+```
+
+e deve poter:
+
+- rilevare Head mancanti;
+- individuare worktree Hydra non registrati;
+- aggiornare percorsi modificati;
+- segnalare branch o directory incoerenti;
+- ricostruire lo stato minimo senza modificare il codice.
+
+Le correzioni distruttive o ambigue richiedono sempre una conferma esplicita.
+
+### 7.7 Diagnostica dello storage
+
+```bash
+hydra doctor storage
+```
+
+Il comando verifica il volume sul quale saranno create le Head e mostra almeno:
+
+```text
+Storage backend: copy-on-write
+Native primitive: APFS clone
+Fallback: full copy
+Mutable hard links: disabled
+Isolation: supported
+```
+
+La diagnostica deve eseguire una prova reale e sicura in una directory temporanea sul volume di destinazione: la sola rilevazione del sistema operativo non è sufficiente.
+
+---
+
+## 8. CLI dell’MVP
+
+```bash
+hydra init [path]
+
+hydra status
+
+hydra head create <name> [--from <ref>] [--target <ref>]
+hydra head list
+hydra head status <name>
+hydra head path <name>
+hydra head open <name>
+hydra head remove <name> [--force]
+
+hydra repair
+hydra doctor storage
+```
+
+Eventuali alias più brevi potranno essere introdotti senza cambiare il modello:
+
+```bash
+hydra create <name>
+hydra list
+hydra open <name>
+hydra destroy <name>
+```
+
+La gerarchia `hydra head ...` resta però più chiara e lascia spazio a future entità.
+
+---
+
+## 9. Stato locale e fonte della verità
+
+Esempio di `<git-common-dir>/hydra/heads.json`:
+
+```json
+{
+  "version": 1,
+  "heads": {
+    "payment": {
+      "worktreePath": "/projects/ecommerce.heads/payment",
+      "headRef": "refs/heads/hydra/payment",
+      "baseRef": "refs/heads/beta",
+      "baseCommit": "abc123",
+      "targetRef": "refs/heads/beta",
+      "materializationBackend": "cow",
+      "createdAt": "2026-07-26T20:00:00Z"
+    }
+  }
+}
+```
+
+Il file:
+
+- viene scritto atomicamente;
+- contiene una versione dello schema;
+- non è l’unica fonte della verità;
+- non memorizza informazioni ricavabili in modo affidabile da Git se non utili alla riconciliazione;
+- non contiene PID, porte, agenti o runtime nell’MVP.
+
+Git rimane autorevole per:
+
+- worktree esistenti;
+- branch e ref;
+- commit;
+- stato del working tree.
+
+Hydra rimane autorevole per:
+
+- nome logico della Head;
+- base ref originaria;
+- base commit registrato;
+- target previsto;
+- backend di materializzazione usato e diagnostica associata;
+- configurazioni e intenzioni che Git non conosce.
+
+Lo stato non deve contenere una patch proprietaria necessaria per aprire o ricostruire i file. Ogni Head resta autosufficiente come normale working tree.
+
+---
+
+## 10. Operazioni Git
+
+Hydra deve rimanere pienamente compatibile con l’uso diretto di Git.
+
+Dentro una Head, l’utente può normalmente:
+
+```bash
+git status
+git diff
+git add .
+git commit
+git fetch
+git rebase
+git merge
+git push
+```
+
+Un commit creato in una Head è immediatamente disponibile nel repository condiviso.
+
+Nell’MVP Hydra non implementa:
+
+- merge automatico;
+- rebase automatico;
+- risoluzione dei conflitti;
+- push o pull impliciti;
+- sincronizzazione automatica con la base;
+- cancellazione automatica dei branch.
+
+Queste operazioni hanno conseguenze abbastanza importanti da dover restare inizialmente sotto il controllo esplicito dell’utente e di Git.
+
+---
+
+## 11. Casi limite minimi
+
+L’MVP deve gestire in modo prevedibile:
+
+- repository standard e repository già aperti da un worktree;
+- repository omonimi collocati in directory differenti;
+- branch sorgente locale;
+- ref o commit esplicito;
+- nomi di Head duplicati;
+- branch Hydra già esistente;
+- destinazione già esistente;
+- directory sorella predefinita già appartenente a un altro progetto;
+- `headsDirectory` configurata dentro il repository o dentro un’altra Head;
+- worktree bloccato o rimosso manualmente;
+- repository in stato detached;
+- submodule;
+- file ignorati grandi;
+- filesystem senza supporto CoW;
+- Head collocate su un volume differente dalla sorgente;
+- fallimento di un clone CoW a metà materializzazione;
+- sorgente candidata modificata durante la verifica;
+- symlink;
+- interruzione durante creazione o copia;
+- perdita del file di stato;
+- rimozione manuale di una directory;
+- modifica diretta delle ref tramite Git.
+
+Per i submodule, l’MVP può dichiarare un supporto limitato e lasciare esplicito il comando necessario per inizializzarli. Non deve fingere che siano già isolati o pronti.
+
+Le operazioni che attraversano più passaggi devono essere progettate come transazioni recuperabili:
+
+1. validazione;
+2. creazione branch;
+3. creazione worktree;
+4. copia overlay;
+5. registrazione;
+6. rollback sicuro o stato riconciliabile in caso di errore.
+
+---
+
+## 12. Requisiti non funzionali
+
+### Portabilità
+
+Target iniziali:
+
+- macOS;
+- Linux.
+
+Il design deve evitare assunzioni che impediscano un successivo supporto a Windows.
+
+### Prestazioni
+
+- Nessuna duplicazione dell’object database Git.
+- Clone CoW dei file tracciati e degli overlay quando il volume lo supporta.
+- Copia completa per singolo file come fallback sicuro.
+- Stato calcolato tramite comandi Git mirati.
+- Materializzazione preceduta da scansione e stima.
+- Distinzione tra dimensione logica della Head e spazio fisico esclusivo quando il backend consente di misurarlo in modo attendibile.
+- Nessun daemon obbligatorio nell’MVP.
+
+### Sicurezza
+
+- Nessuna rimozione forzata implicita.
+- Nessun hard link per file modificabili.
+- Nessuna interpolazione insicura dei comandi.
+- Validazione e normalizzazione di tutti i percorsi.
+- Nessuna uscita dalla root tramite traversal o symlink.
+- Scritture di stato atomiche.
+- Messaggi di errore che indicano cosa è stato creato e come recuperarlo.
+
+### Osservabilità
+
+Ogni comando deve poter produrre:
+
+- output leggibile;
+- exit code coerenti;
+- opzionalmente output JSON per script e integrazioni future.
+
+---
+
+## 13. Stack consigliato
+
+```text
+hydra/
+├── Cargo.toml
+├── rust-toolchain.toml
+└── crates/
+    ├── hydra-cli/
+    ├── hydra-core/
+    ├── hydra-git/
+    ├── hydra-materializer/
+    ├── hydra-overlays/
+    └── hydra-config/
+```
+
+Tecnologie:
+
+- Rust con toolchain ed edition dichiarate nel repository;
+- Cargo workspace;
+- `clap` o equivalente per il parsing dichiarativo della CLI;
+- `std::process::Command` o un wrapper Rust giustificato per Git e processi;
+- `serde` e `serde_json` o equivalenti per configurazione e stato;
+- errori tipizzati e contestualizzati, senza panic per condizioni operative recuperabili;
+- adapter nativi minimi per APFS clone e reflink Linux, con fallback portabile;
+- una libreria compatibile con la semantica `gitignore`, verificata con test di conformità;
+- test Rust unitari, di integrazione e CLI eseguiti da Cargo;
+- repository Git e filesystem temporanei reali per verificare i contratti di integrazione.
+
+Lo sviluppo segue obbligatoriamente il ciclo Red-Green-Refactor. Ogni comportamento viene introdotto partendo da un test fallito e ogni modifica protegge sia il nuovo contratto sia il comportamento esistente più esposto a regressioni.
+
+Per l’MVP, file JSON e scritture atomiche sono sufficienti. SQLite e dipendenze native aggiuntive non sono necessari, salvo gli adapter minimi richiesti dalle primitive CoW di piattaforma.
+
+---
+
+## 14. Fuori dall’MVP
+
+| Funzionalità | Fase prevista |
+|---|---|
+| Ciclo di vita Head/worktree | MVP |
+| Branch privato per Head | MVP |
+| Materializer CoW con fallback sicuro | MVP |
+| Diagnostica del backend storage | MVP |
+| Overlay basato su `.gitignore` | MVP |
+| Status e rimozione protetta | MVP |
+| Apertura tramite comando configurabile | MVP |
+| Repair e riconciliazione | MVP |
+| Hook o comando di setup | v0.2 |
+| Adapter per agenti | v0.2 |
+| Processi runtime e porte | v0.2 |
+| Dashboard web locale | v0.3 |
+| Diff visuale navigabile | v0.3 |
+| Merge/rebase assistiti | v0.3 |
+| Terminale incorporato | Successivo |
+| Docker e servizi isolati | Successivo |
+| Isolamento di database e cache | Successivo |
+| Collaborazione cloud | Non prioritaria |
+| Applicazione desktop Tauri | Solo se giustificata dall’uso |
+| Filesystem virtuale Hydra | Solo se diventa necessario garantire CoW su volumi non compatibili |
+
+Dashboard, runtime e agenti rimangono parte della visione, ma vengono costruiti sopra un motore delle Head già affidabile.
+
+---
+
+## 15. Definition of done
+
+Hydra v0.1 è conclusa quando:
+
+1. può inizializzare un normale repository Git;
+2. crea per default una directory sorella `<nome-progetto>.heads`;
+3. rifiuta destinazioni interne al working tree o appartenenti a un altro progetto;
+4. genera una configurazione che espande dinamicamente `.gitignore`;
+5. crea almeno tre Head dallo stesso commit;
+6. assegna a ogni Head un branch privato;
+7. presenta ogni Head come un progetto completo a IDE e agenti;
+8. materializza i file tracciati tramite CoW quando supportato;
+9. materializza gli overlay applicando correttamente pattern, negazioni e precedenze;
+10. applica lo stesso modello CoW/copia ai file tracciati e non tracciati;
+11. usa una copia completa sicura quando CoW non è disponibile;
+12. non usa hard link per alcun file modificabile;
+13. dichiara il backend effettivo tramite `hydra doctor storage`;
+14. impedisce la copia di percorsi vietati o pericolosi;
+15. modificare un file tracciato o un overlay in una Head non altera le altre;
+16. ogni Head produce un diff indipendente;
+17. ogni Head può creare commit sul proprio branch;
+18. i commit sono visibili dal repository originale;
+19. mostra uno stato attendibile delle Head;
+20. impedisce rimozioni rischiose senza `--force`;
+21. rimuove una Head senza danneggiare le altre;
+22. ricostruisce lo stato dopo la perdita dei metadati Hydra;
+23. rimane compatibile con l’uso diretto dei normali comandi Git;
+24. completa i flussi principali su macOS e Linux;
+25. supera test di integrazione eseguiti su repository temporanei reali, includendo sia il backend CoW sia il fallback di copia.
+
+## 16. Ipotesi da validare
+
+L’MVP deve rispondere a una domanda precisa:
+
+> Materializzare ogni attività come una Head Git isolata, completa ma fisicamente efficiente, riduce davvero il caos dello sviluppo parallelo e rende più controllabile il lavoro prodotto dagli agenti AI?
+
+Se la risposta è positiva, Hydra potrà estendere la Head fino a rappresentare un’intera sessione operativa:
+
+```text
+Head
+├── branch
+├── worktree
+├── materializer
+├── overlay
+├── IDE
+├── agent
+├── runtime
+├── diff
+└── commits
+```
+
+Il nucleo, però, deve restare invariato:
+
+> **una directory reale, una diff indipendente, contenuti isolati, Git come fondamento.**
