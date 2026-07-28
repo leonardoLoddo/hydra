@@ -1,0 +1,17 @@
+[package]
+name = "hydra-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[[bin]]
+name = "hydra"
+path = "src/main.rs"
+
+[dependencies]
+clap.workspace = true
+hydra-core = { path = "../hydra-core" }
+
+[lints]
+workspace = true
