@@ -11,7 +11,8 @@ use clap::{Parser, Subcommand};
     name = "hydra",
     version,
     about = "Git-native workspace manager for isolated development Heads",
-    long_about = "Git-native workspace manager for isolated development Heads.\n\nHydra creates independent working directories while preserving familiar Git refs, branches, and repository workflows."
+    long_about = "Git-native workspace manager for isolated development Heads.\n\nHydra creates independent working directories while preserving familiar Git refs, branches, and repository workflows.",
+    after_help = "Command syntax:\n  hydra init [PATH]\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n\nRun 'hydra <command> --help' for details."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -28,6 +29,9 @@ enum Command {
         path: PathBuf,
     },
     /// Create and manage Heads
+    #[command(
+        after_help = "Command syntax:\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n\nRun 'hydra head create --help' for details."
+    )]
     Head {
         #[command(subcommand)]
         command: HeadCommand,
@@ -38,17 +42,17 @@ enum Command {
 enum HeadCommand {
     /// Create a new isolated Head
     #[command(
-        long_about = "Create a new isolated Head.\n\nThe new Head starts at <FROM> and uses <TARGET> as its local integration branch.",
+        long_about = "Create a new isolated Head.\n\nThe new Head starts at <REF> and uses <BRANCH> as its local integration branch.",
         after_help = "Examples:\n  hydra head create payment\n  hydra head create payment --from beta\n  hydra head create payment --from beta --target main"
     )]
     Create {
         /// Name for the new Head
         name: String,
         /// Start the Head at this Git ref or commit (default: HEAD)
-        #[arg(long)]
+        #[arg(long, value_name = "REF")]
         from: Option<String>,
         /// Set the local branch used for integration
-        #[arg(long)]
+        #[arg(long, value_name = "BRANCH")]
         target: Option<String>,
     },
 }

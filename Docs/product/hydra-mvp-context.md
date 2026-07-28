@@ -780,6 +780,9 @@ la stessa grammatica concettuale e lo stesso tono operativo di Git:
   branch locale;
 - l’help di ogni comando documenta scopo, sintassi, argomenti, default
   significativi ed esempi copiabili;
+- l’help principale e quello dei gruppi mostrano la sintassi completa dei
+  comandi annidati già implementati, senza costringere l’utente a scoprirli un
+  livello alla volta;
 - i messaggi restano concisi, dichiarativi e orientati all’esito;
 - una creazione riuscita mostra il percorso concreto della nuova Head e, su un
   terminale interattivo compatibile, lo rende apribile come collegamento locale;

@@ -78,7 +78,10 @@ file.
 Command help follows Git's concise vocabulary and structure: it identifies the
 outcome, displays usage and argument semantics, states meaningful defaults such
 as `HEAD`, and includes copyable examples. Help only advertises behavior
-implemented by the current binary.
+implemented by the current binary. Both `hydra --help` and
+`hydra head --help` include a `Command syntax` index containing the complete
+`hydra head create <NAME> [--from <REF>] [--target <BRANCH>]` invocation, so a
+nested executable command is visible without traversing each help level.
 
 ---
 

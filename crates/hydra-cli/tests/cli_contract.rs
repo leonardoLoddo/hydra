@@ -18,6 +18,11 @@ fn help_describes_hydra_and_its_usage() {
         stdout.contains("Usage: hydra"),
         "help should show how to invoke Hydra, got: {stdout:?}"
     );
+    assert!(
+        stdout.contains("Command syntax:")
+            && stdout.contains("hydra head create <NAME> [--from <REF>] [--target <BRANCH>]"),
+        "top-level help should expose the complete create syntax, got: {stdout:?}"
+    );
 }
 
 #[test]
@@ -76,12 +81,16 @@ fn head_create_help_uses_the_documented_nested_syntax() {
         stdout.contains("Create a new isolated Head"),
         "help should state the command outcome, got: {stdout:?}"
     );
-    assert!(stdout.contains("--from <FROM>"));
+    assert!(stdout.contains("--from <REF>"));
     assert!(
         stdout.contains("HEAD"),
         "help should document the default base, got: {stdout:?}"
     );
-    assert!(stdout.contains("--target <TARGET>"));
+    assert!(
+        stdout.contains("starts at <REF>") && stdout.contains("uses <BRANCH>"),
+        "help should use the public option placeholders consistently, got: {stdout:?}"
+    );
+    assert!(stdout.contains("--target <BRANCH>"));
     assert!(
         stdout.contains("local branch"),
         "help should use familiar Git terminology, got: {stdout:?}"
@@ -91,5 +100,26 @@ fn head_create_help_uses_the_documented_nested_syntax() {
             && stdout.contains("hydra head create payment")
             && stdout.contains("hydra head create payment --from beta --target main"),
         "help should include copyable examples, got: {stdout:?}"
+    );
+}
+
+#[test]
+fn head_help_exposes_the_complete_create_syntax() {
+    let output = Command::new(env!("CARGO_BIN_EXE_hydra"))
+        .args(["head", "--help"])
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(
+        output.status.success(),
+        "head help should succeed, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8(output.stdout).expect("help output should be UTF-8");
+    assert!(
+        stdout.contains("Command syntax:")
+            && stdout.contains("hydra head create <NAME> [--from <REF>] [--target <BRANCH>]"),
+        "head help should expose the complete create syntax, got: {stdout:?}"
     );
 }
