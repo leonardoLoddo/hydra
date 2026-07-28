@@ -23,7 +23,8 @@ It does not own product behavior, CLI contracts, Git semantics, storage design, 
 - Consult it for code review even when no implementation is requested, because regressions and missing TDD evidence are review concerns.
 - Consult `commit-conventions.md` before creating or changing a commit and when reviewing commit-message or history quality.
 - Combine this route with the product route whenever behavior visible to Hydra users may change.
-- Combine it with future technical routers for CLI, Git, storage, configuration, security, or architecture when those domains are affected.
+- Combine it with [`../architecture/architecture-context-router.md`](../architecture/architecture-context-router.md) whenever work affects crate boundaries, dependency direction, initialization, persistence sequencing, or rollback.
+- Combine it with future technical routers for CLI, Git, storage, configuration, or security when those domains are affected.
 
 Routes are cumulative. Development rules do not replace the behavior and safety contracts owned by other domains.
 

@@ -13,5 +13,8 @@ path = "src/main.rs"
 clap.workspace = true
 hydra-core = { path = "../hydra-core" }
 
+[dev-dependencies]
+serde_json.workspace = true
+
 [lints]
 workspace = true

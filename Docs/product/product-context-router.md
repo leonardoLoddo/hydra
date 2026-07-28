@@ -21,7 +21,8 @@ It does not own implementation-level conventions once those are documented in de
 - Consult `hydra-mvp-context.md` for every feature, bug fix, architectural decision, or documentation change that could alter externally observable Hydra behavior.
 - Consult it before adding functionality to confirm whether the behavior belongs in the MVP.
 - Treat its safety guarantees and Definition of Done as binding product requirements.
-- If a task affects only internal implementation details without changing product behavior, consult the future owning technical router as well; when no such router exists yet, use the MVP document for constraints and inspect the codebase for established conventions.
+- If a task affects internal component boundaries or project initialization details, consult [`../architecture/architecture-context-router.md`](../architecture/architecture-context-router.md) as well.
+- When no existing technical route owns another implementation concern, use the MVP document for constraints, inspect the codebase for established conventions, and identify the documentation gap before making a material decision.
 - If a future focused product document overlaps this context, consult both until the foundational document explicitly delegates ownership.
 
 Routes are cumulative. Never stop after the first matching document when multiple rows apply.

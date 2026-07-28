@@ -26,6 +26,7 @@ Reading this file alone is never sufficient when a matching child router exists.
 | Domain | Consult when the task involves | Router |
 |---|---|---|
 | Product | Product definition, MVP scope, Head lifecycle, user-facing behavior, constraints, supported platforms, or roadmap boundaries | [`product/product-context-router.md`](product/product-context-router.md) |
+| Architecture | Implemented component boundaries, crate responsibilities, dependency direction, project initialization internals, persistence workflows, or rollback design | [`architecture/architecture-context-router.md`](architecture/architecture-context-router.md) |
 | Development | Any Rust code, tests, bug fix, refactor, dependency, Cargo configuration, quality gate, regression assessment, commit, or history convention | [`development/development-context-router.md`](development/development-context-router.md) |
 
 ---
@@ -94,6 +95,10 @@ Do not add individual leaf-document routes to `AGENTS.md`. `AGENTS.md` links onl
 ```text
 Docs/
 ├── hydra-context-router.md
+├── architecture/
+│   ├── architecture-context-router.md
+│   ├── project-initialization.md
+│   └── system-architecture.md
 ├── development/
 │   ├── commit-conventions.md
 │   ├── development-context-router.md
