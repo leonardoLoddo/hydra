@@ -485,6 +485,10 @@ Hydra:
 8. verifica le capacità di materializzazione del volume;
 9. non modifica i file applicativi del progetto.
 
+Al termine, `hydra init` dichiara il backend verificato sul volume delle Head:
+`copy-on-write` quando la prova nativa riesce, oppure `full copy` quando è stato
+verificato il fallback sicuro.
+
 ### 7.2 Creazione di una Head
 
 ```bash

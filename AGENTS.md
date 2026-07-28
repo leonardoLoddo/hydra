@@ -339,6 +339,21 @@ Prefer:
 
 Avoid unrelated refactors and formatting churn.
 
+## Structural Refactoring
+
+When splitting a monolithic production or integration-test file:
+
+1. run and record the complete applicable test baseline before moving code;
+2. split by existing reasons to change and side-effect boundaries, not by an arbitrary line target;
+3. prefer private modules in the current crate before proposing another crate;
+4. preserve public APIs, persisted formats, errors, and observable CLI behavior unless the task explicitly changes them;
+5. keep visibility narrow and keep tests with the responsibility or observable scenario they protect;
+6. rerun focused tests after each move and the same complete quality gates after restructuring;
+7. report the largest-file and total-line effects, acknowledging reasonable module-boundary overhead;
+8. update routed architecture documentation when the resulting boundaries are reusable.
+
+The detailed binding workflow is owned by the structural refactoring section of the routed Rust/TDD development standard.
+
 ---
 
 # Dependencies and External Knowledge

@@ -2,4 +2,4 @@
 
 mod init;
 
-pub use init::{InitError, InitializedProject, initialize};
+pub use init::{InitError, InitializedProject, StorageBackend, initialize};

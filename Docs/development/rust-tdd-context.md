@@ -74,6 +74,43 @@ A compile failure may count as Red when the new test intentionally references a 
 - Keep observable behavior unchanged unless the task explicitly requires otherwise.
 - Run tests for representative consumers of every changed shared abstraction.
 
+#### Structural refactoring workflow
+
+Use this workflow when a production module or integration-test file has
+accumulated multiple responsibilities and is becoming difficult to navigate or
+review:
+
+1. Run the complete applicable test suite before moving code and record the
+   baseline.
+2. Map the file by reasons to change, side-effect boundaries, data ownership,
+   and test responsibility. Module names must describe responsibilities that
+   already exist in the implementation.
+3. Prefer private modules inside the current crate before introducing a new
+   crate. A new crate still requires the stronger boundary evidence defined by
+   the architecture rules.
+4. Keep one small orchestrator that expresses the workflow and delegate Git,
+   serialization, storage, persistence, rollback, and error rendering through
+   narrow internal interfaces when those responsibilities are present.
+5. Keep visibility as narrow as possible. Use private items or `pub(super)`
+   boundaries and preserve the existing public API unless an explicit behavior
+   change is part of the task.
+6. Move existing unit tests with the responsibility they protect. Split
+   integration tests by observable scenario, such as contract, success,
+   conflict, or adapter failure. Extract fixtures only when they remove
+   repetition without hiding the state or command that makes a test meaningful.
+7. Run focused tests after each move, then the same complete suite and quality
+   gates used for the baseline.
+8. Measure and report both the largest resulting files and the total line-count
+   effect. File length is a diagnostic signal, not a quota: a small increase
+   from imports and module boundaries is acceptable when cohesion and
+   navigability materially improve.
+9. Update architecture documentation when the new module responsibilities are
+   intended to guide future changes. Do not document temporary file shuffling.
+
+A structural refactor must not obtain smaller files by deleting regression
+coverage, weakening errors, widening visibility, introducing speculative
+layers, or moving unrelated behavior into generic utility modules.
+
 ### Dependency and Toolchain Changes
 
 - Define the behavior or compatibility need before changing the dependency.

@@ -35,6 +35,18 @@ the core workflow completes.
 Operational errors are written to stderr and produce a non-zero exit status.
 The CLI does not perform partial initialization itself.
 
+`hydra --version` reports the executable name and the workspace package
+version. After successful initialization, stdout identifies both the repository
+and the storage backend verified on the Heads volume:
+
+```text
+Initialized Hydra in <repository-root>
+Storage backend: copy-on-write
+```
+
+The second line is `Storage backend: full copy` when the native clone probe is
+not supported and the safe copy fallback succeeds.
+
 ---
 
 ## Repository Discovery
@@ -55,8 +67,16 @@ state belongs. This distinction is required for repositories accessed through
 Git worktrees.
 
 Hydra rejects the operation before mutation when Git cannot start, Git returns
-a failing status, output is empty or not valid UTF-8, or the resolved
-repository path has no usable name and parent directory.
+a failing status, output is empty, or the resolved repository path has no
+usable name and parent directory. Git failures retain the operation being
+performed, exit status, and stderr so an unsupported Git option is not
+misreported as a missing repository.
+
+On Unix, Git path output is converted without requiring UTF-8 and only the
+single record terminator emitted by Git is removed. Repository names must still
+be valid UTF-8 because they are persisted in JSON and used in the sibling
+directory name. Unsupported names are rejected before mutation instead of
+being converted lossily. Non-Unix builds require Git path output to be UTF-8.
 
 ---
 
@@ -95,7 +115,7 @@ The project configuration is JSON schema version 1:
 ```json
 {
   "version": 1,
-  "projectId": "example-1a2b3c4d",
+  "projectId": "example-5b8d9f430d5543eca3aa967dd484bf41",
   "headsDirectory": "../Example.heads",
   "branchPrefix": "hydra/",
   "storage": {
@@ -128,7 +148,7 @@ stable through persistence in `.hydra.json`.
 Its implementation format is:
 
 ```text
-<repository-slug>-<8 random hexadecimal characters>
+<repository-slug>-<32 random hexadecimal characters>
 ```
 
 The slug:
@@ -150,15 +170,18 @@ guarantee.
 Initialization validates all predictable destination conflicts before creating
 an artifact.
 
-It refuses to proceed when:
+It refuses to proceed when any filesystem entry, including a dangling symlink,
+already occupies:
 
-- `.hydra.json` already exists;
-- the default sibling Heads directory already exists;
-- `<git-common-dir>/hydra/heads.json` already exists.
+- `.hydra.json`;
+- the default sibling Heads directory;
+- `<git-common-dir>/hydra`.
 
 The existing Heads directory is never claimed, emptied, or reused implicitly.
-This protects unrelated data while ownership reconciliation is not yet
-implemented.
+The same rule applies to the local state directory: initialization creates it
+exclusively and never follows or claims a pre-existing directory or symlink.
+This protects unrelated data and removes the check-then-use window for that
+trust boundary while ownership reconciliation is not yet implemented.
 
 Serialization of both JSON documents also completes in memory before the first
 filesystem mutation.
@@ -172,7 +195,9 @@ After discovery, validation, and serialization, the implementation performs:
 ```text
 create Heads directory
         ↓
-create/reuse <git-common-dir>/hydra
+probe clone and full-copy capability in Heads directory
+        ↓
+create <git-common-dir>/hydra exclusively
         ↓
 atomically publish heads.json
         ↓
@@ -184,18 +209,28 @@ report success
 `.hydra.json` is published last. Its presence therefore means that all earlier
 steps returned successfully during the same process.
 
+The storage probe creates uniquely named source and target files inside the new
+Heads directory. It attempts the platform clone primitive through the
+`reflink-copy` safe API and verifies the target bytes. If cloning fails, it
+creates the target exclusively, performs a full copy, synchronizes it, and
+verifies the bytes. Every probe file is removed before initialization
+continues; cleanup failure aborts initialization and is reported.
+
 Each JSON file is published with this sequence:
 
 1. create a uniquely named temporary file in the destination directory using
    exclusive creation;
 2. write the complete serialized content;
 3. call `sync_all` on the temporary file;
-4. rename the temporary file to its final path;
-5. remove the temporary file on a reported failure.
+4. create the final path as a hard link to the completed temporary file;
+5. remove the temporary link;
+6. on Unix, synchronize the parent directory.
 
-Writing the temporary file beside its destination keeps the rename on the same
-filesystem and provides atomic replacement semantics for a destination that
-was validated as absent.
+The hard-link publication step is an atomic create-if-absent operation: it
+cannot replace a destination introduced between validation and publication.
+The temporary and final entries refer only to the same completed, immutable
+metadata payload and the temporary entry is immediately removed. Mutable Hydra
+or application files must never use hard links as an isolation mechanism.
 
 ---
 
@@ -205,19 +240,19 @@ Rollback removes only artifacts created by the current invocation.
 
 | Failure point | Required cleanup |
 |---|---|
+| Storage probe | Remove probe files and the newly created empty Heads directory |
 | Creating local state directory | Remove the newly created empty Heads directory |
-| Publishing local state | Remove the empty Heads directory; remove the state directory only if this invocation created it |
-| Publishing project configuration | Remove the new local state file and empty Heads directory; remove the state directory only if this invocation created it |
-| Temporary-file write or rename | Remove the operation's temporary file |
+| Publishing local state | Remove the empty Heads and state directories |
+| Publishing project configuration | Remove the new local state file and empty Heads and state directories |
+| Temporary-file write or publication | Remove every temporary and final link owned by the failed publication |
 
 Cleanup is deliberately limited to `remove_file` and `remove_dir` on exact
 paths. `remove_dir` succeeds only for an empty directory, so rollback cannot
 recursively erase unexpected content.
 
-Rollback is currently best effort: the original operational error remains the
-reported error if cleanup itself fails. Future work that introduces
-interruption recovery must make leftover artifacts explicitly diagnosable and
-reconcilable.
+If cleanup fails, the returned error contains both the original operational
+error and every exact path that rollback could not remove. A cleanup failure is
+therefore diagnosable and never silently hidden.
 
 ---
 
@@ -226,12 +261,14 @@ reconcilable.
 `hydra-core` returns typed initialization errors for:
 
 - Git executable failure;
-- path not belonging to a Git repository;
-- empty or invalid Git path output;
+- Git command failure with operation, status, and stderr;
+- empty or unsupported Git path output;
 - repository path without a usable parent or name;
+- repository name that cannot be persisted losslessly;
 - existing project configuration;
 - existing Heads directory;
-- existing local state;
+- existing or unsafe local state directory;
+- failed or invalid storage capability probe;
 - JSON serialization failure;
 - contextual filesystem failures.
 
@@ -249,12 +286,25 @@ temporary Git repositories.
 Coverage currently proves:
 
 - the documented `hydra init [PATH]` syntax;
+- executable version output and internal Clap command consistency;
+- defaulting the optional path to the current directory;
 - rejection outside a Git repository without creating `.hydra.json`;
 - creation of configuration, sibling Heads directory, and local state;
+- real storage probing with visible backend selection and verified full-copy
+  fallback;
 - schema version and initial configuration values;
+- full UUID entropy in the generated project identifier;
+- correct use of the Git common directory from a linked worktree;
 - refusal to reuse a pre-existing default Heads directory;
-- absence of configuration and local state after that validation failure;
-- removal of the new Heads directory when local state creation fails.
+- refusal to claim or follow a pre-existing local state directory;
+- preservation of dangling configuration symlinks;
+- preservation of trailing whitespace in repository paths;
+- distinct diagnostics for unrelated Git command failures;
+- absence of newly created configuration and local state after destination
+  conflicts;
+- removal of the new Heads directory when local state creation fails;
+- atomic no-clobber publication;
+- explicit diagnostics when rollback cannot remove an owned artifact.
 
 Tests must continue to assert externally observable files, exit status, stdout,
 and stderr rather than only internal calls.
@@ -266,27 +316,20 @@ and stderr rather than only internal calls.
 The following product requirements are not yet implemented by the current
 initialization workflow:
 
-1. **Storage capability verification.** The product specification requires
-   `hydra init` to probe the actual destination volume. The current
-   implementation writes `storage.mode: "auto"` but does not execute a CoW
-   capability probe. It must not be interpreted as evidence that CoW is
-   available.
-2. **Recognition of an owned existing Heads directory.** The current
+1. **Recognition of an owned existing Heads directory.** The current
    implementation safely rejects every pre-existing default directory. It
    cannot yet distinguish a directory owned by the same project from unrelated
    data.
-3. **Crash reconciliation.** File publication is atomic, but an external
+2. **Crash reconciliation.** File publication is atomic, but an external
    interruption between transaction steps can leave a local state file or empty
    directory without `.hydra.json`. Initialization does not yet resume or
    reconcile that state.
-4. **Rollback diagnostics.** Cleanup is best effort and a cleanup failure is not
-   currently added to the returned error.
-5. **Directory durability.** Files are synchronized before rename, but parent
-   directories are not synchronized after rename. Atomic visibility is
-   provided; full durability across sudden power loss is not yet established.
-6. **Non-UTF-8 Git paths.** Git path output must currently be valid UTF-8, and
-   repository names use a lossy conversion when deriving display-oriented
-   names.
+3. **Non-Unix directory durability.** Unix parent directories are synchronized
+   after metadata publication. The non-Unix implementation currently provides
+   atomic visibility but does not claim the same power-loss durability.
+4. **Non-UTF-8 repository names.** Unix Git paths are preserved byte-for-byte,
+   but a repository name that cannot be represented in JSON is rejected rather
+   than encoded into a persistent surrogate.
 
 These gaps are implementation boundaries, not accepted reductions of the MVP
 safety or completion criteria.

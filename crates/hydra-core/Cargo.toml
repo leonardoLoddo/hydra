@@ -6,9 +6,13 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+reflink-copy.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 uuid.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
 
 [lints]
 workspace = true

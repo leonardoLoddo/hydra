@@ -15,6 +15,7 @@ hydra-core = { path = "../hydra-core" }
 
 [dev-dependencies]
 serde_json.workspace = true
+tempfile.workspace = true
 
 [lints]
 workspace = true

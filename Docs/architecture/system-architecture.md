@@ -23,11 +23,23 @@ Hydra/
 └── crates/
     ├── hydra-cli/
     │   ├── src/main.rs
-    │   └── tests/cli.rs
+    │   └── tests/
+    │       ├── common/mod.rs
+    │       ├── cli_contract.rs
+    │       ├── init_conflicts.rs
+    │       ├── init_git_errors.rs
+    │       └── init_success.rs
     └── hydra-core/
         └── src/
             ├── lib.rs
-            └── init.rs
+            ├── init.rs
+            └── init/
+                ├── artifacts.rs
+                ├── configuration.rs
+                ├── error.rs
+                ├── git.rs
+                ├── persistence.rs
+                └── storage.rs
 ```
 
 The root Cargo manifests are authoritative for the exact Rust version, edition,
@@ -92,6 +104,7 @@ terminal interface. It currently owns project initialization, including:
 - Git repository and common-directory discovery;
 - derivation and validation of initialization paths;
 - configuration and local-state serialization;
+- real storage capability probing on the Heads volume;
 - atomic publication of state files;
 - rollback of artifacts created by a failed initialization;
 - typed errors with preserved sources for operational failures.
@@ -101,6 +114,25 @@ process, or parse CLI syntax.
 
 Expected failures from Git, user paths, existing state, serialization, and the
 filesystem return errors rather than panicking.
+
+### Initialization module boundaries
+
+Project initialization is kept inside one public core capability while its
+internal responsibilities remain separated:
+
+| Module | Responsibility |
+|---|---|
+| `init.rs` | Orchestrate initialization and validate derived destinations before mutation |
+| `init/git.rs` | Execute Git discovery commands and translate their path output |
+| `init/configuration.rs` | Build and serialize initial shared configuration and local state |
+| `init/storage.rs` | Probe native CoW support and verify the full-copy fallback |
+| `init/persistence.rs` | Sequence filesystem mutations and publish metadata atomically |
+| `init/artifacts.rs` | Track exact owned artifacts and perform non-recursive rollback |
+| `init/error.rs` | Define and render typed initialization and cleanup failures |
+
+These are private implementation modules, not independent services or crates.
+They may depend on one another only through narrow `pub(super)` functions and
+types. The public API continues to be re-exported by `hydra-core/src/lib.rs`.
 
 ---
 
@@ -141,6 +173,11 @@ Multi-step workflows must:
 Platform-specific storage primitives must remain behind narrow interfaces.
 They must not leak platform conditions into CLI parsing or general Head
 lifecycle rules.
+
+The current storage boundary uses the safe `reflink-copy` API to reach APFS
+clone and Linux reflink primitives. Hydra verifies the resulting bytes and
+always verifies a full-copy fallback when cloning is unavailable. Native
+results from one platform do not establish support on another.
 
 ---
 
