@@ -314,24 +314,39 @@ Tutte le Head possono nascere dallo stesso commit di `beta`, ma ognuna avanza su
 
 ## 6. Configurazione del progetto
 
-Hydra usa due livelli distinti.
+Hydra separa configurazione condivisa, locator locale e stato fisico.
 
 | Posizione | Funzione | Versionabile |
 |---|---|---:|
 | `<project-root>/.hydra.json` | Politica condivisa per creare le Head | Sì |
-| `<git-common-dir>/hydra/heads.json` | Stato locale delle Head | No |
+| `<git-common-dir>/hydra/project.json` | Locator canonico e identità dell'installazione locale | No |
+| `<heads-directory>/.hydra/directory.json` | Marker di ownership della directory | No |
+| `<heads-directory>/.hydra/heads.json` | Inventario delle Head fisiche locali | No |
 
-La configurazione nel progetto descrive come quel progetto deve essere materializzato. Lo stato locale registra invece quali Head esistono sulla singola macchina.
+La configurazione nel progetto descrive come quel progetto deve essere
+materializzato. Il locator nel Git common directory permette al workspace
+principale e a tutte le worktree di trovare la stessa directory fisica senza
+reinterpretare un path relativo. Il marker e l'inventario risiedono invece
+nella directory comune delle Head, accanto alle istanze che descrivono.
+
+`projectId` identifica lo stesso progetto tra dispositivi;
+`installationId` identifica una singola inizializzazione locale. Due
+collaboratori condividono quindi il primo ma possiedono locator, directory Head
+e `installationId` differenti.
 
 ### Configurazione iniziale
 
-`hydra init` genera:
+Il contratto condiviso target usa una politica portabile anziché un percorso
+fisico dipendente dalla macchina:
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "projectId": "heimdall-a84f2c",
-  "headsDirectory": "../Heimdall.heads",
+  "headsDirectory": {
+    "strategy": "sibling",
+    "suffix": ".heads"
+  },
   "branchPrefix": "hydra/",
   "storage": {
     "mode": "auto"
@@ -346,7 +361,75 @@ La configurazione nel progetto descrive come quel progetto deve essere materiali
 
 `projectId` è un identificatore stabile del progetto e non dipende soltanto dal nome della directory. Permette a Hydra di distinguere repository omonimi nei metadati e nelle future operazioni globali.
 
-`headsDirectory` indica dove materializzare le Head. Il valore predefinito è la directory sorella `<nome-progetto>.heads`; può essere modificato esplicitamente, purché la destinazione rispetti i vincoli di sicurezza e non si trovi dentro il working tree del progetto o di un’altra Head.
+`headsDirectory` descrive come individuare la directory locale, non memorizza il
+percorso assoluto di una singola installazione. La strategia `sibling` risolve
+su ogni dispositivo una directory sorella `<nome-progetto><suffix>`. Il
+percorso canonico risultante e l'identità dell'installazione rimangono stato
+locale non versionato.
+
+Lo schema v2 tratta `headsDirectory` come un'unione discriminata dal campo
+`strategy`. Le strategie previste sono:
+
+| Strategy | Configurazione versionata | Risoluzione locale |
+|---|---|---|
+| `sibling` | `suffix` obbligatorio | Directory sorella `<nome-progetto><suffix>` |
+| `relative` | `base: "repositoryParent"` e `path` obbligatori | `path` relativo alla directory che contiene il repository |
+| `local` | Nessun percorso | Percorso assoluto scelto localmente e registrato soltanto nel locator non versionato |
+
+Esempi:
+
+```json
+{
+  "strategy": "sibling",
+  "suffix": "-hydra-heads"
+}
+```
+
+```json
+{
+  "strategy": "relative",
+  "base": "repositoryParent",
+  "path": "workspaces/heimdall-heads"
+}
+```
+
+```json
+{
+  "strategy": "local"
+}
+```
+
+`suffix` è un frammento di nome, non un percorso. Non impone convenzioni
+stilistiche: può contenere testo ASCII o Unicode, spazi e punteggiatura e non
+deve iniziare con un separatore convenzionale. Sono quindi validi, per esempio,
+`.heads`, `heads`, `-hydra-heads` e ` workspace 🚀`.
+
+Hydra rifiuta soltanto valori vuoti, caratteri di controllo e `/` o `\`, perché
+questi ultimi trasformerebbero il suffisso in un percorso anziché in un
+frammento del nome della directory. Eventuali ulteriori limiti specifici di un
+filesystem vengono restituiti come errori operativi della piattaforma, non
+normalizzati o sostituiti silenziosamente.
+
+Il `path` della strategia `relative` usa `/` come separatore portabile, non può
+essere vuoto o assoluto e non può contenere componenti `.` o `..`. La strategia
+`local` richiede una scelta locale esplicita durante inizializzazione,
+collegamento o riparazione; il percorso non viene mai scritto nella
+configurazione versionata.
+
+Ogni strategy accetta soltanto i propri campi. Strategy sconosciute, campi
+mancanti o campi appartenenti a un'altra variante producono un errore di
+configurazione; Hydra non applica fallback impliciti.
+
+Qualunque destinazione risolta viene canonicalizzata e deve rispettare gli
+stessi vincoli di ownership: non può trovarsi dentro il working tree del
+progetto, dentro un'altra Head o nella directory appartenente a un altro
+progetto.
+
+Hydra implementa soltanto la versione 2 della configurazione strutturata. La
+versione 1 sperimentale non è compatibile e viene rifiutata esplicitamente:
+poiché Hydra non è ancora stata distribuita, mantenere un parser o una
+migrazione per quel formato aggiungerebbe complessità senza proteggere utenti
+reali.
 
 Con `storage.mode: "auto"`, Hydra prova il clone CoW sul volume di destinazione e usa la copia completa se non è supportato. Modalità più rigide potranno essere esposte per test e automazioni, ma il default deve privilegiare compatibilità e sicurezza.
 
@@ -385,9 +468,12 @@ Esempio:
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "projectId": "heimdall-a84f2c",
-  "headsDirectory": "../Heimdall.heads",
+  "headsDirectory": {
+    "strategy": "sibling",
+    "suffix": ".heads"
+  },
   "branchPrefix": "hydra/",
   "overlay": {
     "copy": [
@@ -800,7 +886,41 @@ branch, worktree o stato.
 
 ## 9. Stato locale e fonte della verità
 
-Esempio di `<git-common-dir>/hydra/heads.json`:
+Il Git common directory è la directory amministrativa condivisa da tutte le
+worktree dello stesso repository. In un repository normale coincide
+tipicamente con `.git`; in una linked worktree il suo `.git` operativo è
+separato, ma `git rev-parse --git-common-dir` continua a restituire la stessa
+directory comune.
+
+Hydra vi conserva soltanto il locator necessario al bootstrap:
+
+```json
+{
+  "version": 1,
+  "projectId": "ecommerce-a84f2c",
+  "installationId": "local-24b64f",
+  "projectRoot": "/projects/ecommerce",
+  "headsDirectory": "/projects/ecommerce.heads"
+}
+```
+
+La directory risolta contiene un marker di ownership
+`<heads-directory>/.hydra/directory.json`:
+
+```json
+{
+  "version": 1,
+  "projectId": "ecommerce-a84f2c",
+  "installationId": "local-24b64f"
+}
+```
+
+Locator e marker devono concordare prima di ogni mutazione. Un `projectId`
+uguale con `installationId` differente rappresenta un'altra installazione
+locale dello stesso progetto e non autorizza il riuso implicito della
+directory.
+
+L'inventario fisico vive in `<heads-directory>/.hydra/heads.json`:
 
 ```json
 {
@@ -819,13 +939,23 @@ Esempio di `<git-common-dir>/hydra/heads.json`:
 }
 ```
 
-Il file:
+Questa separazione evita due dipendenze circolari:
 
-- viene scritto atomicamente;
-- contiene una versione dello schema;
-- non è l’unica fonte della verità;
-- non memorizza informazioni ricavabili in modo affidabile da Git se non utili alla riconciliazione;
-- non contiene PID, porte, agenti o runtime nell’MVP.
+- qualsiasi Head trova il locator attraverso il Git common directory;
+- se l'inventario viene perso, Git e le directory fisiche rimangono
+  ispezionabili;
+- se il locator viene perso, il marker permette a un futuro `repair` di
+  riconnettere una directory indicata esplicitamente dall'utente;
+- spostare repository o directory Head richiede una relocation esplicita e
+  verificata, non la risoluzione silenziosa di un nuovo percorso.
+
+I file locali:
+
+- vengono scritti atomicamente;
+- contengono una versione dello schema;
+- non sono l’unica fonte della verità;
+- non memorizzano informazioni ricavabili in modo affidabile da Git se non utili alla riconciliazione;
+- non contengono PID, porte, agenti o runtime nell’MVP.
 
 Git rimane autorevole per:
 
@@ -1029,6 +1159,7 @@ Per l’MVP, file JSON e scritture atomiche sono sufficienti. SQLite e dipendenz
 | Chiusura con merge o comando configurabile | MVP |
 | Completamento shell statico e dinamico delle Head | MVP |
 | Repair e riconciliazione | MVP |
+| Head Recipe condivisibili e materializzabili | Successivo |
 | Hook o comando di setup | v0.2 |
 | Adapter per agenti | v0.2 |
 | Processi runtime e porte | v0.2 |
@@ -1043,6 +1174,43 @@ Per l’MVP, file JSON e scritture atomiche sono sufficienti. SQLite e dipendenz
 | Filesystem virtuale Hydra | Solo se diventa necessario garantire CoW su volumi non compatibili |
 
 Dashboard, runtime e agenti rimangono parte della visione, ma vengono costruiti sopra un motore delle Head già affidabile.
+
+### Head Recipe condivisibili
+
+Una Head fisica rimane un'istanza locale e non viene versionata. In futuro
+Hydra può introdurre una **Head Recipe** portabile che descrive l'intenzione
+riproducibile necessaria a materializzare una nuova istanza su un altro
+dispositivo:
+
+```json
+{
+  "version": 1,
+  "name": "payment",
+  "source": "feature/payment",
+  "target": "main",
+  "overlayProfile": "default",
+  "lifecycle": {
+    "removeRecipeOnClose": true
+  }
+}
+```
+
+Una recipe può essere creata direttamente oppure promuovendo una Head locale
+tramite un comando dedicato. La promozione deve verificare che il contenuto da
+condividere sia raggiungibile tramite Git e non può incorporare modifiche non
+committate, percorsi locali, backend, lock, timestamp operativi o segreti degli
+overlay.
+
+Un collaboratore materializza la recipe come una nuova Head locale: path,
+worktree, branch privato e backend restano specifici del suo dispositivo. Git
+continua a trasportare commit e ref Git; la recipe trasporta soltanto intenzione
+e parametri riproducibili.
+
+Una recipe può dichiararsi effimera e richiedere la rimozione dopo la chiusura
+riuscita della relativa Head. Poiché una recipe versionata è un file Git, tale
+rimozione deve far parte esplicitamente della transazione di chiusura: non deve
+sporcare silenziosamente un'altra worktree, essere eseguita dopo una chiusura
+fallita o generare un commit implicito non autorizzato.
 
 ---
 

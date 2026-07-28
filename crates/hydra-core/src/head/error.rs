@@ -17,8 +17,19 @@ pub enum HeadError {
         path: PathBuf,
         source: serde_json::Error,
     },
+    InvalidLocalMetadata {
+        kind: &'static str,
+        path: PathBuf,
+        source: serde_json::Error,
+    },
     UnsupportedConfigurationVersion(u32),
     UnsupportedStateVersion(u32),
+    UnsupportedLocalMetadataVersion {
+        kind: &'static str,
+        version: u32,
+    },
+    LocalIdentityMismatch(PathBuf),
+    DirectoryPolicyMismatch(PathBuf),
     InvalidName(String),
     HeadAlreadyExists(String),
     DestinationExists(PathBuf),
@@ -67,26 +78,26 @@ impl fmt::Display for HeadError {
             } => display_git_failure(formatter, operation, *status, stderr),
             Self::ProjectNotInitialized(path) => display_not_initialized(formatter, path),
             Self::InvalidConfiguration { path, source } => {
-                display_invalid_json(formatter, "configuration", path, source)
+                display_invalid_configuration(formatter, path, source)
             }
-            Self::InvalidState { path, source } => {
-                display_invalid_json(formatter, "state", path, source)
+            Self::InvalidState { path, source } => display_invalid_state(formatter, path, source),
+            Self::InvalidLocalMetadata { kind, path, source } => {
+                display_invalid_json(formatter, kind, path, source)
             }
             Self::UnsupportedConfigurationVersion(version) => {
-                display_unsupported_version(formatter, "configuration", *version)
+                display_unsupported_configuration(formatter, *version)
             }
             Self::UnsupportedStateVersion(version) => {
-                display_unsupported_version(formatter, "state", *version)
+                display_unsupported_state(formatter, *version)
             }
+            Self::UnsupportedLocalMetadataVersion { kind, version } => {
+                display_unsupported_version(formatter, kind, *version)
+            }
+            Self::LocalIdentityMismatch(path) => display_identity_mismatch(formatter, path),
+            Self::DirectoryPolicyMismatch(path) => display_policy_mismatch(formatter, path),
             Self::InvalidName(name) => write!(formatter, "invalid Head name {name:?}"),
             Self::HeadAlreadyExists(name) => write!(formatter, "Head {name:?} already exists"),
-            Self::DestinationExists(path) => {
-                write!(
-                    formatter,
-                    "Head destination {} already exists",
-                    path.display()
-                )
-            }
+            Self::DestinationExists(path) => display_destination_exists(formatter, path),
             Self::BranchAlreadyExists(branch) => {
                 write!(formatter, "Head branch {branch:?} already exists")
             }
@@ -192,6 +203,22 @@ fn display_invalid_json(
     )
 }
 
+fn display_invalid_configuration(
+    formatter: &mut fmt::Formatter<'_>,
+    path: &std::path::Path,
+    source: &serde_json::Error,
+) -> fmt::Result {
+    display_invalid_json(formatter, "configuration", path, source)
+}
+
+fn display_invalid_state(
+    formatter: &mut fmt::Formatter<'_>,
+    path: &std::path::Path,
+    source: &serde_json::Error,
+) -> fmt::Result {
+    display_invalid_json(formatter, "state", path, source)
+}
+
 fn display_not_initialized(
     formatter: &mut fmt::Formatter<'_>,
     path: &std::path::Path,
@@ -205,6 +232,50 @@ fn display_unsupported_version(
     version: u32,
 ) -> fmt::Result {
     write!(formatter, "Hydra {kind} version {version} is not supported")
+}
+
+fn display_unsupported_configuration(
+    formatter: &mut fmt::Formatter<'_>,
+    version: u32,
+) -> fmt::Result {
+    display_unsupported_version(formatter, "configuration", version)
+}
+
+fn display_unsupported_state(formatter: &mut fmt::Formatter<'_>, version: u32) -> fmt::Result {
+    display_unsupported_version(formatter, "state", version)
+}
+
+fn display_identity_mismatch(
+    formatter: &mut fmt::Formatter<'_>,
+    path: &std::path::Path,
+) -> fmt::Result {
+    write!(
+        formatter,
+        "Hydra directory ownership does not match the local project at {}",
+        path.display()
+    )
+}
+
+fn display_destination_exists(
+    formatter: &mut fmt::Formatter<'_>,
+    path: &std::path::Path,
+) -> fmt::Result {
+    write!(
+        formatter,
+        "Head destination {} already exists",
+        path.display()
+    )
+}
+
+fn display_policy_mismatch(
+    formatter: &mut fmt::Formatter<'_>,
+    path: &std::path::Path,
+) -> fmt::Result {
+    write!(
+        formatter,
+        "Heads directory {} does not match the versioned directory policy",
+        path.display()
+    )
 }
 
 fn display_rollback_failure(
@@ -230,9 +301,9 @@ impl Error for HeadError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::GitUnavailable(error) => Some(error),
-            Self::InvalidConfiguration { source, .. } | Self::InvalidState { source, .. } => {
-                Some(source)
-            }
+            Self::InvalidConfiguration { source, .. }
+            | Self::InvalidState { source, .. }
+            | Self::InvalidLocalMetadata { source, .. } => Some(source),
             Self::SerializeState(error) => Some(error),
             Self::Timestamp(error) => Some(error),
             Self::FileSystem { source, .. } => Some(source),

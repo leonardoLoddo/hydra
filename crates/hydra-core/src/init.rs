@@ -10,7 +10,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use configuration::{serialize_initial_configuration, serialize_initial_state};
+use configuration::serialize_initial_metadata;
 use git::{discover_repository, repository_name_as_str};
 use persistence::{InitialFiles, create_initial_files};
 
@@ -19,6 +19,9 @@ pub use storage::StorageBackend;
 
 const CONFIG_FILE_NAME: &str = ".hydra.json";
 const STATE_DIRECTORY_NAME: &str = "hydra";
+const LOCATOR_FILE_NAME: &str = "project.json";
+const HEADS_METADATA_DIRECTORY_NAME: &str = ".hydra";
+const DIRECTORY_MARKER_FILE_NAME: &str = "directory.json";
 const STATE_FILE_NAME: &str = "heads.json";
 
 #[derive(Debug)]
@@ -42,36 +45,46 @@ pub fn initialize(path: &Path) -> Result<InitializedProject, InitError> {
         .file_name()
         .ok_or_else(|| InitError::UnsupportedRepositoryPath(repository.root.clone()))?;
     let repository_name = repository_name_as_str(repository_name)?;
-    let repository_parent = repository
-        .root
+    let repository_root =
+        fs::canonicalize(&repository.root).map_err(|source| InitError::FileSystem {
+            action: "resolve repository root",
+            path: repository.root.clone(),
+            source,
+        })?;
+    let repository_parent = repository_root
         .parent()
-        .ok_or_else(|| InitError::UnsupportedRepositoryPath(repository.root.clone()))?;
+        .ok_or_else(|| InitError::UnsupportedRepositoryPath(repository_root.clone()))?;
 
     let heads_name = format!("{repository_name}.heads");
     let heads_directory = repository_parent.join(&heads_name);
-    let configuration_path = repository.root.join(CONFIG_FILE_NAME);
+    let configuration_path = repository_root.join(CONFIG_FILE_NAME);
     let state_directory = repository.git_common_directory.join(STATE_DIRECTORY_NAME);
-    let state_path = state_directory.join(STATE_FILE_NAME);
+    let locator_path = state_directory.join(LOCATOR_FILE_NAME);
+    let heads_metadata_directory = heads_directory.join(HEADS_METADATA_DIRECTORY_NAME);
+    let marker_path = heads_metadata_directory.join(DIRECTORY_MARKER_FILE_NAME);
+    let inventory_path = heads_metadata_directory.join(STATE_FILE_NAME);
 
     validate_destinations(
         &configuration_path,
         &heads_directory,
         &state_directory,
-        &state_path,
+        &locator_path,
     )?;
 
-    let configuration_bytes = serialize_initial_configuration(repository_name, &heads_name)?;
-    let state_bytes = serialize_initial_state()?;
+    let metadata = serialize_initial_metadata(repository_name, &repository_root, &heads_directory)?;
     let files = InitialFiles {
         heads_directory: &heads_directory,
+        heads_metadata_directory: &heads_metadata_directory,
+        marker_path: &marker_path,
+        inventory_path: &inventory_path,
         state_directory: &state_directory,
-        state_path: &state_path,
+        locator_path: &locator_path,
         configuration_path: &configuration_path,
     };
-    let storage_backend = create_initial_files(&files, &state_bytes, &configuration_bytes)?;
+    let storage_backend = create_initial_files(&files, &metadata)?;
 
     Ok(InitializedProject {
-        repository_root: repository.root,
+        repository_root,
         heads_directory,
         storage_backend,
     })
@@ -81,7 +94,7 @@ fn validate_destinations(
     configuration_path: &Path,
     heads_directory: &Path,
     state_directory: &Path,
-    state_path: &Path,
+    locator_path: &Path,
 ) -> Result<(), InitError> {
     if path_entry_exists(configuration_path, "inspect project configuration")? {
         return Err(InitError::AlreadyInitialized(
@@ -99,8 +112,8 @@ fn validate_destinations(
                 state_directory.to_path_buf(),
             ));
         }
-        Ok(_) if path_entry_exists(state_path, "inspect local state")? => {
-            return Err(InitError::LocalStateExists(state_path.to_path_buf()));
+        Ok(_) if path_entry_exists(locator_path, "inspect local project locator")? => {
+            return Err(InitError::LocalStateExists(locator_path.to_path_buf()));
         }
         Ok(_) => {
             return Err(InitError::StateDirectoryExists(

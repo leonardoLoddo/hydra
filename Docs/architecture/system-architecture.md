@@ -43,7 +43,10 @@ Hydra/
             │   ├── materializer.rs
             │   ├── overlay.rs
             │   ├── persistence.rs
-            │   └── state.rs
+            │   ├── state.rs
+            │   └── state/
+            │       ├── configuration.rs
+            │       └── installation.rs
             ├── init.rs
             └── init/
                 ├── artifacts.rs
@@ -140,7 +143,7 @@ internal responsibilities remain separated:
 |---|---|
 | `init.rs` | Orchestrate initialization and validate derived destinations before mutation |
 | `init/git.rs` | Execute Git discovery commands and translate their path output |
-| `init/configuration.rs` | Build and serialize initial shared configuration and local state |
+| `init/configuration.rs` | Build and serialize shared configuration, local locator, ownership marker, and initial inventory |
 | `init/storage.rs` | Probe native CoW support and verify the full-copy fallback |
 | `init/persistence.rs` | Sequence filesystem mutations and publish metadata atomically |
 | `init/artifacts.rs` | Track exact owned artifacts and perform non-recursive rollback |
@@ -160,7 +163,9 @@ Head creation follows the same small-orchestrator rule:
 | `head/git.rs` | Discover Git state and own ref, branch, index, worktree, and verification commands |
 | `head/materializer.rs` | Materialize Git tree entries without a standard checkout |
 | `head/overlay.rs` | Expand overlay rules, select safe source files, copy them, and verify content identity |
-| `head/state.rs` | Validate versioned configuration/state, manage the state transaction, and classify commit boundaries |
+| `head/state.rs` | Manage the physical inventory transaction and classify commit boundaries |
+| `head/state/configuration.rs` | Parse and validate schema-v2 directory policies and shared Head settings |
+| `head/state/installation.rs` | Resolve the Git-common locator, verify directory ownership and worktree boundaries, and locate the physical inventory |
 | `head/persistence.rs` | Acquire and release the state lock and replace local state atomically |
 | `head/error.rs` | Define and render typed creation, rollback, and post-commit cleanup failures |
 

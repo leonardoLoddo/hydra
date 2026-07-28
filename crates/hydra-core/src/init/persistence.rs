@@ -9,20 +9,23 @@ use uuid::Uuid;
 use super::{
     InitError, StorageBackend,
     artifacts::{OwnedArtifacts, rollback_owned_artifacts},
+    configuration::InitialMetadata,
     storage::probe_storage,
 };
 
 pub(super) struct InitialFiles<'a> {
     pub(super) heads_directory: &'a Path,
+    pub(super) heads_metadata_directory: &'a Path,
+    pub(super) marker_path: &'a Path,
+    pub(super) inventory_path: &'a Path,
     pub(super) state_directory: &'a Path,
-    pub(super) state_path: &'a Path,
+    pub(super) locator_path: &'a Path,
     pub(super) configuration_path: &'a Path,
 }
 
 pub(super) fn create_initial_files(
     files: &InitialFiles<'_>,
-    state_bytes: &[u8],
-    configuration_bytes: &[u8],
+    metadata: &InitialMetadata,
 ) -> Result<StorageBackend, InitError> {
     create_directory(files.heads_directory, "create Heads directory")?;
 
@@ -39,7 +42,10 @@ pub(super) fn create_initial_files(
         }
     };
 
-    if let Err(error) = create_directory(files.state_directory, "create state directory") {
+    if let Err(error) = create_directory(
+        files.heads_metadata_directory,
+        "create Heads metadata directory",
+    ) {
         return Err(rollback_owned_artifacts(
             error,
             OwnedArtifacts {
@@ -49,27 +55,77 @@ pub(super) fn create_initial_files(
         ));
     }
 
-    if let Err(error) = write_atomic(files.state_path, state_bytes) {
+    if let Err(error) = create_directory(files.state_directory, "create state directory") {
         return Err(rollback_owned_artifacts(
             error,
             OwnedArtifacts {
                 files: Vec::new(),
                 directories: vec![
+                    files.heads_metadata_directory.to_path_buf(),
                     files.heads_directory.to_path_buf(),
-                    files.state_directory.to_path_buf(),
                 ],
             },
         ));
     }
 
-    if let Err(error) = write_atomic(files.configuration_path, configuration_bytes) {
+    if let Err(error) = write_atomic(files.marker_path, &metadata.marker) {
         return Err(rollback_owned_artifacts(
             error,
             OwnedArtifacts {
-                files: vec![files.state_path.to_path_buf()],
+                files: Vec::new(),
                 directories: vec![
-                    files.heads_directory.to_path_buf(),
                     files.state_directory.to_path_buf(),
+                    files.heads_metadata_directory.to_path_buf(),
+                    files.heads_directory.to_path_buf(),
+                ],
+            },
+        ));
+    }
+
+    if let Err(error) = write_atomic(files.inventory_path, &metadata.inventory) {
+        return Err(rollback_owned_artifacts(
+            error,
+            OwnedArtifacts {
+                files: vec![files.marker_path.to_path_buf()],
+                directories: vec![
+                    files.state_directory.to_path_buf(),
+                    files.heads_metadata_directory.to_path_buf(),
+                    files.heads_directory.to_path_buf(),
+                ],
+            },
+        ));
+    }
+
+    if let Err(error) = write_atomic(files.locator_path, &metadata.locator) {
+        return Err(rollback_owned_artifacts(
+            error,
+            OwnedArtifacts {
+                files: vec![
+                    files.inventory_path.to_path_buf(),
+                    files.marker_path.to_path_buf(),
+                ],
+                directories: vec![
+                    files.state_directory.to_path_buf(),
+                    files.heads_metadata_directory.to_path_buf(),
+                    files.heads_directory.to_path_buf(),
+                ],
+            },
+        ));
+    }
+
+    if let Err(error) = write_atomic(files.configuration_path, &metadata.configuration) {
+        return Err(rollback_owned_artifacts(
+            error,
+            OwnedArtifacts {
+                files: vec![
+                    files.locator_path.to_path_buf(),
+                    files.inventory_path.to_path_buf(),
+                    files.marker_path.to_path_buf(),
+                ],
+                directories: vec![
+                    files.state_directory.to_path_buf(),
+                    files.heads_metadata_directory.to_path_buf(),
+                    files.heads_directory.to_path_buf(),
                 ],
             },
         ));
@@ -196,8 +252,10 @@ fn sync_parent_directory(_path: &Path) -> io::Result<()> {
 mod tests {
     use std::{fs, io};
 
-    use super::{cleanup_failed_temporary_link_removal, write_atomic};
-    use crate::init::InitError;
+    use super::{
+        InitialFiles, cleanup_failed_temporary_link_removal, create_initial_files, write_atomic,
+    };
+    use crate::init::{InitError, configuration::InitialMetadata};
 
     #[test]
     fn atomic_publication_never_replaces_an_existing_destination() {
@@ -250,5 +308,57 @@ mod tests {
             }
             other => panic!("expected reported cleanup failure, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn initialization_rolls_back_all_local_metadata_when_configuration_publication_conflicts() {
+        let temporary = tempfile::tempdir().expect("temporary directory should be created");
+        let heads_directory = temporary.path().join("project.heads");
+        let heads_metadata_directory = heads_directory.join(".hydra");
+        let marker_path = heads_metadata_directory.join("directory.json");
+        let inventory_path = heads_metadata_directory.join("heads.json");
+        let state_directory = temporary.path().join("git-common/hydra");
+        let locator_path = state_directory.join("project.json");
+        fs::create_dir_all(
+            state_directory
+                .parent()
+                .expect("state directory should have a parent"),
+        )
+        .expect("Git common directory should be created");
+        let configuration_path = temporary.path().join(".hydra.json");
+        fs::write(&configuration_path, b"preexisting\n")
+            .expect("configuration conflict should be created");
+
+        let files = InitialFiles {
+            heads_directory: &heads_directory,
+            heads_metadata_directory: &heads_metadata_directory,
+            marker_path: &marker_path,
+            inventory_path: &inventory_path,
+            state_directory: &state_directory,
+            locator_path: &locator_path,
+            configuration_path: &configuration_path,
+        };
+        let metadata = InitialMetadata {
+            configuration: b"configuration\n".to_vec(),
+            locator: b"locator\n".to_vec(),
+            marker: b"marker\n".to_vec(),
+            inventory: b"inventory\n".to_vec(),
+        };
+
+        create_initial_files(&files, &metadata)
+            .expect_err("configuration publication conflict should fail");
+
+        assert_eq!(
+            fs::read(&configuration_path).expect("preexisting configuration should remain"),
+            b"preexisting\n"
+        );
+        assert!(
+            !heads_directory.exists(),
+            "rollback should remove the owned Heads tree"
+        );
+        assert!(
+            !state_directory.exists(),
+            "rollback should remove the owned locator directory"
+        );
     }
 }

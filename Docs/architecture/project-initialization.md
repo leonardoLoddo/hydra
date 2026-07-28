@@ -94,29 +94,31 @@ the current implementation derives:
 |---|---|
 | Shared project configuration | `<repository-root>/.hydra.json` |
 | Default Heads directory | `<repository-parent>/<repository-name>.heads/` |
-| Local state directory | `<git-common-dir>/hydra/` |
-| Local Head state | `<git-common-dir>/hydra/heads.json` |
+| Local locator directory | `<git-common-dir>/hydra/` |
+| Local project locator | `<git-common-dir>/hydra/project.json` |
+| Heads metadata directory | `<heads-directory>/.hydra/` |
+| Directory ownership marker | `<heads-directory>/.hydra/directory.json` |
+| Local Head inventory | `<heads-directory>/.hydra/heads.json` |
 
-The stored `headsDirectory` value is relative to the repository root:
-
-```text
-../<repository-name>.heads
-```
-
-The resolved Git common directory, not an assumed `.git` subdirectory, must be
-used for local state.
+The shared configuration stores a portable `sibling` policy. The local locator
+stores canonical absolute `projectRoot` and `headsDirectory` paths so every
+linked worktree can bootstrap from the same Git common directory without
+resolving the policy against its own root.
 
 ---
 
 ## Initial Persisted Data
 
-The project configuration is JSON schema version 1:
+The project configuration is JSON schema version 2:
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "projectId": "example-5b8d9f430d5543eca3aa967dd484bf41",
-  "headsDirectory": "../Example.heads",
+  "headsDirectory": {
+    "strategy": "sibling",
+    "suffix": ".heads"
+  },
   "branchPrefix": "hydra/",
   "storage": {
     "mode": "auto"
@@ -129,7 +131,29 @@ The project configuration is JSON schema version 1:
 }
 ```
 
-The local state is initialized as:
+The Git common directory receives the local locator:
+
+```json
+{
+  "version": 1,
+  "projectId": "example-5b8d9f430d5543eca3aa967dd484bf41",
+  "installationId": "local-7e8864fe35434de98d762a73387fbd76",
+  "projectRoot": "/work/Example",
+  "headsDirectory": "/work/Example.heads"
+}
+```
+
+The Heads directory receives a matching ownership marker:
+
+```json
+{
+  "version": 1,
+  "projectId": "example-5b8d9f430d5543eca3aa967dd484bf41",
+  "installationId": "local-7e8864fe35434de98d762a73387fbd76"
+}
+```
+
+Its physical inventory is initialized as:
 
 ```json
 {
@@ -138,7 +162,9 @@ The local state is initialized as:
 }
 ```
 
-Both files are pretty-printed UTF-8 JSON terminated by a newline.
+All four files are pretty-printed UTF-8 JSON terminated by a newline. Version-1
+project configurations are intentionally unsupported because the experimental
+format was never released.
 
 ### Project identifier
 
@@ -163,6 +189,10 @@ The random suffix comes from a UUID version 4. Callers must treat the complete
 identifier as opaque; its formatting is not a user-facing compatibility
 guarantee.
 
+`installationId` is generated independently as `local-` followed by the 32
+hexadecimal UUID characters. It identifies only this local initialization and
+must match between the locator and directory marker.
+
 ---
 
 ## Validation Before Mutation
@@ -178,13 +208,13 @@ already occupies:
 - `<git-common-dir>/hydra`.
 
 The existing Heads directory is never claimed, emptied, or reused implicitly.
-The same rule applies to the local state directory: initialization creates it
-exclusively and never follows or claims a pre-existing directory or symlink.
+The same rule applies to the local locator directory: initialization creates
+it exclusively and never follows or claims a pre-existing directory or symlink.
 This protects unrelated data and removes the check-then-use window for that
 trust boundary while ownership reconciliation is not yet implemented.
 
-Serialization of both JSON documents also completes in memory before the first
-filesystem mutation.
+Serialization of all four JSON documents also completes in memory before the
+first filesystem mutation.
 
 ---
 
@@ -197,9 +227,15 @@ create Heads directory
         ↓
 probe clone and full-copy capability in Heads directory
         ↓
+create <heads-directory>/.hydra exclusively
+        ↓
 create <git-common-dir>/hydra exclusively
         ↓
-atomically publish heads.json
+atomically publish directory.json
+        ↓
+atomically publish <heads-directory>/.hydra/heads.json
+        ↓
+atomically publish <git-common-dir>/hydra/project.json
         ↓
 atomically publish .hydra.json
         ↓
@@ -241,9 +277,10 @@ Rollback removes only artifacts created by the current invocation.
 | Failure point | Required cleanup |
 |---|---|
 | Storage probe | Remove probe files and the newly created empty Heads directory |
-| Creating local state directory | Remove the newly created empty Heads directory |
-| Publishing local state | Remove the empty Heads and state directories |
-| Publishing project configuration | Remove the new local state file and empty Heads and state directories |
+| Creating either metadata directory | Remove only directories created by the invocation, from child to parent |
+| Publishing marker or inventory | Remove previously published owned files and the empty metadata directories |
+| Publishing the locator | Remove marker, inventory, and empty metadata directories |
+| Publishing project configuration | Remove locator, marker, inventory, and empty metadata directories |
 | Temporary-file write or publication | Remove every temporary and final link owned by the failed publication |
 
 Cleanup is deliberately limited to `remove_file` and `remove_dir` on exact
@@ -267,7 +304,7 @@ therefore diagnosable and never silently hidden.
 - repository name that cannot be persisted losslessly;
 - existing project configuration;
 - existing Heads directory;
-- existing or unsafe local state directory;
+- existing or unsafe local locator directory;
 - failed or invalid storage capability probe;
 - JSON serialization failure;
 - contextual filesystem failures.
@@ -289,20 +326,21 @@ Coverage currently proves:
 - executable version output and internal Clap command consistency;
 - defaulting the optional path to the current directory;
 - rejection outside a Git repository without creating `.hydra.json`;
-- creation of configuration, sibling Heads directory, and local state;
+- creation of schema-v2 configuration, sibling Heads directory, locator,
+  ownership marker, and physical inventory;
 - real storage probing with visible backend selection and verified full-copy
   fallback;
-- schema version and initial configuration values;
-- full UUID entropy in the generated project identifier;
+- schema versions and initial configuration values;
+- full UUID entropy in the generated project and installation identifiers;
 - correct use of the Git common directory from a linked worktree;
 - refusal to reuse a pre-existing default Heads directory;
-- refusal to claim or follow a pre-existing local state directory;
+- refusal to claim or follow a pre-existing local locator directory;
 - preservation of dangling configuration symlinks;
 - preservation of trailing whitespace in repository paths;
 - distinct diagnostics for unrelated Git command failures;
-- absence of newly created configuration and local state after destination
+- absence of newly created configuration and local metadata after destination
   conflicts;
-- removal of the new Heads directory when local state creation fails;
+- removal of the new Heads directory when local metadata creation fails;
 - atomic no-clobber publication;
 - explicit diagnostics when rollback cannot remove an owned artifact.
 
@@ -319,11 +357,12 @@ initialization workflow:
 1. **Recognition of an owned existing Heads directory.** The current
    implementation safely rejects every pre-existing default directory. It
    cannot yet distinguish a directory owned by the same project from unrelated
-   data.
+   data during `hydra init`; ownership is validated when opening an existing
+   installation for Head creation.
 2. **Crash reconciliation.** File publication is atomic, but an external
-   interruption between transaction steps can leave a local state file or empty
-   directory without `.hydra.json`. Initialization does not yet resume or
-   reconcile that state.
+   interruption between transaction steps can leave local metadata files or
+   empty directories without `.hydra.json`. Initialization does not yet resume
+   or reconcile that state.
 3. **Non-Unix directory durability.** Unix parent directories are synchronized
    after metadata publication. The non-Unix implementation currently provides
    atomic visibility but does not claim the same power-loss durability.

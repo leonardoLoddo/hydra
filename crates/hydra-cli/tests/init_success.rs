@@ -43,8 +43,14 @@ fn init_creates_project_configuration_heads_directory_and_local_state() {
     )
     .expect("project configuration should be valid JSON");
 
-    assert_eq!(config["version"], 1);
-    assert_eq!(config["headsDirectory"], "../SampleProject.heads");
+    assert_eq!(config["version"], 2);
+    assert_eq!(
+        config["headsDirectory"],
+        serde_json::json!({
+            "strategy": "sibling",
+            "suffix": ".heads"
+        })
+    );
     assert_eq!(config["branchPrefix"], "hydra/");
     assert_eq!(config["storage"]["mode"], "auto");
     assert_eq!(config["overlay"]["copy"][0], "... .gitignore");
@@ -59,17 +65,61 @@ fn init_creates_project_configuration_heads_directory_and_local_state() {
         "project ID should contain the repository slug and the complete UUID entropy"
     );
 
+    let heads_directory = fs::canonicalize(directory.path().join("SampleProject.heads"))
+        .expect("default sibling Heads directory should resolve");
     assert!(
-        directory.path().join("SampleProject.heads").is_dir(),
+        heads_directory.is_dir(),
         "default sibling Heads directory should be created"
     );
 
-    let state: serde_json::Value = serde_json::from_slice(
-        &fs::read(repository.join(".git/hydra/heads.json")).expect("local state should be created"),
+    let locator: serde_json::Value = serde_json::from_slice(
+        &fs::read(repository.join(".git/hydra/project.json"))
+            .expect("local project locator should be created"),
     )
-    .expect("local state should be valid JSON");
+    .expect("local project locator should be valid JSON");
+    assert_eq!(locator["version"], 1);
+    assert_eq!(locator["projectId"], config["projectId"]);
+    assert_eq!(
+        locator["projectRoot"],
+        fs::canonicalize(&repository)
+            .expect("repository should resolve")
+            .display()
+            .to_string()
+    );
+    assert_eq!(
+        locator["headsDirectory"],
+        heads_directory.display().to_string()
+    );
+    assert!(
+        locator["installationId"]
+            .as_str()
+            .and_then(|value| value.strip_prefix("local-"))
+            .is_some_and(|suffix| {
+                suffix.len() == 32 && suffix.chars().all(|c| c.is_ascii_hexdigit())
+            }),
+        "installation ID should contain complete UUID entropy"
+    );
+
+    let marker: serde_json::Value = serde_json::from_slice(
+        &fs::read(heads_directory.join(".hydra/directory.json"))
+            .expect("Heads directory ownership marker should be created"),
+    )
+    .expect("ownership marker should be valid JSON");
+    assert_eq!(marker["version"], 1);
+    assert_eq!(marker["projectId"], locator["projectId"]);
+    assert_eq!(marker["installationId"], locator["installationId"]);
+
+    let state: serde_json::Value = serde_json::from_slice(
+        &fs::read(heads_directory.join(".hydra/heads.json"))
+            .expect("local Head inventory should be created"),
+    )
+    .expect("local Head inventory should be valid JSON");
     assert_eq!(state["version"], 1);
     assert_eq!(state["heads"], serde_json::json!({}));
+    assert!(
+        !repository.join(".git/hydra/heads.json").exists(),
+        "the Git common directory should contain only the local locator"
+    );
 }
 
 #[test]
@@ -92,7 +142,13 @@ fn init_defaults_to_the_current_directory() {
     );
     assert!(repository.join(".hydra.json").is_file());
     assert!(directory.path().join("SampleProject.heads").is_dir());
-    assert!(repository.join(".git/hydra/heads.json").is_file());
+    assert!(repository.join(".git/hydra/project.json").is_file());
+    assert!(
+        directory
+            .path()
+            .join("SampleProject.heads/.hydra/heads.json")
+            .is_file()
+    );
 }
 
 #[test]
@@ -152,12 +208,19 @@ fn init_uses_the_shared_git_directory_from_a_linked_worktree() {
     assert!(linked_worktree.join(".hydra.json").is_file());
     assert!(directory.path().join("LinkedHead.heads").is_dir());
     assert!(
-        repository.join(".git/hydra/heads.json").is_file(),
-        "local state must use the common Git directory"
+        repository.join(".git/hydra/project.json").is_file(),
+        "the local locator must use the common Git directory"
     );
     assert!(
-        !linked_worktree.join(".git/hydra/heads.json").exists(),
+        !linked_worktree.join(".git/hydra/project.json").exists(),
         "Hydra must not treat the linked worktree .git file as a directory"
+    );
+    assert!(
+        directory
+            .path()
+            .join("LinkedHead.heads/.hydra/heads.json")
+            .is_file(),
+        "the physical inventory must live in the Heads directory"
     );
 }
 

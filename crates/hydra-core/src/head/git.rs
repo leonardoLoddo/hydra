@@ -32,6 +32,28 @@ impl Repository {
     }
 }
 
+pub(super) fn worktree_paths(repository: &Repository) -> Result<Vec<PathBuf>, HeadError> {
+    let output = run_git(
+        &repository.root,
+        &["worktree", "list", "--porcelain", "-z"],
+        "listing Git worktrees",
+    )?;
+    let mut paths = Vec::new();
+    for record in output.stdout.split(|byte| *byte == 0) {
+        if let Some(value) = record.strip_prefix(b"worktree ") {
+            if value.is_empty() {
+                return Err(HeadError::InvalidGitOutput("worktree path"));
+            }
+            paths.push(bytes_to_path(value)?);
+        }
+    }
+    if paths.is_empty() {
+        Err(HeadError::InvalidGitOutput("worktree list"))
+    } else {
+        Ok(paths)
+    }
+}
+
 pub(super) fn resolve_commit(
     repository: &Repository,
     reference: &str,

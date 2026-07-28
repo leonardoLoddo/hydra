@@ -40,8 +40,8 @@ fn init_rejects_a_repository_name_that_cannot_be_stored_losslessly() {
         "unsupported names must be rejected before mutation"
     );
     assert!(
-        !repository.join(".git/hydra/heads.json").exists(),
-        "unsupported names must not create local state"
+        !repository.join(".git/hydra/project.json").exists(),
+        "unsupported names must not create the local locator"
     );
 }
 

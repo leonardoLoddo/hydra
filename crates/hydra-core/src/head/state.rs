@@ -1,3 +1,6 @@
+mod configuration;
+mod installation;
+
 use std::{
     collections::BTreeMap,
     fs,
@@ -13,41 +16,12 @@ use crate::StorageBackend;
 use serde::{Deserialize, Serialize};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
-const CONFIG_FILE_NAME: &str = ".hydra.json";
-const STATE_FILE_NAME: &str = "heads.json";
-const SUPPORTED_SCHEMA_VERSION: u32 = 1;
+use configuration::ProjectConfiguration;
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ProjectConfiguration {
-    version: u32,
-    #[serde(rename = "projectId")]
-    _project_id: String,
-    heads_directory: PathBuf,
-    branch_prefix: String,
-    #[serde(rename = "storage")]
-    _storage: StorageConfiguration,
-    overlay: OverlayConfiguration,
-}
-
-#[derive(Deserialize)]
-struct StorageConfiguration {
-    #[serde(rename = "mode")]
-    _mode: StorageMode,
-}
-
-#[derive(Deserialize)]
-enum StorageMode {
-    #[serde(rename = "auto")]
-    Auto,
-}
-
-#[derive(Deserialize)]
-struct OverlayConfiguration {
-    copy: Vec<String>,
-}
+const SUPPORTED_LOCAL_METADATA_VERSION: u32 = 1;
 
 #[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 struct LocalState {
     version: u32,
     heads: BTreeMap<String, HeadMetadata>,
@@ -109,30 +83,8 @@ pub(super) struct StateTransaction {
 
 impl StateTransaction {
     pub(super) fn open(repository: &Repository) -> Result<Self, HeadError> {
-        let configuration_path = repository.root.join(CONFIG_FILE_NAME);
-        validate_regular_file(&configuration_path, true)?;
-        let configuration_bytes =
-            fs::read(&configuration_path).map_err(|source| HeadError::FileSystem {
-                action: "read project configuration",
-                path: configuration_path.clone(),
-                source,
-            })?;
-        let configuration: ProjectConfiguration = serde_json::from_slice(&configuration_bytes)
-            .map_err(|source| HeadError::InvalidConfiguration {
-                path: configuration_path,
-                source,
-            })?;
-        if configuration.version != SUPPORTED_SCHEMA_VERSION {
-            return Err(HeadError::UnsupportedConfigurationVersion(
-                configuration.version,
-            ));
-        }
-
-        let state_path = repository
-            .git_common_directory
-            .join("hydra")
-            .join(STATE_FILE_NAME);
-        validate_regular_file(&state_path, false)?;
+        let configuration = ProjectConfiguration::load(&repository.root)?;
+        let state_path = installation::inventory_path(&configuration, repository)?;
         let lock = StateLock::acquire(&state_path)?;
         let loaded_state = (|| {
             let original_state = fs::read(&state_path).map_err(|source| HeadError::FileSystem {
@@ -146,7 +98,7 @@ impl StateTransaction {
                     source,
                 }
             })?;
-            if state.version != SUPPORTED_SCHEMA_VERSION {
+            if state.version != SUPPORTED_LOCAL_METADATA_VERSION {
                 return Err(HeadError::UnsupportedStateVersion(state.version));
             }
             Ok((original_state, state))
@@ -178,44 +130,19 @@ impl StateTransaction {
     }
 
     pub(super) fn branch_prefix(&self) -> &str {
-        &self.configuration.branch_prefix
+        self.configuration.branch_prefix()
     }
 
     pub(super) fn overlay_rules(&self) -> &[String] {
-        &self.configuration.overlay.copy
+        self.configuration.overlay_rules()
     }
 
-    pub(super) fn heads_directory(&self, repository: &Repository) -> Result<PathBuf, HeadError> {
-        let configured = if self.configuration.heads_directory.is_absolute() {
-            self.configuration.heads_directory.clone()
-        } else {
-            repository.root.join(&self.configuration.heads_directory)
-        };
-        let metadata =
-            fs::symlink_metadata(&configured).map_err(|source| HeadError::FileSystem {
-                action: "inspect Heads directory",
-                path: configured.clone(),
-                source,
-            })?;
-        if !metadata.is_dir() {
-            return Err(HeadError::UnsafeHeadsDirectory(configured));
-        }
-        let heads = fs::canonicalize(&configured).map_err(|source| HeadError::FileSystem {
-            action: "resolve Heads directory",
-            path: configured,
-            source,
-        })?;
-        let repository_root =
-            fs::canonicalize(&repository.root).map_err(|source| HeadError::FileSystem {
-                action: "resolve repository root",
-                path: repository.root.clone(),
-                source,
-            })?;
-        if heads.starts_with(&repository_root) {
-            Err(HeadError::UnsafeHeadsDirectory(heads))
-        } else {
-            Ok(heads)
-        }
+    pub(super) fn heads_directory(&self) -> Result<PathBuf, HeadError> {
+        self.state_path
+            .parent()
+            .and_then(Path::parent)
+            .map(Path::to_path_buf)
+            .ok_or_else(|| HeadError::UnsafeHeadsDirectory(self.state_path.clone()))
     }
 
     pub(super) fn commit(mut self, name: String, metadata: HeadMetadata) -> Result<(), HeadError> {
@@ -258,20 +185,5 @@ impl StateTransaction {
                 failures: vec![cleanup.to_string()],
             }),
         }
-    }
-}
-
-fn validate_regular_file(path: &Path, configuration: bool) -> Result<(), HeadError> {
-    match fs::symlink_metadata(path) {
-        Ok(metadata) if metadata.is_file() => Ok(()),
-        Ok(_) => Err(HeadError::UnsafeProjectFile(path.to_path_buf())),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound && configuration => {
-            Err(HeadError::ProjectNotInitialized(path.to_path_buf()))
-        }
-        Err(source) => Err(HeadError::FileSystem {
-            action: "inspect Hydra project file",
-            path: path.to_path_buf(),
-            source,
-        }),
     }
 }

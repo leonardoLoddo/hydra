@@ -82,11 +82,32 @@ pub fn create_initialized_project(directory: &TestDirectory) -> PathBuf {
 }
 
 #[allow(dead_code)]
+pub fn heads_directory(repository: &Path) -> PathBuf {
+    let locator_path = repository.join(".git/hydra/project.json");
+    let locator: serde_json::Value = serde_json::from_slice(
+        &fs::read(&locator_path).expect("local project locator should be readable"),
+    )
+    .expect("local project locator should be valid JSON");
+    PathBuf::from(
+        locator["headsDirectory"]
+            .as_str()
+            .expect("locator should contain a Heads directory"),
+    )
+}
+
+#[allow(dead_code)]
+pub fn head_state_path(repository: &Path) -> PathBuf {
+    heads_directory(repository).join(".hydra/heads.json")
+}
+
+#[allow(dead_code)]
+pub fn head_state_lock_path(repository: &Path) -> PathBuf {
+    heads_directory(repository).join(".hydra/heads.json.lock")
+}
+
+#[allow(dead_code)]
 pub fn assert_no_head_creation_artifacts(repository: &Path, name: &str) {
-    let heads_directory = repository
-        .parent()
-        .expect("repository should have a parent")
-        .join("SampleProject.heads");
+    let heads_directory = heads_directory(repository);
     assert!(
         !heads_directory.join(name).exists(),
         "failed creation must not leave a Head directory"
@@ -98,7 +119,7 @@ pub fn assert_no_head_creation_artifacts(repository: &Path, name: &str) {
         "failed creation must not leave a branch"
     );
     assert!(
-        !repository.join(".git/hydra/heads.json.lock").exists(),
+        !head_state_lock_path(repository).exists(),
         "failed creation must release the state lock"
     );
 }

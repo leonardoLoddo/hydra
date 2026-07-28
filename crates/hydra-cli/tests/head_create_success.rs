@@ -2,7 +2,47 @@ mod common;
 
 use std::{fs, process::Stdio};
 
-use common::{TestDirectory, create_initialized_project, hydra_command, run_git};
+use common::{
+    TestDirectory, create_initialized_project, head_state_path, heads_directory, hydra_command,
+    run_git,
+};
+
+fn relocate_heads_directory(
+    repository: &std::path::Path,
+    destination: &std::path::Path,
+    policy: serde_json::Value,
+) {
+    let original = heads_directory(repository);
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent).expect("destination parent should be created");
+    }
+    fs::rename(&original, destination).expect("Heads directory should be relocated");
+    let destination =
+        fs::canonicalize(destination).expect("relocated Heads directory should resolve");
+
+    let configuration_path = repository.join(".hydra.json");
+    let mut configuration: serde_json::Value = serde_json::from_slice(
+        &fs::read(&configuration_path).expect("configuration should be readable"),
+    )
+    .expect("configuration should be valid JSON");
+    configuration["headsDirectory"] = policy;
+    fs::write(
+        &configuration_path,
+        serde_json::to_vec_pretty(&configuration).expect("configuration should serialize"),
+    )
+    .expect("configuration should be updated");
+
+    let locator_path = repository.join(".git/hydra/project.json");
+    let mut locator: serde_json::Value =
+        serde_json::from_slice(&fs::read(&locator_path).expect("locator should be readable"))
+            .expect("locator should be valid JSON");
+    locator["headsDirectory"] = destination.display().to_string().into();
+    fs::write(
+        &locator_path,
+        serde_json::to_vec_pretty(&locator).expect("locator should serialize"),
+    )
+    .expect("locator should be updated");
+}
 
 #[test]
 fn head_create_builds_an_isolated_worktree_and_records_its_metadata() {
@@ -61,7 +101,7 @@ fn head_create_builds_an_isolated_worktree_and_records_its_metadata() {
     );
 
     let state: serde_json::Value = serde_json::from_slice(
-        &fs::read(repository.join(".git/hydra/heads.json")).expect("state should be readable"),
+        &fs::read(head_state_path(&repository)).expect("state should be readable"),
     )
     .expect("state should remain valid JSON");
     let metadata = &state["heads"]["payment"];
@@ -106,11 +146,157 @@ fn head_create_resolves_explicit_base_and_target_branches() {
         String::from_utf8_lossy(&output.stderr)
     );
     let state: serde_json::Value = serde_json::from_slice(
-        &fs::read(repository.join(".git/hydra/heads.json")).expect("state should be readable"),
+        &fs::read(head_state_path(&repository)).expect("state should be readable"),
     )
     .expect("state should be valid JSON");
     assert_eq!(state["heads"]["auth"]["baseRef"], "refs/heads/beta");
     assert_eq!(state["heads"]["auth"]["targetRef"], "refs/heads/main");
+}
+
+#[test]
+fn head_create_uses_the_same_heads_directory_when_invoked_from_a_head() {
+    let directory = TestDirectory::new("head-create-from-head");
+    let repository = create_initialized_project(&directory);
+    let output = run_git(&repository, &["add", ".hydra.json"]);
+    assert!(output.status.success());
+    let output = run_git(
+        &repository,
+        &[
+            "-c",
+            "user.name=Hydra Tests",
+            "-c",
+            "user.email=hydra-tests@example.invalid",
+            "commit",
+            "--quiet",
+            "-m",
+            "track Hydra configuration",
+        ],
+    );
+    assert!(output.status.success());
+
+    let first = hydra_command()
+        .args(["head", "create", "payment"])
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+    assert!(
+        first.status.success(),
+        "first Head creation should succeed, stderr: {}",
+        String::from_utf8_lossy(&first.stderr)
+    );
+
+    let payment = directory.path().join("SampleProject.heads/payment");
+    let second = hydra_command()
+        .args(["head", "create", "auth"])
+        .current_dir(&payment)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(
+        second.status.success(),
+        "creation from a Head should use the installation locator, stderr: {}",
+        String::from_utf8_lossy(&second.stderr)
+    );
+    assert!(directory.path().join("SampleProject.heads/auth").is_dir());
+    assert!(
+        !directory
+            .path()
+            .join("SampleProject.heads/payment.heads")
+            .exists(),
+        "the versioned sibling policy must not be resolved relative to the current Head"
+    );
+    let state: serde_json::Value = serde_json::from_slice(
+        &fs::read(head_state_path(&repository)).expect("state should be readable"),
+    )
+    .expect("state should be valid JSON");
+    assert!(state["heads"]["payment"].is_object());
+    assert!(state["heads"]["auth"].is_object());
+}
+
+#[test]
+fn head_create_accepts_an_arbitrary_safe_sibling_suffix() {
+    let directory = TestDirectory::new("head-arbitrary-suffix");
+    let repository = create_initialized_project(&directory);
+    let relocated = directory.path().join("SampleProject custom heads 🚀");
+    relocate_heads_directory(
+        &repository,
+        &relocated,
+        serde_json::json!({
+            "strategy": "sibling",
+            "suffix": " custom heads 🚀"
+        }),
+    );
+
+    let output = hydra_command()
+        .args(["head", "create", "payment"])
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(
+        output.status.success(),
+        "safe Unicode and whitespace should be accepted in a suffix, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(relocated.join("payment").is_dir());
+}
+
+#[test]
+fn head_create_resolves_a_portable_relative_heads_directory() {
+    let directory = TestDirectory::new("head-relative-strategy");
+    let repository = create_initialized_project(&directory);
+    let relocated = directory
+        .path()
+        .join("shared workspaces/SampleProject heads");
+    relocate_heads_directory(
+        &repository,
+        &relocated,
+        serde_json::json!({
+            "strategy": "relative",
+            "base": "repositoryParent",
+            "path": "shared workspaces/SampleProject heads"
+        }),
+    );
+
+    let output = hydra_command()
+        .args(["head", "create", "payment"])
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(
+        output.status.success(),
+        "relative strategy should resolve from the stable project parent, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(relocated.join("payment").is_dir());
+}
+
+#[test]
+fn head_create_uses_a_non_versioned_local_heads_directory() {
+    let directory = TestDirectory::new("head-local-strategy");
+    let repository = create_initialized_project(&directory);
+    let relocated = directory.path().join("device-specific storage");
+    relocate_heads_directory(
+        &repository,
+        &relocated,
+        serde_json::json!({
+            "strategy": "local"
+        }),
+    );
+
+    let output = hydra_command()
+        .args(["head", "create", "payment"])
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(
+        output.status.success(),
+        "local strategy should trust only the verified non-versioned locator, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(relocated.join("payment").is_dir());
 }
 
 #[test]

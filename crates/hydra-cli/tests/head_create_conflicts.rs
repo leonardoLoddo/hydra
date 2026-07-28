@@ -3,8 +3,8 @@ mod common;
 use std::fs;
 
 use common::{
-    TestDirectory, assert_no_head_creation_artifacts, create_initialized_project, hydra_command,
-    run_git,
+    TestDirectory, assert_no_head_creation_artifacts, create_initialized_project,
+    head_state_lock_path, hydra_command, run_git,
 };
 
 #[test]
@@ -62,7 +62,7 @@ fn head_create_preserves_a_preexisting_destination() {
         b"owned elsewhere\n"
     );
     assert!(
-        !repository.join(".git/hydra/heads.json.lock").exists(),
+        !head_state_lock_path(&repository).exists(),
         "destination conflict must release the state lock"
     );
 }
@@ -98,7 +98,7 @@ fn head_create_preserves_a_preexisting_branch() {
         ],
     );
     assert!(output.status.success(), "preexisting branch must remain");
-    assert!(!repository.join(".git/hydra/heads.json.lock").exists());
+    assert!(!head_state_lock_path(&repository).exists());
 }
 
 #[test]
@@ -126,7 +126,7 @@ fn head_create_rejects_a_duplicate_without_altering_the_existing_head() {
             .join("SampleProject.heads/payment/src/app.txt")
             .is_file()
     );
-    assert!(!repository.join(".git/hydra/heads.json.lock").exists());
+    assert!(!head_state_lock_path(&repository).exists());
 }
 
 #[test]

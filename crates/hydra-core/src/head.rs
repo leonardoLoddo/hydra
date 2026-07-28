@@ -131,7 +131,7 @@ fn prepare_head(
         return Err(HeadError::HeadAlreadyExists(options.name.clone()));
     }
 
-    let heads_directory = transaction.heads_directory(repository)?;
+    let heads_directory = transaction.heads_directory()?;
     let head_path = heads_directory.join(&options.name);
     ensure_destination_absent(&head_path)?;
 

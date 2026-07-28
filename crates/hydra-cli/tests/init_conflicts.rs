@@ -64,8 +64,8 @@ fn init_refuses_to_reuse_a_preexisting_default_heads_directory() {
         "destination conflict must not create project configuration"
     );
     assert!(
-        !repository.join(".git/hydra/heads.json").exists(),
-        "destination conflict must not create local state"
+        !repository.join(".git/hydra/project.json").exists(),
+        "destination conflict must not create the local locator"
     );
 }
 
@@ -158,7 +158,7 @@ fn init_rejects_a_symlinked_local_state_directory() {
         "Hydra must not replace the state symlink"
     );
     assert!(
-        !external_state.join("heads.json").exists(),
+        !external_state.join("project.json").exists(),
         "Hydra must not write through the state symlink"
     );
     assert!(
@@ -203,8 +203,8 @@ fn init_preserves_a_dangling_project_configuration_symlink() {
         "Hydra must not create the symlink target"
     );
     assert!(
-        !repository.join(".git/hydra/heads.json").exists(),
-        "configuration conflict must not create local state"
+        !repository.join(".git/hydra/project.json").exists(),
+        "configuration conflict must not create the local locator"
     );
     assert!(
         !directory.path().join("SampleProject.heads").exists(),
