@@ -544,17 +544,105 @@ Lo stato mostra almeno:
 hydra head open payment
 ```
 
-Hydra può eseguire un comando configurabile, per esempio:
+Hydra può eseguire un adapter a comando configurabile. La configurazione deve
+separare programma e argomenti, così i placeholder non vengono interpolati in
+una stringa di shell:
 
 ```json
 {
-  "openCommand": "code {path}"
+  "commands": {
+    "open": {
+      "program": "code",
+      "args": ["{path}"]
+    }
+  }
 }
 ```
 
 Si tratta di un adapter generico a comando, non di un’integrazione specifica con VS Code.
 
-### 7.5 Rimozione sicura
+I placeholder iniziali disponibili per gli adapter sono:
+
+- `{name}`;
+- `{path}`;
+- `{headRef}`;
+- `{baseRef}`;
+- `{targetRef}`.
+
+Hydra passa ogni argomento separatamente al processo configurato e non
+costruisce un comando shell non escapato.
+
+### 7.5 Chiusura
+
+```bash
+hydra head close payment
+```
+
+La chiusura rappresenta il workflow esplicito che conclude il lavoro di una
+Head. In assenza di configurazione custom, Hydra:
+
+1. verifica che la Head e il relativo target siano coerenti;
+2. integra il branch privato della Head nel suo `targetRef`;
+3. usa il normale comportamento Git: fast-forward quando possibile, altrimenti
+   merge commit;
+4. non esegue rebase, squash o risoluzione automatica dei conflitti;
+5. solo dopo un merge riuscito esegue la rimozione protetta della Head.
+
+Per una Head creata da un branch locale senza `--target`, `targetRef` coincide
+con il branch di partenza. Un `--target` esplicito rimane invece autorevole per
+la chiusura.
+
+Il merge predefinito non deve sporcare o modificare implicitamente un altro
+working tree dell’utente. Prima dell’implementazione va definito un meccanismo
+di integrazione isolato che garantisca:
+
+- target ref invariata se il merge fallisce o produce conflitti;
+- nessuna modifica al working tree principale o a un’altra Head;
+- nessuna eliminazione della Head in caso di conflitto;
+- diagnostica sufficiente per risolvere o ripetere esplicitamente la chiusura.
+
+La chiusura può essere sostituita da un adapter configurabile:
+
+```json
+{
+  "commands": {
+    "close": {
+      "strategy": "command",
+      "program": "./tools/close-head",
+      "args": ["{path}", "{headRef}", "{targetRef}"],
+      "removeOnSuccess": true
+    }
+  }
+}
+```
+
+Se `commands.close` è assente, i default equivalgono concettualmente a:
+
+```json
+{
+  "strategy": "merge",
+  "removeOnSuccess": true
+}
+```
+
+`removeOnSuccess` non viene espanso dentro il comando custom: è un passo
+successivo posseduto da Hydra. Il passo viene eseguito soltanto se l’adapter
+termina con successo e usa le stesse protezioni di `hydra head remove`, senza
+forzature implicite. Se il comando riesce ma la rimozione protetta fallisce,
+Hydra segnala separatamente che l’azione di chiusura è completata ma la Head è
+rimasta presente.
+
+Con `removeOnSuccess: false`, Hydra esegue l’azione di chiusura ma conserva
+worktree, branch e metadati. Un comando custom che non integra i commit nel
+`targetRef` non può aggirare la protezione contro la perdita di lavoro:
+l’eventuale rimozione finale deve fallire in modo sicuro.
+
+Hydra non può assumere di poter annullare in sicurezza effetti Git o filesystem
+prodotti da un adapter arbitrario. Se il comando custom fallisce dopo avere
+modificato la target ref, Hydra conserva la Head, non esegue la rimozione e
+segnala la differenza rispetto allo snapshot iniziale.
+
+### 7.6 Rimozione sicura
 
 ```bash
 hydra head remove payment
@@ -571,7 +659,46 @@ Senza `--force`, Hydra rifiuta la rimozione se:
 
 Worktree e branch sono entità separate. La rimozione ordinaria elimina il worktree secondo una politica esplicita e non deve cancellare automaticamente un branch che contiene lavoro recuperabile.
 
-### 7.6 Repair e riconciliazione
+### 7.7 Completamento della shell
+
+Hydra deve offrire completamento tramite Tab per la gerarchia dei comandi,
+le opzioni e soprattutto per le entità locali già esistenti.
+
+```bash
+hydra completions <shell>
+```
+
+Il completamento dinamico dei nomi di Head si applica almeno a:
+
+```bash
+hydra head status <name>
+hydra head path <name>
+hydra head open <name>
+hydra head close <name>
+hydra head remove <name>
+```
+
+La regola generale è: una posizione che richiede un’entità esistente propone
+le entità di quel tipo note al progetto corrente; una posizione che crea una
+nuova entità, come `head create <name>`, non propone nomi già occupati.
+
+La risoluzione dei candidati deve:
+
+- essere read-only e non eseguire repair, open, close o remove;
+- non mostrare prompt;
+- essere sufficientemente veloce per l’uso interattivo;
+- restituire nomi ordinati e senza duplicati;
+- fallire silenziosamente con zero candidati fuori da un progetto Hydra o con
+  stato non leggibile;
+- delegare alla shell l’escaping finale dei candidati;
+- poter essere riutilizzata dai diversi script di completamento senza
+  duplicare la logica di lettura dello stato.
+
+Il primo supporto deve coprire almeno le shell principali dell’ambiente di
+sviluppo del progetto. L’elenco esatto delle shell supportate e il contratto del
+comando interno per i candidati vanno fissati prima dell’implementazione.
+
+### 7.8 Repair e riconciliazione
 
 ```bash
 hydra repair
@@ -593,7 +720,7 @@ e deve poter:
 
 Le correzioni distruttive o ambigue richiedono sempre una conferma esplicita.
 
-### 7.7 Diagnostica dello storage
+### 7.9 Diagnostica dello storage
 
 ```bash
 hydra doctor storage
@@ -625,8 +752,10 @@ hydra head list
 hydra head status <name>
 hydra head path <name>
 hydra head open <name>
+hydra head close <name>
 hydra head remove <name> [--force]
 
+hydra completions <shell>
 hydra repair
 hydra doctor storage
 ```
@@ -714,14 +843,19 @@ Un commit creato in una Head è immediatamente disponibile nel repository condiv
 
 Nell’MVP Hydra non implementa:
 
-- merge automatico;
+- merge automatici o in background al di fuori dell’azione esplicita
+  `hydra head close`;
 - rebase automatico;
 - risoluzione dei conflitti;
 - push o pull impliciti;
 - sincronizzazione automatica con la base;
-- cancellazione automatica dei branch.
+- cancellazione di branch al di fuori delle azioni esplicite e protette
+  `head remove` e `head close`.
 
-Queste operazioni hanno conseguenze abbastanza importanti da dover restare inizialmente sotto il controllo esplicito dell’utente e di Git.
+La chiusura è quindi un’orchestrazione richiesta esplicitamente dall’utente,
+non una sincronizzazione automatica. Le altre operazioni hanno conseguenze
+abbastanza importanti da dover restare inizialmente sotto il controllo
+esplicito dell’utente e di Git.
 
 ---
 
@@ -751,6 +885,11 @@ L’MVP deve gestire in modo prevedibile:
 - perdita del file di stato;
 - rimozione manuale di una directory;
 - modifica diretta delle ref tramite Git.
+- `targetRef` avanzata dopo la creazione della Head;
+- target già aperto in un altro worktree;
+- conflitto durante la chiusura;
+- adapter di chiusura terminato con exit code non-zero;
+- merge riuscito seguito da rimozione protetta fallita.
 
 Per i submodule, l’MVP può dichiarare un supporto limitato e lasciare esplicito il comando necessario per inizializzarli. Non deve fingere che siano già isolati o pronti.
 
@@ -762,6 +901,17 @@ Le operazioni che attraversano più passaggi devono essere progettate come trans
 4. copia overlay;
 5. registrazione;
 6. rollback sicuro o stato riconciliabile in caso di errore.
+
+La chiusura richiede una transazione distinta:
+
+1. validazione della Head e snapshot della target ref;
+2. integrazione isolata o adapter custom;
+3. verifica dell’esito e della target ref risultante;
+4. rimozione protetta soltanto quando configurata;
+5. se l’integrazione nativa fallisce, conservazione della Head e target ref
+   invariata;
+6. se un adapter custom fallisce, conservazione della Head e segnalazione di
+   ogni modifica osservata sulla target ref.
 
 ---
 
@@ -851,13 +1001,15 @@ Per l’MVP, file JSON e scritture atomiche sono sufficienti. SQLite e dipendenz
 | Overlay basato su `.gitignore` | MVP |
 | Status e rimozione protetta | MVP |
 | Apertura tramite comando configurabile | MVP |
+| Chiusura con merge o comando configurabile | MVP |
+| Completamento shell statico e dinamico delle Head | MVP |
 | Repair e riconciliazione | MVP |
 | Hook o comando di setup | v0.2 |
 | Adapter per agenti | v0.2 |
 | Processi runtime e porte | v0.2 |
 | Dashboard web locale | v0.3 |
 | Diff visuale navigabile | v0.3 |
-| Merge/rebase assistiti | v0.3 |
+| Merge/rebase assistiti e risoluzione interattiva | v0.3 |
 | Terminale incorporato | Successivo |
 | Docker e servizi isolati | Successivo |
 | Isolamento di database e cache | Successivo |
@@ -897,7 +1049,14 @@ Hydra v0.1 è conclusa quando:
 22. ricostruisce lo stato dopo la perdita dei metadati Hydra;
 23. rimane compatibile con l’uso diretto dei normali comandi Git;
 24. completa i flussi principali su macOS e Linux;
-25. supera test di integrazione eseguiti su repository temporanei reali, includendo sia il backend CoW sia il fallback di copia.
+25. completa tramite Tab i nomi delle Head nei comandi che richiedono una Head
+    esistente;
+26. chiude una Head integrandola nel `targetRef` e la rimuove soltanto dopo
+    un’integrazione riuscita;
+27. permette un adapter di chiusura custom con rimozione finale configurabile e
+    protetta;
+28. supera test di integrazione eseguiti su repository temporanei reali,
+    includendo sia il backend CoW sia il fallback di copia.
 
 ## 16. Ipotesi da validare
 
