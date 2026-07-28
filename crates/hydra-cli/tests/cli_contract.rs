@@ -53,3 +53,25 @@ fn init_help_uses_the_documented_optional_path_syntax() {
         "init help should expose the documented syntax, got: {stdout:?}"
     );
 }
+
+#[test]
+fn head_create_help_uses_the_documented_nested_syntax() {
+    let output = Command::new(env!("CARGO_BIN_EXE_hydra"))
+        .args(["head", "create", "--help"])
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(
+        output.status.success(),
+        "head create help should succeed, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8(output.stdout).expect("help output should be UTF-8");
+    assert!(
+        stdout.contains("Usage: hydra head create [OPTIONS] <NAME>"),
+        "help should expose the documented nested syntax, got: {stdout:?}"
+    );
+    assert!(stdout.contains("--from <FROM>"));
+    assert!(stdout.contains("--target <TARGET>"));
+}

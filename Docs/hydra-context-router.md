@@ -97,6 +97,7 @@ Docs/
 ├── hydra-context-router.md
 ├── architecture/
 │   ├── architecture-context-router.md
+│   ├── head-creation.md
 │   ├── project-initialization.md
 │   └── system-architecture.md
 ├── development/

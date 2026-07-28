@@ -26,12 +26,24 @@ Hydra/
     │   └── tests/
     │       ├── common/mod.rs
     │       ├── cli_contract.rs
+    │       ├── head_create_conflicts.rs
+    │       ├── head_create_overlay_failures.rs
+    │       ├── head_create_state_failures.rs
+    │       ├── head_create_success.rs
     │       ├── init_conflicts.rs
     │       ├── init_git_errors.rs
     │       └── init_success.rs
     └── hydra-core/
         └── src/
             ├── lib.rs
+            ├── head.rs
+            ├── head/
+            │   ├── error.rs
+            │   ├── git.rs
+            │   ├── materializer.rs
+            │   ├── overlay.rs
+            │   ├── persistence.rs
+            │   └── state.rs
             ├── init.rs
             └── init/
                 ├── artifacts.rs
@@ -99,7 +111,8 @@ temporary repositories.
 ## `hydra-core` Responsibilities
 
 `hydra-core` owns product rules and state-changing workflows independent of the
-terminal interface. It currently owns project initialization, including:
+terminal interface. It currently owns project initialization and Head
+creation, including:
 
 - Git repository and common-directory discovery;
 - derivation and validation of initialization paths;
@@ -107,6 +120,9 @@ terminal interface. It currently owns project initialization, including:
 - real storage capability probing on the Heads volume;
 - atomic publication of state files;
 - rollback of artifacts created by a failed initialization;
+- private branch and no-checkout worktree creation;
+- tracked and overlay materialization with CoW/copy isolation;
+- transactional Head metadata publication and creation rollback;
 - typed errors with preserved sources for operational failures.
 
 Public core APIs return data or typed errors. They do not print, terminate the
@@ -133,6 +149,25 @@ internal responsibilities remain separated:
 These are private implementation modules, not independent services or crates.
 They may depend on one another only through narrow `pub(super)` functions and
 types. The public API continues to be re-exported by `hydra-core/src/lib.rs`.
+
+### Head creation module boundaries
+
+Head creation follows the same small-orchestrator rule:
+
+| Module | Responsibility |
+|---|---|
+| `head.rs` | Validate and orchestrate the complete creation transaction |
+| `head/git.rs` | Discover Git state and own ref, branch, index, worktree, and verification commands |
+| `head/materializer.rs` | Materialize Git tree entries without a standard checkout |
+| `head/overlay.rs` | Expand overlay rules, select safe source files, copy them, and verify content identity |
+| `head/state.rs` | Validate versioned configuration/state, manage the state transaction, and classify commit boundaries |
+| `head/persistence.rs` | Acquire and release the state lock and replace local state atomically |
+| `head/error.rs` | Define and render typed creation, rollback, and post-commit cleanup failures |
+
+The terminal confirmation remains in `hydra-cli`; the core exposes the
+confirmation requirement as data and recomputes the overlay plan after
+confirmation. Detailed workflow ownership is documented in
+[`head-creation.md`](head-creation.md).
 
 ---
 
