@@ -251,7 +251,7 @@ fn inspect_metadata(
     })
 }
 
-fn validated_head_path(
+pub(super) fn validated_head_path(
     heads_directory: &Path,
     name: &str,
     metadata: &HeadMetadata,

@@ -102,6 +102,7 @@ impl HeadMetadata {
 }
 
 pub(super) struct StateSnapshot {
+    configuration: ProjectConfiguration,
     state: LocalState,
     state_path: PathBuf,
 }
@@ -111,7 +112,11 @@ impl StateSnapshot {
         let configuration = ProjectConfiguration::load(&repository.root)?;
         let state_path = installation::inventory_path(&configuration, repository)?;
         let state = read_local_state(&state_path)?;
-        Ok(Self { state, state_path })
+        Ok(Self {
+            configuration,
+            state,
+            state_path,
+        })
     }
 
     pub(super) fn heads(&self) -> &BTreeMap<String, HeadMetadata> {
@@ -127,6 +132,10 @@ impl StateSnapshot {
 
     pub(super) fn heads_directory(&self) -> Result<PathBuf, HeadError> {
         heads_directory_from_state_path(&self.state_path)
+    }
+
+    pub(super) fn branch_prefix(&self) -> &str {
+        self.configuration.branch_prefix()
     }
 }
 
@@ -177,6 +186,10 @@ impl StateTransaction {
             .ok_or_else(|| HeadError::HeadNotFound(name.to_owned()))
     }
 
+    pub(super) fn heads(&self) -> &BTreeMap<String, HeadMetadata> {
+        &self.state.heads
+    }
+
     pub(super) fn branch_prefix(&self) -> &str {
         self.configuration.branch_prefix()
     }
@@ -219,6 +232,26 @@ impl StateTransaction {
                 replace_state_atomically(&self.state_path, &self.original_state, &bytes)
             });
         self.finish_commit(result)
+    }
+
+    pub(super) fn remove_many(mut self, names: &[String]) -> Result<(), HeadError> {
+        for name in names {
+            self.state
+                .heads
+                .remove(name)
+                .ok_or_else(|| HeadError::HeadNotFound(name.clone()))?;
+        }
+        let result = serde_json::to_vec_pretty(&self.state)
+            .map_err(HeadError::SerializeState)
+            .and_then(|mut bytes| {
+                bytes.push(b'\n');
+                replace_state_atomically(&self.state_path, &self.original_state, &bytes)
+            });
+        self.finish_commit(result)
+    }
+
+    pub(super) fn release(self) -> Result<(), HeadError> {
+        self.lock.release()
     }
 
     pub(super) fn abort(self, original: HeadError) -> HeadError {

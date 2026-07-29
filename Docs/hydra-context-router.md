@@ -103,6 +103,7 @@ Docs/
 │   ├── head-inspection.md
 │   ├── head-removal.md
 │   ├── project-initialization.md
+│   ├── repair.md
 │   └── system-architecture.md
 ├── development/
 │   ├── commit-conventions.md

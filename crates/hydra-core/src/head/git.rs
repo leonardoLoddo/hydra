@@ -15,6 +15,12 @@ pub(super) struct Repository {
 }
 
 #[derive(Debug)]
+pub(super) struct RegisteredWorktree {
+    pub(super) path: PathBuf,
+    pub(super) branch: Option<String>,
+}
+
+#[derive(Debug)]
 pub(super) struct TrackedEntry {
     pub(super) mode: String,
     pub(super) object: String,
@@ -47,24 +53,60 @@ impl Repository {
 }
 
 pub(super) fn worktree_paths(repository: &Repository) -> Result<Vec<PathBuf>, HeadError> {
+    registered_worktrees(repository).map(|worktrees| {
+        worktrees
+            .into_iter()
+            .map(|worktree| worktree.path)
+            .collect()
+    })
+}
+
+pub(super) fn registered_worktrees(
+    repository: &Repository,
+) -> Result<Vec<RegisteredWorktree>, HeadError> {
     let output = run_git(
         &repository.root,
         &["worktree", "list", "--porcelain", "-z"],
         "listing Git worktrees",
     )?;
-    let mut paths = Vec::new();
-    for record in output.stdout.split(|byte| *byte == 0) {
+    parse_registered_worktrees(&output.stdout)
+}
+
+fn parse_registered_worktrees(bytes: &[u8]) -> Result<Vec<RegisteredWorktree>, HeadError> {
+    let mut worktrees = Vec::new();
+    let mut current: Option<RegisteredWorktree> = None;
+    for record in bytes.split(|byte| *byte == 0) {
         if let Some(value) = record.strip_prefix(b"worktree ") {
+            if let Some(worktree) = current.take() {
+                worktrees.push(worktree);
+            }
             if value.is_empty() {
                 return Err(HeadError::InvalidGitOutput("worktree path"));
             }
-            paths.push(bytes_to_path(value)?);
+            current = Some(RegisteredWorktree {
+                path: bytes_to_path(value)?,
+                branch: None,
+            });
+        } else if let Some(value) = record.strip_prefix(b"branch ") {
+            let worktree = current
+                .as_mut()
+                .ok_or(HeadError::InvalidGitOutput("worktree list"))?;
+            if value.is_empty() {
+                return Err(HeadError::InvalidGitOutput("worktree branch"));
+            }
+            worktree.branch = Some(
+                String::from_utf8(value.to_vec())
+                    .map_err(|_| HeadError::InvalidGitOutput("worktree branch"))?,
+            );
         }
     }
-    if paths.is_empty() {
+    if let Some(worktree) = current {
+        worktrees.push(worktree);
+    }
+    if worktrees.is_empty() {
         Err(HeadError::InvalidGitOutput("worktree list"))
     } else {
-        Ok(paths)
+        Ok(worktrees)
     }
 }
 
@@ -379,6 +421,22 @@ pub(super) fn remove_registered_worktree(
     ensure_success("removing the Head worktree", &output)
 }
 
+pub(super) fn move_registered_worktree(
+    repository: &Repository,
+    source: &Path,
+    destination: &Path,
+) -> Result<(), HeadError> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(&repository.root)
+        .args(["worktree", "move", "--"])
+        .arg(source)
+        .arg(destination)
+        .output()
+        .map_err(HeadError::GitUnavailable)?;
+    ensure_success("restoring the Head worktree path", &output)
+}
+
 pub(super) fn is_ancestor(
     repository: &Repository,
     ancestor: &str,
@@ -590,7 +648,38 @@ mod tests {
 
     use tempfile::tempdir;
 
-    use super::{Repository, parse_worktree_changes, worktree_matches_commit};
+    use super::{
+        Repository, parse_registered_worktrees, parse_worktree_changes, worktree_matches_commit,
+    };
+
+    #[test]
+    fn porcelain_worktrees_keep_paths_and_symbolic_branches_together() {
+        let worktrees = parse_registered_worktrees(
+            b"worktree /projects/demo\0HEAD 1111\0branch refs/heads/main\0\0\
+              worktree /projects/demo.heads/payment\0HEAD 2222\0branch refs/heads/hydra/payment\0\0",
+        )
+        .expect("porcelain worktrees should parse");
+
+        assert_eq!(worktrees.len(), 2);
+        assert_eq!(worktrees[0].path, Path::new("/projects/demo"));
+        assert_eq!(worktrees[0].branch.as_deref(), Some("refs/heads/main"));
+        assert_eq!(worktrees[1].path, Path::new("/projects/demo.heads/payment"));
+        assert_eq!(
+            worktrees[1].branch.as_deref(),
+            Some("refs/heads/hydra/payment")
+        );
+    }
+
+    #[test]
+    fn porcelain_worktrees_represent_detached_heads_without_a_branch() {
+        let worktrees =
+            parse_registered_worktrees(b"worktree /projects/detached\0HEAD 1111\0detached\0\0")
+                .expect("detached worktree should parse");
+
+        assert_eq!(worktrees.len(), 1);
+        assert_eq!(worktrees[0].path, Path::new("/projects/detached"));
+        assert_eq!(worktrees[0].branch, None);
+    }
 
     #[test]
     fn porcelain_rename_counts_once_as_modified() {

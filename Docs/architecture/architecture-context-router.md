@@ -22,6 +22,7 @@ conventions, which remain in the development domain.
 | [`head-inspection.md`](head-inspection.md) | `hydra status`, `hydra head list`, `hydra head status`, `hydra head path`, read-only inventory access, Git status counting, ahead/behind calculation, or consistency diagnostics | Implemented read-only inspection model, CLI output contracts, trust-boundary validation, Git comparison rules, and verification coverage. |
 | [`head-removal.md`](head-removal.md) | `hydra head remove`, forced removal, worktree deletion, integrated or preserved private branches, inventory removal, or partial-removal recovery | Implemented protected Head-removal transaction, safety validation, branch recoverability, failure boundaries, and regression coverage. |
 | [`head-close.md`](head-close.md) | `hydra head close`, isolated fast-forward or merge integration, target-ref updates, conflict preservation, checked-out targets, or removal after integration | Implemented close transaction, checkout-free integration, compare-and-swap target publication, conflict behavior, and protected-removal composition. |
+| [`repair.md`](repair.md) | `hydra repair`, inventory/worktree reconciliation, stale entries, moved or missing worktrees, untracked Hydra branches, guided recovery, or repair limitations | Implemented read-only repair planning, explicitly confirmed deterministic corrections, report-only inconsistencies, and race-safety boundaries. |
 
 ---
 
@@ -43,6 +44,8 @@ conventions, which remain in the development domain.
   close`.
 - Consult `head-close.md` for every change that integrates a private Head
   branch into its target or composes integration with protected removal.
+- Consult `repair.md` for every change that detects or mutates inconsistent
+  Hydra inventory, worktree paths, or recoverable branch state.
 - Consult both documents when initialization work changes a component boundary
   or introduces a new Git, configuration, state, or filesystem component.
 - Combine this router with the product router for user-visible behavior and

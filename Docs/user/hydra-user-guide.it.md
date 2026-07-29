@@ -37,6 +37,7 @@ Il binario corrente espone:
 ```text
 hydra init [PATH]
 hydra status
+hydra repair
 hydra head create <NAME> [--from <REF>] [--target <BRANCH>]
 hydra head list
 hydra head status <NAME>
@@ -50,13 +51,14 @@ Puoi verificare la sintassi installata con:
 ```bash
 hydra --help
 hydra init --help
+hydra repair --help
 hydra head --help
 hydra head create --help
 hydra head close --help
 hydra head remove --help
 ```
 
-I comandi `open`, `repair`, `doctor` e il completamento
+I comandi `open`, `doctor` e il completamento
 della shell appartengono al contratto MVP, ma non sono ancora implementati.
 
 ---
@@ -387,14 +389,46 @@ l'integrazione riesce ma la rimozione protetta fallisce, l'errore indica il
 commit già pubblicato: non tentare di annullarlo manualmente e ripeti la
 diagnostica sulla Head rimasta.
 
-### 4.8 Stato attuale del ciclo di vita
+### 4.8 Ripara inventario e worktree
 
-Oggi Hydra crea, registra, ispeziona, integra e rimuove le Head. Evita comunque
-di cancellare manualmente una directory Head o di usare `git worktree remove`:
-l’inventario Hydra rimarrebbe incoerente.
+Per confrontare lo stato locale di Hydra con le worktree e i branch Git:
 
-Fino all’implementazione della chiusura, il flusso supportato termina con il
-lavoro e i commit sul branch privato della Head.
+```bash
+hydra repair
+```
+
+Se tutto è coerente, il comando termina senza modifiche:
+
+```text
+Hydra state is consistent.
+```
+
+Hydra può proporti due correzioni deterministiche:
+
+- rimuovere dall’inventario una Head la cui directory e registrazione Git non
+  esistono più, conservando sempre il branch privato;
+- riportare nel percorso gestito una worktree spostata, quando Git associa in
+  modo univoco quel percorso al branch privato registrato.
+
+Entrambe richiedono una conferma esplicita. Una risposta vuota o negativa non
+applica modifiche. Dopo la conferma, Hydra acquisisce il lock, ricontrolla lo
+stato corrente e salta una correzione che nel frattempo non è più valida.
+
+Altre incoerenze vengono soltanto segnalate: worktree Hydra non presenti
+nell’inventario, directory registrate ma mancanti, directory non registrate,
+branch assenti o differenti e associazioni ambigue. Hydra conserva file e ref
+perché Git non contiene informazioni sufficienti per ricostruire con certezza
+base, target, backend e intenzione originaria.
+
+`repair` non elimina lock stale, non corregge ownership o locator e non
+ricostruisce un inventario completamente perso.
+
+### 4.9 Stato attuale del ciclo di vita
+
+Oggi Hydra crea, registra, ispeziona, integra, rimuove e riconcilia le Head.
+Evita comunque di cancellare manualmente una directory Head o di usare
+`git worktree remove`: `hydra repair` può recuperare solo gli stati
+deterministici descritti sopra.
 
 ---
 
@@ -816,7 +850,8 @@ metadata symlinkate e destinazioni annidate dentro altre worktree.
 ### “Hydra is already initialized”
 
 Esiste già `.hydra.json`. Non eseguire nuovamente `hydra init` e non cancellare
-metadati finché non è disponibile un comando di repair.
+metadati. Usa `hydra status` o `hydra repair` per ispezionare lo stato locale;
+il repair corrente non reinizializza il progetto.
 
 ### “configuration version 1 is not supported”
 
@@ -836,8 +871,8 @@ hydra head create experiment --from <COMMIT> --target main
 ### “directory ownership does not match”
 
 Locator e marker non descrivono la stessa installazione. Non correggere gli ID
-a mano e non riutilizzare implicitamente la directory. Il flusso guidato di
-repair è pianificato ma non ancora disponibile.
+a mano e non riutilizzare implicitamente la directory. Il comando `repair`
+corrente richiede un’installazione già validabile e non corregge l’identità.
 
 ### “does not match the versioned directory policy”
 
@@ -850,14 +885,20 @@ configurazione conosciuta senza cancellare le Head; la relocation assistita non
 
 Un’operazione Hydra potrebbe essere attiva oppure essersi interrotta. Non
 eliminare automaticamente il lock: prima verifica processi, worktree, branch e
-inventario. La riconciliazione automatica è pianificata.
+inventario. Il comando `repair` corrente non rimuove lock stale.
 
 ### “Head removal is incomplete”
 
 Git ha già rimosso la worktree, ma Hydra non ha completato inventario o pulizia
 del branch. Non cancellare manualmente il branch indicato: contiene il punto di
-recupero. Ispeziona `git worktree list`, `git show <branch>` e l'output di
-`hydra status`; il comando guidato `hydra repair` è ancora pianificato.
+recupero. Esegui:
+
+```bash
+hydra repair
+```
+
+Se directory e registrazione Git sono assenti ma il branch esiste, Hydra
+propone di rimuovere la sola voce stale e conserva il branch.
 
 ### “Unsafe overlay symlinks”
 
@@ -878,7 +919,6 @@ Il contratto MVP comprende:
 - adapter di chiusura configurabile alternativo all'integrazione Git nativa;
 - completamento della shell per i nomi delle Head;
 - diagnostica del backend storage;
-- repair e riconciliazione;
 - output JSON per automazioni;
 - una skill installabile che insegni agli agenti AI a usare questi flussi senza
   aggirare le protezioni di Hydra.

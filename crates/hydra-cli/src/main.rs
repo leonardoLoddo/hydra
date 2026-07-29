@@ -15,7 +15,7 @@ mod output;
     version,
     about = "Git-native workspace manager for isolated development Heads",
     long_about = "Git-native workspace manager for isolated development Heads.\n\nHydra creates independent working directories while preserving familiar Git refs, branches, and repository workflows.",
-    after_help = "Command syntax:\n  hydra init [PATH]\n  hydra status\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra <command> --help' for details."
+    after_help = "Command syntax:\n  hydra init [PATH]\n  hydra status\n  hydra repair\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra <command> --help' for details."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -33,6 +33,12 @@ enum Command {
     },
     /// Show the project and local Heads
     Status,
+    /// Reconcile Hydra inventory with Git worktrees
+    #[command(
+        long_about = "Reconcile Hydra inventory with Git worktrees.\n\nHydra reports ambiguous inconsistencies without mutation and asks for confirmation before applying deterministic repairs.",
+        after_help = "Examples:\n  hydra repair"
+    )]
+    Repair,
     /// Create and manage Heads
     #[command(
         after_help = "Command syntax:\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra head <command> --help' for details."
@@ -118,6 +124,7 @@ fn main() -> ExitCode {
             }
         },
         Command::Status => inspection::show_project_status(),
+        Command::Repair => repair(),
         Command::Head {
             command: HeadCommand::Create { name, from, target },
         } => create_head(&name, from.as_deref(), target.as_deref()),
@@ -137,6 +144,223 @@ fn main() -> ExitCode {
             command: HeadCommand::Close { name },
         } => close_head(&name),
     }
+}
+
+fn repair() -> ExitCode {
+    let plan = match hydra_core::plan_repairs(Path::new(".")) {
+        Ok(plan) => plan,
+        Err(error) => {
+            eprintln!("error: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    if plan.issues.is_empty() {
+        println!("Hydra state is consistent.");
+        return ExitCode::SUCCESS;
+    }
+
+    for issue in &plan.issues {
+        show_repair_issue(issue);
+    }
+    if plan.stale_inventory.is_empty() && plan.moved_worktrees.is_empty() {
+        println!("No automatic repairs available; manual recovery required.");
+        return ExitCode::SUCCESS;
+    }
+
+    let stdin = io::stdin();
+    let mut input = stdin.lock();
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    let restore_allowed = if plan.moved_worktrees.is_empty() {
+        false
+    } else {
+        match request_moved_worktree_confirmation(
+            &mut input,
+            &mut output,
+            plan.moved_worktrees.len(),
+        ) {
+            Ok(confirmed) => confirmed,
+            Err(error) => {
+                eprintln!("error: failed to read repair confirmation: {error}");
+                return ExitCode::FAILURE;
+            }
+        }
+    };
+    let cleanup_allowed = if plan.stale_inventory.is_empty() {
+        false
+    } else {
+        match request_stale_inventory_confirmation(
+            &mut input,
+            &mut output,
+            plan.stale_inventory.len(),
+        ) {
+            Ok(confirmed) => confirmed,
+            Err(error) => {
+                eprintln!("error: failed to read repair confirmation: {error}");
+                return ExitCode::FAILURE;
+            }
+        }
+    };
+    if !restore_allowed && !cleanup_allowed {
+        println!("No repairs applied.");
+        return ExitCode::SUCCESS;
+    }
+
+    let restore_names = if restore_allowed {
+        plan.moved_worktrees.as_slice()
+    } else {
+        &[]
+    };
+    let cleanup_names = if cleanup_allowed {
+        plan.stale_inventory.as_slice()
+    } else {
+        &[]
+    };
+    match hydra_core::apply_repairs(Path::new("."), cleanup_names, restore_names) {
+        Ok(result) => {
+            let restored = result.restored_worktrees.len();
+            if restored == 1 {
+                println!("Restored 1 Head worktree to its managed path.");
+            } else if restored > 1 {
+                println!("Restored {restored} Head worktrees to their managed paths.");
+            }
+            let removed = result.removed_stale_inventory.len();
+            if removed == 1 {
+                println!("Removed 1 stale inventory entry.");
+            } else if removed > 1 {
+                println!("Removed {removed} stale inventory entries.");
+            }
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("error: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn show_repair_issue(issue: &hydra_core::RepairIssue) {
+    match issue {
+        hydra_core::RepairIssue::StaleInventory {
+            name,
+            path,
+            head_ref,
+        } => println!(
+            "Stale inventory: {name} (missing {}, preserving {head_ref})",
+            safe_path_label(path)
+        ),
+        hydra_core::RepairIssue::MovedHeadWorktree {
+            name,
+            recorded_path: _,
+            registered_path,
+        } => println!(
+            "Moved Head worktree: {name} is registered at {}",
+            safe_path_label(registered_path)
+        ),
+        hydra_core::RepairIssue::UnregisteredHeadDirectory { name, path } => println!(
+            "Unregistered Head directory: {name} at {}; manual recovery required",
+            safe_path_label(path)
+        ),
+        hydra_core::RepairIssue::InvalidHeadDirectory { name, path } => println!(
+            "Invalid Head directory: {name} at {}; manual recovery required",
+            safe_path_label(path)
+        ),
+        hydra_core::RepairIssue::MissingRegisteredWorktree {
+            name,
+            path,
+            head_ref: _,
+        } => println!(
+            "Missing registered worktree: {name} at {}; manual recovery required",
+            safe_path_label(path)
+        ),
+        hydra_core::RepairIssue::MissingHeadBranch { name, head_ref } => {
+            println!("Missing Head branch: {name} expects {head_ref}; manual recovery required");
+        }
+        hydra_core::RepairIssue::WorktreeBranchMismatch {
+            name,
+            path,
+            expected_ref,
+            observed_ref,
+        } => println!(
+            "Worktree branch mismatch: {name} at {} expects {expected_ref}, observed {}; manual recovery required",
+            safe_path_label(path),
+            observed_ref.as_deref().unwrap_or("detached HEAD")
+        ),
+        hydra_core::RepairIssue::MetadataBranchMismatch {
+            name,
+            recorded_ref,
+            expected_ref,
+        } => println!(
+            "Metadata branch mismatch: {name} records {recorded_ref}, expected {expected_ref}; manual recovery required"
+        ),
+        hydra_core::RepairIssue::AmbiguousHeadWorktrees {
+            name,
+            head_ref,
+            paths,
+        } => println!(
+            "Ambiguous Head worktrees: {name} branch {head_ref} appears at {} location(s); manual recovery required",
+            paths.len()
+        ),
+        hydra_core::RepairIssue::UntrackedHydraWorktree {
+            name,
+            path,
+            head_ref: _,
+        } => println!(
+            "Untracked Hydra worktree: {name} at {}; manual recovery required",
+            safe_path_label(path)
+        ),
+        _ => println!("Unknown repair issue; manual recovery required"),
+    }
+}
+
+fn request_stale_inventory_confirmation(
+    input: &mut impl BufRead,
+    output: &mut impl Write,
+    count: usize,
+) -> io::Result<bool> {
+    if count == 1 {
+        write!(
+            output,
+            "Remove 1 stale inventory entry while preserving its branch? [y/N] "
+        )?;
+    } else {
+        write!(
+            output,
+            "Remove {count} stale inventory entries while preserving their branches? [y/N] "
+        )?;
+    }
+    output.flush()?;
+    let mut response = String::new();
+    input.read_line(&mut response)?;
+    Ok(matches!(
+        response.trim().to_ascii_lowercase().as_str(),
+        "y" | "yes"
+    ))
+}
+
+fn request_moved_worktree_confirmation(
+    input: &mut impl BufRead,
+    output: &mut impl Write,
+    count: usize,
+) -> io::Result<bool> {
+    if count == 1 {
+        write!(
+            output,
+            "Move 1 relocated Head worktree back to its managed path? [y/N] "
+        )?;
+    } else {
+        write!(
+            output,
+            "Move {count} relocated Head worktrees back to their managed paths? [y/N] "
+        )?;
+    }
+    output.flush()?;
+    let mut response = String::new();
+    input.read_line(&mut response)?;
+    Ok(matches!(
+        response.trim().to_ascii_lowercase().as_str(),
+        "y" | "yes"
+    ))
 }
 
 fn close_head(name: &str) -> ExitCode {

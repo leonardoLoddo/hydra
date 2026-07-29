@@ -136,6 +136,7 @@ fn help_exposes_the_complete_inspection_syntax() {
     let stdout = String::from_utf8(output.stdout).expect("help output should be UTF-8");
     for syntax in [
         "hydra status",
+        "hydra repair",
         "hydra head list",
         "hydra head status <NAME>",
         "hydra head path <NAME>",
@@ -195,4 +196,19 @@ fn head_close_help_documents_integration_and_protected_removal() {
     assert!(stdout.contains("without checking it out"));
     assert!(stdout.contains("protected removal"));
     assert!(stdout.contains("hydra head close payment"));
+}
+
+#[test]
+fn repair_help_documents_reconciliation_and_confirmation() {
+    let output = Command::new(env!("CARGO_BIN_EXE_hydra"))
+        .args(["repair", "--help"])
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("help output should be UTF-8");
+    assert!(stdout.contains("Usage: hydra repair"));
+    assert!(stdout.contains("Git worktrees"));
+    assert!(stdout.contains("confirmation"));
+    assert!(stdout.contains("hydra repair"));
 }
