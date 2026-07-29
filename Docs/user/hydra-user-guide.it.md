@@ -256,10 +256,21 @@ Worktree: present
 Consistency: ok
 ```
 
-Ahead/behind confronta il branch della Head con lo stato corrente della
-`baseRef`. Il commit tra parentesi nella riga `Base` è invece il commit esatto
-usato durante la creazione. Se la base ref non esiste più, Hydra segnala
-l'incoerenza e usa quel commit esatto come riferimento di fallback.
+Branch, commit e modifiche descrivono ciò che è realmente aperto nella
+worktree. Se usi Git per passare a un altro branch, Hydra conserva anche
+l'intenzione registrata e la rende esplicita:
+
+```text
+Branch: refs/heads/alternate (expected refs/heads/hydra/payment)
+Consistency: worktree branch does not match metadata
+```
+
+Ahead/behind confronta il commit osservato nella worktree con lo stato corrente
+della `baseRef`. Il commit tra parentesi nella riga `Base` è invece il commit
+esatto usato durante la creazione. Se la base ref non esiste più, Hydra segnala
+l'incoerenza e usa quel commit esatto come riferimento di fallback. Se
+l'origine era uno SHA o un'altra espressione non simbolica, il confronto usa
+sempre il `baseCommit` completo e non reinterpreta il testo originale.
 
 Per ottenere soltanto il percorso assoluto registrato:
 
@@ -272,6 +283,12 @@ Questo formato è intenzionalmente componibile:
 ```bash
 cd "$(hydra head path payment)"
 ```
+
+Quando stdout è collegato a una pipeline, Hydra conserva esattamente i byte del
+percorso. Quando il comando scrive direttamente su un terminale, eventuali
+caratteri di controllo vengono mostrati come escape testuali per non produrre
+sequenze terminale ambigue o pericolose. Anche i percorsi negli output umani di
+`status` sono sempre neutralizzati.
 
 I quattro comandi di ispezione sono read-only: non creano il lock
 `heads.json.lock`, non aggiornano i metadati e non eseguono repair. Se una

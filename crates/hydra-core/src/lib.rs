@@ -5,6 +5,7 @@ mod init;
 
 pub use head::{
     ChangeCounts, CreateHeadOptions, CreatedHead, HeadError, HeadInspection, HeadSummary,
-    ProjectInspection, create_head, head_path, inspect_head, inspect_project, list_heads,
+    ProjectInspection, WorktreeHead, create_head, head_path, inspect_head, inspect_project,
+    list_heads,
 };
 pub use init::{InitError, InitializedProject, StorageBackend, initialize};

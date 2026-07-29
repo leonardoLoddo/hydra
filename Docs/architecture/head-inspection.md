@@ -61,7 +61,11 @@ refs are inspectable inconsistencies and are reported without mutation.
 lexicographic order. Empty state produces successful empty output.
 
 `hydra head path <name>` returns only the validated absolute recorded path plus
-a newline. An unknown name fails without stdout.
+a newline. An unknown name fails without stdout. When stdout is not a terminal,
+the Unix implementation writes the exact path bytes for command substitution
+and pipelines. On a terminal, control characters are rendered as textual
+escapes. Human-readable status output always applies the same safe rendering
+to paths and persisted text.
 
 `hydra status` returns:
 
@@ -78,7 +82,8 @@ Summary status is:
 
 `hydra head status <name>` returns recorded intent and observed state:
 
-- path, private branch, current branch commit;
+- path, observed worktree branch and current worktree commit;
+- the expected private branch when the observed branch differs;
 - base ref and exact creation commit;
 - target ref;
 - modified, added, deleted, and untracked counts;
@@ -104,14 +109,21 @@ second path without counting it as another change.
 Ahead/behind comes from:
 
 ```text
-git rev-list --left-right --count <baseRef>...<headRef>
+git rev-list --left-right --count <resolved-base-commit>...<worktree-commit>
 ```
 
 The displayed order is `ahead/behind`, reversing Git's left/right field order.
-The comparison uses the current `baseRef`, so advancement of the source branch
-is visible. The separately displayed `baseCommit` preserves the exact creation
-point. If the recorded base ref no longer exists, Hydra reports the
-inconsistency and falls back to `baseCommit` for the comparison.
+For a symbolic base, Hydra first resolves the current `baseRef` to its full
+commit, so advancement of the source branch is visible. For every
+non-symbolic base, including an abbreviated object ID, Hydra uses the recorded
+full `baseCommit` and never re-resolves the original expression. If a symbolic
+base no longer exists, Hydra reports the inconsistency and falls back to that
+same exact creation commit.
+
+The right side is the commit observed through the worktree's `HEAD`, not the
+commit currently referenced by the recorded private branch. This keeps branch,
+commit, changes, and ahead/behind at one observational grain when direct Git
+usage switches or detaches the worktree.
 
 Consistency checks currently cover:
 
@@ -121,6 +133,7 @@ Consistency checks currently cover:
 - missing base refs, with comparison fallback to the exact creation commit;
 - missing target refs;
 - worktree branches that differ from recorded metadata;
+- detached worktree state;
 - worktree branch or status queries that cannot be read.
 
 ---
@@ -134,7 +147,10 @@ CLI integration tests use disposable Git repositories and prove:
 - clean and modified classification;
 - exact detailed metadata and change counts;
 - ahead and behind changes when the Head and base ref advance independently;
+- observed branch and commit reporting after a direct Git branch switch;
+- deterministic comparison for abbreviated non-symbolic bases;
 - path-only output;
+- safe terminal rendering with exact non-terminal path bytes;
 - unknown-name rejection;
 - missing worktree, base-ref, and target-ref diagnostics without repair;
 - rejection of recorded paths outside the owned Heads directory;

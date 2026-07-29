@@ -11,8 +11,8 @@ use std::path::{Path, PathBuf};
 pub use error::HeadError;
 use git::Repository;
 pub use inspection::{
-    ChangeCounts, HeadInspection, HeadSummary, ProjectInspection, head_path, inspect_head,
-    inspect_project, list_heads,
+    ChangeCounts, HeadInspection, HeadSummary, ProjectInspection, WorktreeHead, head_path,
+    inspect_head, inspect_project, list_heads,
 };
 use materializer::materialize_tracked_files;
 use overlay::{OverlayPlan, materialize_overlays, plan_overlays};

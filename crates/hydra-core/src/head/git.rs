@@ -67,6 +67,7 @@ pub(super) fn ref_exists(repository: &Repository, reference: &str) -> Result<boo
         .arg("-C")
         .arg(&repository.root)
         .args(["show-ref", "--verify", "--quiet"])
+        .arg("--")
         .arg(reference)
         .output()
         .map_err(HeadError::GitUnavailable)?;
@@ -94,10 +95,10 @@ pub(super) fn commit_for_ref(
 
 pub(super) fn ahead_behind(
     repository: &Repository,
-    base: &str,
-    head_ref: &str,
+    base_commit: &str,
+    head_commit: &str,
 ) -> Result<(usize, usize), HeadError> {
-    let range = format!("{base}...{head_ref}");
+    let range = format!("{base_commit}...{head_commit}");
     let output = run_git(
         &repository.root,
         &["rev-list", "--left-right", "--count", &range],
@@ -128,13 +129,29 @@ pub(super) fn worktree_changes(path: &Path) -> Result<WorktreeChanges, HeadError
     parse_worktree_changes(&output.stdout)
 }
 
-pub(super) fn symbolic_head(path: &Path) -> Result<String, HeadError> {
+pub(super) fn symbolic_head(path: &Path) -> Result<Option<String>, HeadError> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(path)
+        .args(["symbolic-ref", "--quiet", "HEAD"])
+        .output()
+        .map_err(HeadError::GitUnavailable)?;
+    if output.status.success() {
+        stdout_line(&output, "Head branch").map(Some)
+    } else if output.status.code() == Some(1) {
+        Ok(None)
+    } else {
+        Err(command_failure("reading the Head branch", &output))
+    }
+}
+
+pub(super) fn worktree_commit(path: &Path) -> Result<String, HeadError> {
     let output = run_git(
         path,
-        &["symbolic-ref", "--quiet", "HEAD"],
-        "reading the Head branch",
+        &["rev-parse", "--verify", "HEAD^{commit}"],
+        "reading the worktree commit",
     )?;
-    stdout_line(&output, "Head branch")
+    stdout_line(&output, "worktree commit")
 }
 
 pub(super) fn resolve_commit(

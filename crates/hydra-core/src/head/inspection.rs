@@ -27,7 +27,8 @@ pub struct HeadSummary {
 pub struct HeadInspection {
     pub name: String,
     pub path: PathBuf,
-    pub head_ref: String,
+    pub recorded_head_ref: String,
+    pub worktree_head: WorktreeHead,
     pub commit: Option<String>,
     pub base_ref: String,
     pub base_commit: String,
@@ -39,6 +40,13 @@ pub struct HeadInspection {
     pub behind: Option<usize>,
     pub worktree_present: bool,
     pub consistency_issues: Vec<String>,
+}
+
+#[derive(Debug)]
+pub enum WorktreeHead {
+    Branch(String),
+    Detached,
+    Unavailable,
 }
 
 #[derive(Debug)]
@@ -170,21 +178,39 @@ fn inspect_metadata(
     if !git::ref_exists(repository, metadata.target_ref())? {
         consistency_issues.push("target ref is missing".to_owned());
     }
+    let creation_commit = git::commit_for_ref(repository, metadata.base_commit())?;
     let comparison_base = if metadata.base_ref().starts_with("refs/")
         && !git::ref_exists(repository, metadata.base_ref())?
     {
         consistency_issues.push("base ref is missing".to_owned());
-        metadata.base_commit()
+        creation_commit.clone()
+    } else if metadata.base_ref().starts_with("refs/") {
+        git::commit_for_ref(repository, metadata.base_ref())?
     } else {
-        metadata.base_ref()
+        creation_commit
     };
 
     let mut changes = None;
+    let mut worktree_head = WorktreeHead::Unavailable;
+    let mut commit = None;
     if worktree_present {
         match git::symbolic_head(&path) {
-            Ok(reference) if reference == metadata.head_ref() => {}
-            Ok(_) => consistency_issues.push("worktree branch does not match metadata".to_owned()),
+            Ok(Some(reference)) if reference == metadata.head_ref() => {
+                worktree_head = WorktreeHead::Branch(reference);
+            }
+            Ok(Some(reference)) => {
+                worktree_head = WorktreeHead::Branch(reference);
+                consistency_issues.push("worktree branch does not match metadata".to_owned());
+            }
+            Ok(None) => {
+                worktree_head = WorktreeHead::Detached;
+                consistency_issues.push("worktree is detached".to_owned());
+            }
             Err(_) => consistency_issues.push("worktree branch is unreadable".to_owned()),
+        }
+        match git::worktree_commit(&path) {
+            Ok(observed_commit) => commit = Some(observed_commit),
+            Err(_) => consistency_issues.push("worktree commit is unreadable".to_owned()),
         }
         match git::worktree_changes(&path) {
             Ok(status) => {
@@ -199,13 +225,8 @@ fn inspect_metadata(
         }
     }
 
-    let commit = if head_ref_exists {
-        Some(git::commit_for_ref(repository, metadata.head_ref())?)
-    } else {
-        None
-    };
-    let (ahead, behind) = if head_ref_exists {
-        let (ahead, behind) = git::ahead_behind(repository, comparison_base, metadata.head_ref())?;
+    let (ahead, behind) = if let Some(observed_commit) = &commit {
+        let (ahead, behind) = git::ahead_behind(repository, &comparison_base, observed_commit)?;
         (Some(ahead), Some(behind))
     } else {
         (None, None)
@@ -214,7 +235,8 @@ fn inspect_metadata(
     Ok(HeadInspection {
         name: name.to_owned(),
         path,
-        head_ref: metadata.head_ref().to_owned(),
+        recorded_head_ref: metadata.head_ref().to_owned(),
+        worktree_head,
         commit,
         base_ref: metadata.base_ref().to_owned(),
         base_commit: metadata.base_commit().to_owned(),

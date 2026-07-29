@@ -7,6 +7,7 @@ use std::{
 use clap::{Parser, Subcommand};
 
 mod inspection;
+mod output;
 
 #[derive(Parser)]
 #[command(
@@ -220,15 +221,7 @@ fn write_created_head_path(
 }
 
 fn safe_path_label(path: &Path) -> String {
-    let mut label = String::new();
-    for character in path.to_string_lossy().chars() {
-        if character.is_control() {
-            label.extend(character.escape_default());
-        } else {
-            label.push(character);
-        }
-    }
-    label
+    output::safe_path_label(path)
 }
 
 #[cfg(unix)]

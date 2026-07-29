@@ -52,6 +52,28 @@ fn revision(repository: &std::path::Path, reference: &str) -> String {
         .to_owned()
 }
 
+fn commit_empty(repository: &std::path::Path, message: &str) {
+    let output = run_git(
+        repository,
+        &[
+            "-c",
+            "user.name=Hydra Tests",
+            "-c",
+            "user.email=hydra-tests@example.invalid",
+            "commit",
+            "--quiet",
+            "--allow-empty",
+            "-m",
+            message,
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "empty fixture commit should succeed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
 #[test]
 fn project_status_and_head_list_report_local_heads_in_name_order_without_mutation() {
     let directory = TestDirectory::new("head-list");
@@ -175,6 +197,83 @@ fn head_status_reports_metadata_git_changes_and_ahead_behind() {
 }
 
 #[test]
+fn head_status_uses_the_commit_really_open_in_the_worktree() {
+    let directory = TestDirectory::new("head-observed-branch");
+    let repository = create_initialized_project(&directory);
+    create_head(&repository, "payment");
+    let head_path = heads_directory(&repository).join("payment");
+    let output = run_git(&repository, &["branch", "alternate"]);
+    assert!(output.status.success());
+    let output = run_git(&head_path, &["switch", "--quiet", "alternate"]);
+    assert!(output.status.success());
+    commit_empty(&head_path, "alternate progress");
+    let observed_commit = revision(&head_path, "HEAD");
+
+    let output = hydra_command()
+        .args(["head", "status", "payment"])
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(
+        output.status.success(),
+        "a branch mismatch should remain inspectable, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).expect("status output should be UTF-8");
+    assert!(stdout.contains("Branch: refs/heads/alternate (expected refs/heads/hydra/payment)\n"));
+    assert!(stdout.contains(&format!("Commit: {observed_commit}\n")));
+    assert!(stdout.contains("Ahead/behind: 1/0\n"));
+    assert!(stdout.contains("Consistency: worktree branch does not match metadata\n"));
+}
+
+#[test]
+fn abbreviated_detached_base_remains_bound_to_its_exact_creation_commit() {
+    let directory = TestDirectory::new("head-abbreviated-base");
+    let repository = create_initialized_project(&directory);
+    let base_commit = revision(&repository, "HEAD");
+    let abbreviated = base_commit
+        .get(..7)
+        .expect("fixture commit should have an abbreviated form");
+    let output = hydra_command()
+        .args([
+            "head",
+            "create",
+            "detached",
+            "--from",
+            abbreviated,
+            "--target",
+            "main",
+        ])
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+    assert!(
+        output.status.success(),
+        "Head creation should succeed, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    commit_empty(&repository, "main progress");
+    let output = run_git(&repository, &["branch", abbreviated, "main"]);
+    assert!(output.status.success());
+
+    let output = hydra_command()
+        .args(["head", "status", "detached"])
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(
+        output.status.success(),
+        "the stored exact commit should remain authoritative, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).expect("status output should be UTF-8");
+    assert!(stdout.contains("Ahead/behind: 0/0\n"));
+    assert!(stdout.contains("Consistency: ok\n"));
+}
+
+#[test]
 fn head_path_prints_only_the_recorded_absolute_path() {
     let directory = TestDirectory::new("head-path");
     let repository = create_initialized_project(&directory);
@@ -194,6 +293,32 @@ fn head_path_prints_only_the_recorded_absolute_path() {
         format!("{}\n", head_path.display())
     );
     assert!(output.stderr.is_empty());
+}
+
+#[test]
+fn human_status_escapes_control_characters_in_paths() {
+    let directory = TestDirectory::new("head-\u{1b}unsafe-path");
+    let repository = create_initialized_project(&directory);
+    create_head(&repository, "payment");
+
+    for arguments in [vec!["status"], vec!["head", "status", "payment"]] {
+        let output = hydra_command()
+            .args(arguments)
+            .current_dir(&repository)
+            .output()
+            .expect("Hydra CLI should start");
+
+        assert!(output.status.success());
+        assert!(
+            !output.stdout.contains(&0x1b),
+            "human status must not emit a terminal escape byte"
+        );
+        assert!(
+            String::from_utf8(output.stdout)
+                .expect("status output should be UTF-8")
+                .contains("\\u{1b}")
+        );
+    }
 }
 
 #[test]

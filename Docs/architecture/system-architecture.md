@@ -24,7 +24,8 @@ Hydra/
     ├── hydra-cli/
     │   ├── src/
     │   │   ├── inspection.rs
-    │   │   └── main.rs
+    │   │   ├── main.rs
+    │   │   └── output.rs
     │   └── tests/
     │       ├── common/mod.rs
     │       ├── cli_contract.rs
@@ -188,6 +189,7 @@ confirmation. Detailed workflow ownership is documented in
 | `head/git.rs` | Execute and parse the Git queries shared by creation and inspection |
 | `head/state.rs` | Load the versioned inventory without taking the mutation lock and expose metadata through narrow internal accessors |
 | `hydra-cli/src/inspection.rs` | Render project summaries, detailed Head status, ordered names, paths, and command exit status |
+| `hydra-cli/src/output.rs` | Neutralize control characters for human terminal output while allowing command-specific raw machine output |
 
 Inspection reuses the same configuration, locator, ownership, and directory
 policy validation as creation. It does not acquire `heads.json.lock`, write

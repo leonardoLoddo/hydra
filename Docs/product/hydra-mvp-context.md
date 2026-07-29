@@ -631,15 +631,25 @@ poter essere composto con shell, IDE e automazioni.
 
 `hydra status` mostra il progetto, la directory fisica delle Head e una sintesi
 `clean`, `modified` o `inconsistent` per ogni Head. `hydra head status` espone
-il dettaglio. I conteggi ahead/behind confrontano il branch della Head con la
-`baseRef` corrente; il `baseCommit` resta visibile separatamente come commit
-esatto dal quale la Head è stata creata.
+il dettaglio. Branch, commit e modifiche descrivono la `HEAD` realmente aperta
+nella worktree. Se differisce dalla `headRef` registrata, Hydra mostra entrambe
+e segnala l'incoerenza.
+
+I conteggi ahead/behind confrontano il commit osservato nella worktree con il
+commit corrente della `baseRef` simbolica. Per un'origine non simbolica, come
+uno SHA abbreviato, usano sempre il `baseCommit` completo registrato: una
+successiva ref con lo stesso nome non può cambiare retroattivamente la base.
+Il `baseCommit` resta visibile come commit esatto dal quale la Head è stata
+creata.
 
 Questi comandi sono strettamente read-only: non acquisiscono il lock destinato
 alle mutazioni, non riscrivono l'inventario e non tentano repair impliciti.
 Un'incoerenza ispezionabile, come una directory mancante o una target ref
 scomparsa, viene mostrata senza correggerla. Metadati che indirizzano fuori
 dalla directory delle Head posseduta vengono invece rifiutati come non sicuri.
+Gli output destinati alle persone neutralizzano i caratteri di controllo nei
+percorsi e nei valori persistiti. `hydra head path`, quando stdout non è un
+terminale, conserva invece il percorso esatto per la composizione in pipeline.
 
 ### 7.4 Apertura
 
