@@ -1159,6 +1159,8 @@ Per l’MVP, file JSON e scritture atomiche sono sufficienti. SQLite e dipendenz
 | Chiusura con merge o comando configurabile | MVP |
 | Completamento shell statico e dinamico delle Head | MVP |
 | Repair e riconciliazione | MVP |
+| Guida utente italiana mantenuta | MVP |
+| Skill operativa installabile per agenti AI | MVP |
 | Head Recipe condivisibili e materializzabili | Successivo |
 | Hook o comando di setup | v0.2 |
 | Adapter per agenti | v0.2 |
@@ -1174,6 +1176,39 @@ Per l’MVP, file JSON e scritture atomiche sono sufficienti. SQLite e dipendenz
 | Filesystem virtuale Hydra | Solo se diventa necessario garantire CoW su volumi non compatibili |
 
 Dashboard, runtime e agenti rimangono parte della visione, ma vengono costruiti sopra un motore delle Head già affidabile.
+
+### Skill operativa per agenti AI
+
+L’MVP deve includere almeno una skill installabile che permetta a un agente AI
+di usare Hydra in modo autonomo, efficace e sicuro. La skill è un asset di
+istruzioni operative, distinto da un adapter o da un’integrazione runtime:
+insegna all’agente a usare la CLI esistente senza introdurre un protocollo
+proprietario, un daemon o accesso diretto ai metadati interni.
+
+La skill deve guidare almeno questi comportamenti:
+
+- verificare repository, configurazione e comandi realmente disponibili;
+- scegliere consapevolmente nome, origine e target di una Head;
+- creare la Head e spostare il proprio contesto operativo nella directory
+  restituita;
+- lavorare e committare soltanto sul branch privato della Head;
+- usare i futuri comandi `status`, `path`, `open`, `close` e `remove` quando
+  saranno implementati, senza anticiparne la sintassi;
+- non modificare manualmente locator, marker, inventario o lock;
+- non sostituire i comandi protetti di Hydra con cancellazioni filesystem o
+  rimozioni worktree distruttive;
+- fermarsi e riportare lo stato quando ownership, policy, working tree o
+  integrazione non consentono un’azione sicura.
+
+La guida utente italiana rimane la sorgente operativa leggibile dalle persone.
+La skill deve derivarne comandi, vincoli e procedure senza creare una seconda
+specifica divergente. Ogni modifica a un workflow rilevante aggiorna nello
+stesso intervento codice, help, test, guida e skill.
+
+La prima skill può essere confezionata per uno specifico ecosistema di agenti,
+ma le istruzioni canoniche devono restare il più possibile indipendenti dal
+vendor, così da poter produrre varianti per altri agenti senza ridefinire il
+comportamento di Hydra.
 
 ### Head Recipe condivisibili
 
@@ -1249,7 +1284,13 @@ Hydra v0.1 è conclusa quando:
 27. permette un adapter di chiusura custom con rimozione finale configurabile e
     protetta;
 28. supera test di integrazione eseguiti su repository temporanei reali,
-    includendo sia il backend CoW sia il fallback di copia.
+    includendo sia il backend CoW sia il fallback di copia;
+29. mantiene una guida utente italiana che distingue comportamento disponibile
+    e pianificato e documenta flusso base, configurazione, customizzazioni,
+    sicurezza e troubleshooting;
+30. distribuisce almeno una skill installabile per agenti AI, allineata alla
+    guida utente e verificata su un repository temporaneo, che usa Hydra senza
+    aggirarne le protezioni.
 
 ## 16. Ipotesi da validare
 

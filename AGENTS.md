@@ -430,6 +430,29 @@ Update documentation when a change introduces or alters:
 
 Update the owning leaf document, its router, and every affected ancestor router in the same task.
 
+For every user-visible CLI, configuration, workflow, validation, output, or
+recovery change, agents MUST also follow the User documentation route selected
+by the macro-router and update the maintained Italian user documentation in the
+same task.
+
+User documentation MUST:
+
+- describe implemented behavior as available only when code, help, and tests
+  support it;
+- label future behavior explicitly as planned or unavailable;
+- keep command examples copyable and aligned with the current CLI;
+- explain advanced customization together with its safety constraints and
+  current operational limitations;
+- avoid asking users to edit local Hydra metadata or perform unsafe Git or
+  filesystem recovery manually.
+
+Once an installable Hydra skill for AI agents exists, any change to a workflow,
+command, configuration field, safety rule, or recovery procedure used by that
+skill MUST update the skill in the same task. Before the skill exists, every
+such change must still assess and preserve its documented MVP requirements.
+The skill is an operational projection of Hydra's canonical product and user
+documentation, not an independent source of product behavior.
+
 If no documentation update is needed, state why in the final report.
 
 ---
@@ -448,6 +471,8 @@ A task is not complete when any applicable item is missing:
 - existing behavior and compatibility were preserved;
 - Rust formatting, compilation, lint, and test gates passed;
 - documentation impact was assessed and routed docs were updated when needed;
+- user documentation and AI-agent skill impact were assessed when behavior is
+  externally observable;
 - changed documentation links and router topology were verified;
 - limitations, assumptions, and unverified areas were reported.
 
@@ -465,6 +490,8 @@ A task is not complete when any applicable item is missing:
 - [ ] Focused tests and complete Cargo quality gates passed
 - [ ] Destructive behavior tested only in disposable environments
 - [ ] Documentation impact assessed
+- [ ] Italian user documentation updated for user-visible changes
+- [ ] AI-agent skill impact assessed and the skill updated when present
 - [ ] Routers updated for documentation topology changes
 - [ ] Commit convention followed when a commit was created or proposed
 - [ ] Remaining assumptions or limitations reported
