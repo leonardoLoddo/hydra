@@ -115,6 +115,12 @@ The CLI should not own Git discovery, path policy, persistence, rollback, or
 other domain decisions. Keeping those operations in the core allows tests and
 future interfaces to reuse one implementation.
 
+For unsafe overlay symlinks, the CLI owns only presentation and confirmation:
+it renders the relative paths returned by the core and translates an explicit
+answer into retry authorization. Selection of the exact exclusion rules,
+validation, atomic `.hydra.json` replacement, and the ordering before Git
+mutation remain core responsibilities.
+
 CLI integration tests execute the compiled `hydra` binary and assert externally
 observable behavior. Tests that mutate Git or the filesystem use newly created
 temporary repositories.
@@ -187,6 +193,13 @@ The terminal confirmation remains in `hydra-cli`; the core exposes the
 confirmation requirement as data and recomputes the overlay plan after
 confirmation. Detailed workflow ownership is documented in
 [`head-creation.md`](head-creation.md).
+
+When planning returns unsafe overlay symlinks, the core reports every
+deterministically ordered relative path. A confirmed retry appends literal,
+root-anchored negation rules to the loaded project configuration, replaces
+`.hydra.json` atomically while the Head state lock is held, and replans before
+creating a branch or worktree. Other unsafe path classes never enter this
+configuration-update flow.
 
 The core also owns typed Head-creation phase events, while the CLI owns whether
 and how to render them. The executable writes these events only to interactive

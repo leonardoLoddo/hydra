@@ -178,6 +178,13 @@ impl StateTransaction {
         self.configuration.overlay_rules()
     }
 
+    pub(super) fn exclude_unsafe_overlay_symlinks(
+        &mut self,
+        paths: &[PathBuf],
+    ) -> Result<(), HeadError> {
+        self.configuration.exclude_unsafe_overlay_symlinks(paths)
+    }
+
     pub(super) fn heads_directory(&self) -> Result<PathBuf, HeadError> {
         heads_directory_from_state_path(&self.state_path)
     }

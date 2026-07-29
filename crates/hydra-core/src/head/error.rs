@@ -41,6 +41,9 @@ pub enum HeadError {
         files: usize,
         bytes: u64,
     },
+    UnsafeOverlaySymlinks {
+        paths: Vec<PathBuf>,
+    },
     OverlayRules(String),
     UnsafeOverlayPath(PathBuf),
     UnsafeHeadPath(PathBuf),
@@ -53,8 +56,10 @@ pub enum HeadError {
         path: PathBuf,
     },
     InvalidGitOutput(&'static str),
+    ConcurrentConfigurationChange(PathBuf),
     ConcurrentStateChange(PathBuf),
     StateLockExists(PathBuf),
+    SerializeConfiguration(serde_json::Error),
     SerializeState(serde_json::Error),
     Timestamp(time::error::Format),
     FileSystem {
@@ -62,6 +67,7 @@ pub enum HeadError {
         path: PathBuf,
         source: std::io::Error,
     },
+    ConfigurationCommittedWithCleanupFailure(Box<HeadError>),
     RollbackFailed {
         original: Box<HeadError>,
         failures: Vec<String>,
@@ -118,6 +124,11 @@ impl fmt::Display for HeadError {
                 formatter,
                 "copying {files} overlay file(s) ({bytes} byte(s)) requires confirmation"
             ),
+            Self::UnsafeOverlaySymlinks { paths } => write!(
+                formatter,
+                "{} unsafe overlay symlink(s) require exclusion",
+                paths.len()
+            ),
             Self::OverlayRules(error) => write!(formatter, "overlay rules are invalid: {error}"),
             Self::UnsafeOverlayPath(path) => display_unsafe_path(formatter, "overlay", path),
             Self::UnsafeHeadPath(path) => display_unsafe_path(formatter, "recorded Head", path),
@@ -147,17 +158,15 @@ impl fmt::Display for HeadError {
                 path.display()
             ),
             Self::InvalidGitOutput(field) => write!(formatter, "Git returned an invalid {field}"),
-            Self::ConcurrentStateChange(path) => write!(
-                formatter,
-                "Hydra state {} changed while the Head was being created",
-                path.display()
-            ),
-            Self::StateLockExists(path) => write!(
-                formatter,
-                "another Hydra state operation owns lock {}",
-                path.display()
-            ),
-            Self::SerializeState(error) => write!(formatter, "could not serialize state: {error}"),
+            Self::ConcurrentConfigurationChange(_)
+            | Self::ConcurrentStateChange(_)
+            | Self::StateLockExists(_)
+            | Self::SerializeConfiguration(_)
+            | Self::SerializeState(_)
+            | Self::ConfigurationCommittedWithCleanupFailure(_)
+            | Self::HeadCommittedWithCleanupFailure(_) => {
+                display_persistence_failure(formatter, self)
+            }
             Self::Timestamp(error) => write!(formatter, "could not format creation time: {error}"),
             Self::FileSystem {
                 action,
@@ -167,10 +176,42 @@ impl fmt::Display for HeadError {
             Self::RollbackFailed { original, failures } => {
                 display_rollback_failure(formatter, original, failures)
             }
-            Self::HeadCommittedWithCleanupFailure(error) => {
-                display_committed_cleanup_failure(formatter, error)
-            }
         }
+    }
+}
+
+fn display_persistence_failure(
+    formatter: &mut fmt::Formatter<'_>,
+    error: &HeadError,
+) -> fmt::Result {
+    match error {
+        HeadError::ConcurrentConfigurationChange(path) => write!(
+            formatter,
+            "Hydra configuration {} changed while exclusions were being saved",
+            path.display()
+        ),
+        HeadError::ConcurrentStateChange(path) => write!(
+            formatter,
+            "Hydra state {} changed while the Head was being created",
+            path.display()
+        ),
+        HeadError::StateLockExists(path) => write!(
+            formatter,
+            "another Hydra state operation owns lock {}",
+            path.display()
+        ),
+        HeadError::SerializeConfiguration(error) => {
+            write!(formatter, "could not serialize configuration: {error}")
+        }
+        HeadError::SerializeState(error) => write!(formatter, "could not serialize state: {error}"),
+        HeadError::ConfigurationCommittedWithCleanupFailure(error) => write!(
+            formatter,
+            ".hydra.json was updated, but cleanup failed: {error}"
+        ),
+        HeadError::HeadCommittedWithCleanupFailure(error) => {
+            display_committed_cleanup_failure(formatter, error)
+        }
+        _ => unreachable!("caller selects persistence failures"),
     }
 }
 
@@ -314,10 +355,11 @@ impl Error for HeadError {
             Self::InvalidConfiguration { source, .. }
             | Self::InvalidState { source, .. }
             | Self::InvalidLocalMetadata { source, .. } => Some(source),
-            Self::SerializeState(error) => Some(error),
+            Self::SerializeConfiguration(error) | Self::SerializeState(error) => Some(error),
             Self::Timestamp(error) => Some(error),
             Self::FileSystem { source, .. } => Some(source),
-            Self::RollbackFailed { original, .. }
+            Self::ConfigurationCommittedWithCleanupFailure(original)
+            | Self::RollbackFailed { original, .. }
             | Self::HeadCommittedWithCleanupFailure(original) => Some(original.as_ref()),
             _ => None,
         }

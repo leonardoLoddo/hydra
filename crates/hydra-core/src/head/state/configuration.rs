@@ -1,16 +1,18 @@
 use std::{
-    fs,
-    path::{Path, PathBuf},
+    fs::{self, File, OpenOptions},
+    io::Write,
+    path::{Component, Path, PathBuf},
 };
 
-use serde::{Deserialize, de::Error as _};
+use serde::{Deserialize, Serialize, de::Error as _};
+use uuid::Uuid;
 
 use super::super::HeadError;
 
 const CONFIG_FILE_NAME: &str = ".hydra.json";
 const SUPPORTED_CONFIGURATION_VERSION: u32 = 2;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ProjectConfiguration {
     version: u32,
@@ -20,9 +22,13 @@ pub(super) struct ProjectConfiguration {
     #[serde(rename = "storage")]
     _storage: StorageConfiguration,
     overlay: OverlayConfiguration,
+    #[serde(skip)]
+    path: PathBuf,
+    #[serde(skip)]
+    original_bytes: Vec<u8>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(tag = "strategy", rename_all = "camelCase", deny_unknown_fields)]
 enum HeadsDirectoryPolicy {
     Sibling {
@@ -37,26 +43,26 @@ enum HeadsDirectoryPolicy {
     Local,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 enum RelativeBase {
     RepositoryParent,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct StorageConfiguration {
     #[serde(rename = "mode")]
     _mode: StorageMode,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 enum StorageMode {
     #[serde(rename = "auto")]
     Auto,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct OverlayConfiguration {
     copy: Vec<String>,
@@ -71,13 +77,18 @@ impl ProjectConfiguration {
             path: path.clone(),
             source,
         })?;
-        let configuration: Self = serde_json::from_slice(&bytes)
-            .map_err(|source| HeadError::InvalidConfiguration { path, source })?;
+        let mut configuration: Self =
+            serde_json::from_slice(&bytes).map_err(|source| HeadError::InvalidConfiguration {
+                path: path.clone(),
+                source,
+            })?;
         if configuration.version != SUPPORTED_CONFIGURATION_VERSION {
             return Err(HeadError::UnsupportedConfigurationVersion(
                 configuration.version,
             ));
         }
+        configuration.path = path;
+        configuration.original_bytes = bytes;
         Ok(configuration)
     }
 
@@ -91,6 +102,24 @@ impl ProjectConfiguration {
 
     pub(super) fn overlay_rules(&self) -> &[String] {
         &self.overlay.copy
+    }
+
+    pub(super) fn exclude_unsafe_overlay_symlinks(
+        &mut self,
+        paths: &[PathBuf],
+    ) -> Result<(), HeadError> {
+        let rules = paths
+            .iter()
+            .map(|path| literal_overlay_exclusion(path))
+            .collect::<Result<Vec<_>, _>>()?;
+        self.overlay.copy.extend(rules);
+
+        let mut replacement =
+            serde_json::to_vec_pretty(self).map_err(HeadError::SerializeConfiguration)?;
+        replacement.push(b'\n');
+        replace_configuration_atomically(&self.path, &self.original_bytes, &replacement)?;
+        self.original_bytes = replacement;
+        Ok(())
     }
 
     pub(super) fn resolve_heads_directory(
@@ -121,6 +150,139 @@ impl ProjectConfiguration {
             HeadsDirectoryPolicy::Local => Ok(located_heads.to_path_buf()),
         }
     }
+}
+
+fn literal_overlay_exclusion(path: &Path) -> Result<String, HeadError> {
+    validate_overlay_exclusion_path(path)?;
+    let mut rule = String::from("!/");
+    let mut first_component = true;
+    for component in path.components() {
+        let Component::Normal(component) = component else {
+            return Err(HeadError::UnsafeOverlayPath(path.to_path_buf()));
+        };
+        let component = component
+            .to_str()
+            .ok_or_else(|| HeadError::UnsafeOverlayPath(path.to_path_buf()))?;
+        if !first_component {
+            rule.push('/');
+        }
+        first_component = false;
+        for character in component.chars() {
+            if matches!(character, '\\' | '*' | '?' | '[' | ']' | '!' | '#' | ' ') {
+                rule.push('\\');
+            }
+            rule.push(character);
+        }
+    }
+    Ok(rule)
+}
+
+fn validate_overlay_exclusion_path(path: &Path) -> Result<(), HeadError> {
+    if path.as_os_str().is_empty()
+        || path.components().any(|component| {
+            !matches!(component, Component::Normal(value) if value
+                .to_str()
+                .is_some_and(|value| !value.chars().any(char::is_control)))
+        })
+    {
+        Err(HeadError::UnsafeOverlayPath(path.to_path_buf()))
+    } else {
+        Ok(())
+    }
+}
+
+fn replace_configuration_atomically(
+    path: &Path,
+    expected: &[u8],
+    replacement: &[u8],
+) -> Result<(), HeadError> {
+    let current = fs::read(path).map_err(|source| HeadError::FileSystem {
+        action: "re-read Hydra configuration",
+        path: path.to_path_buf(),
+        source,
+    })?;
+    if current != expected {
+        return Err(HeadError::ConcurrentConfigurationChange(path.to_path_buf()));
+    }
+
+    let file_name = path
+        .file_name()
+        .ok_or_else(|| HeadError::UnsafeProjectFile(path.to_path_buf()))?;
+    let temporary = path.with_file_name(format!(
+        ".{}.tmp-{}",
+        file_name.to_string_lossy(),
+        Uuid::new_v4().simple()
+    ));
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temporary)
+        .map_err(|source| HeadError::FileSystem {
+            action: "create temporary Hydra configuration",
+            path: temporary.clone(),
+            source,
+        })?;
+    if let Err(source) = file.write_all(replacement).and_then(|()| file.sync_all()) {
+        drop(file);
+        return Err(remove_temporary_configuration_after_error(
+            &temporary,
+            HeadError::FileSystem {
+                action: "write temporary Hydra configuration",
+                path: temporary.clone(),
+                source,
+            },
+        ));
+    }
+    drop(file);
+
+    if let Err(source) = fs::rename(&temporary, path) {
+        return Err(remove_temporary_configuration_after_error(
+            &temporary,
+            HeadError::FileSystem {
+                action: "publish Hydra configuration",
+                path: path.to_path_buf(),
+                source,
+            },
+        ));
+    }
+    sync_configuration_parent(path)
+        .map_err(|error| HeadError::ConfigurationCommittedWithCleanupFailure(Box::new(error)))
+}
+
+fn remove_temporary_configuration_after_error(path: &Path, original: HeadError) -> HeadError {
+    match fs::remove_file(path) {
+        Ok(()) => original,
+        Err(cleanup) => HeadError::RollbackFailed {
+            original: Box::new(original),
+            failures: vec![
+                HeadError::FileSystem {
+                    action: "remove temporary Hydra configuration",
+                    path: path.to_path_buf(),
+                    source: cleanup,
+                }
+                .to_string(),
+            ],
+        },
+    }
+}
+
+#[cfg(unix)]
+fn sync_configuration_parent(path: &Path) -> Result<(), HeadError> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| HeadError::UnsafeProjectFile(path.to_path_buf()))?;
+    File::open(parent)
+        .and_then(|directory| directory.sync_all())
+        .map_err(|source| HeadError::FileSystem {
+            action: "synchronize Hydra configuration directory",
+            path: parent.to_path_buf(),
+            source,
+        })
+}
+
+#[cfg(not(unix))]
+fn sync_configuration_parent(_path: &Path) -> Result<(), HeadError> {
+    Ok(())
 }
 
 fn deserialize_suffix<'de, D>(deserializer: D) -> Result<String, D::Error>
@@ -173,5 +335,47 @@ fn validate_regular_file(path: &Path, configuration: bool) -> Result<(), HeadErr
             path: path.to_path_buf(),
             source,
         }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{fs, path::Path};
+
+    use super::{literal_overlay_exclusion, replace_configuration_atomically};
+    use crate::head::HeadError;
+
+    #[test]
+    fn literal_exclusions_escape_gitignore_metacharacters_and_spaces() {
+        let rule = literal_overlay_exclusion(Path::new("deps/[local] *?#!/bin"))
+            .expect("portable path should become an exclusion");
+
+        assert_eq!(rule, "!/deps/\\[local\\]\\ \\*\\?\\#\\!/bin");
+    }
+
+    #[test]
+    fn atomic_configuration_replacement_preserves_a_concurrent_edit() {
+        let temporary = tempfile::tempdir().expect("temporary directory should be created");
+        let path = temporary.path().join(".hydra.json");
+        let original = b"{\"version\":2}\n";
+        let concurrent = b"{\"version\":2,\"concurrent\":true}\n";
+        fs::write(&path, original).expect("original configuration should be written");
+        fs::write(&path, concurrent).expect("concurrent edit should be written");
+
+        let error = replace_configuration_atomically(
+            &path,
+            original,
+            b"{\"version\":2,\"replacement\":true}\n",
+        )
+        .expect_err("a concurrent edit must not be overwritten");
+
+        assert!(matches!(
+            error,
+            HeadError::ConcurrentConfigurationChange(changed) if changed == path
+        ));
+        assert_eq!(
+            fs::read(&path).expect("configuration should remain readable"),
+            concurrent
+        );
     }
 }

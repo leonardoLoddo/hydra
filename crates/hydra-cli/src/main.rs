@@ -114,7 +114,7 @@ fn main() -> ExitCode {
 
 fn create_head(name: &str, from: Option<&str>, target: Option<&str>) -> ExitCode {
     let progress_enabled = io::stderr().is_terminal();
-    let create = |confirmed_full_copy| {
+    let create = |confirmed_full_copy, exclude_unsafe_overlay_symlinks| {
         hydra_core::create_head_with_progress(
             Path::new("."),
             hydra_core::CreateHeadOptions {
@@ -122,6 +122,7 @@ fn create_head(name: &str, from: Option<&str>, target: Option<&str>) -> ExitCode
                 from: from.map(str::to_owned),
                 target: target.map(str::to_owned),
                 confirmed_full_copy,
+                exclude_unsafe_overlay_symlinks,
             },
             |progress| {
                 if progress_enabled {
@@ -131,7 +132,36 @@ fn create_head(name: &str, from: Option<&str>, target: Option<&str>) -> ExitCode
         )
     };
 
-    match create(false) {
+    let mut exclude_unsafe_overlay_symlinks = false;
+    let first_result = create(false, false);
+    let result = match first_result {
+        Err(hydra_core::HeadError::UnsafeOverlaySymlinks { paths }) => {
+            let stdin = io::stdin();
+            let mut input = stdin.lock();
+            let stdout = io::stdout();
+            let mut output = stdout.lock();
+            let confirmed =
+                request_unsafe_symlink_exclusion(&mut input, &mut output, paths.as_slice());
+            let confirmed = match confirmed {
+                Ok(confirmed) => confirmed,
+                Err(error) => {
+                    eprintln!(
+                        "error: failed to read unsafe-symlink exclusion confirmation: {error}"
+                    );
+                    return ExitCode::FAILURE;
+                }
+            };
+            if !confirmed {
+                eprintln!("error: Head creation cancelled");
+                return ExitCode::FAILURE;
+            }
+            exclude_unsafe_overlay_symlinks = true;
+            create(false, true)
+        }
+        result => result,
+    };
+
+    match result {
         Err(hydra_core::HeadError::OverlayFullCopyConfirmationRequired { files, bytes }) => {
             let stdin = io::stdin();
             let mut input = stdin.lock();
@@ -149,7 +179,7 @@ fn create_head(name: &str, from: Option<&str>, target: Option<&str>) -> ExitCode
                 eprintln!("error: Head creation cancelled");
                 return ExitCode::FAILURE;
             }
-            finish_head_creation(create(true))
+            finish_head_creation(create(true, exclude_unsafe_overlay_symlinks))
         }
         result => finish_head_creation(result),
     }
@@ -224,6 +254,26 @@ fn request_full_copy_confirmation(
         output,
         "Full copy required: {files} file(s), {bytes} byte(s)\nContinue? [y/N] "
     )?;
+    output.flush()?;
+
+    let mut response = String::new();
+    input.read_line(&mut response)?;
+    Ok(matches!(
+        response.trim().to_ascii_lowercase().as_str(),
+        "y" | "yes"
+    ))
+}
+
+fn request_unsafe_symlink_exclusion(
+    input: &mut impl BufRead,
+    output: &mut impl Write,
+    paths: &[PathBuf],
+) -> io::Result<bool> {
+    writeln!(output, "Unsafe overlay symlinks:")?;
+    for path in paths {
+        writeln!(output, "  {}", safe_path_label(path))?;
+    }
+    write!(output, "Exclude them and update .hydra.json? [y/N] ")?;
     output.flush()?;
 
     let mut response = String::new();

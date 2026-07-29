@@ -173,6 +173,11 @@ Materializing 10000 overlay entries...
 Questi messaggi non vengono emessi quando `stderr` è rediretto o catturato da
 un'automazione; l'output finale del comando rimane invariato.
 
+Se gli overlay selezionano link simbolici non sicuri, Hydra li elenca tutti
+prima di creare branch o worktree e può proporti di escluderli dalla
+configurazione condivisa. Il flusso è descritto nella sezione
+[Symlink non sicuri](#symlink-non-sicuri).
+
 Puoi entrare nella Head come in qualunque progetto:
 
 ```bash
@@ -498,6 +503,57 @@ Un overlay può contenere credenziali o configurazioni locali. Hydra lo copia
 nella Head, ma non lo rende sicuro automaticamente: mantieni correttamente
 ignorati i segreti e controlla sempre `git status`.
 
+### Symlink non sicuri
+
+Un symlink overlay assoluto, rotto o che risolve fuori dal progetto non può
+essere ricreato in sicurezza nella Head. Hydra raccoglie tutti i casi rilevati
+e chiede:
+
+```text
+Unsafe overlay symlinks:
+  links/escape
+  public/storage
+Exclude them and update .hydra.json? [y/N]
+```
+
+Rispondendo `y` o `yes`, Hydra aggiunge in fondo a `overlay.copy` esclusioni
+letterali e ancorate:
+
+```json
+{
+  "overlay": {
+    "copy": [
+      "... .gitignore",
+      "!/links/escape",
+      "!/public/storage"
+    ]
+  }
+}
+```
+
+La pianificazione viene quindi ripetuta e la Head viene creata senza quei
+link. Il comportamento è generale e non dipende dal nome `public/storage`:
+vale per tutti i symlink non sicuri selezionati dagli overlay. I symlink
+relativi che rimangono dentro il progetto continuano invece a essere
+materializzati normalmente.
+
+Invio, EOF, `n` o qualunque altra risposta annullano la creazione senza
+modificare `.hydra.json`, branch, worktree o inventario. La configurazione
+viene salvata atomicamente e Hydra rifiuta di sovrascriverla se è cambiata nel
+frattempo. Dopo una risposta positiva, controlla e versiona la modifica:
+
+```bash
+git diff -- .hydra.json
+git add .hydra.json
+git commit -m "chore: exclude unsafe Hydra overlays"
+```
+
+L'esclusione confermata rimane anche se in seguito annulli una distinta
+richiesta di copia completa: hai già autorizzato una modifica persistente alla
+configurazione. File speciali, collisioni con file tracciati e symlink divenuti
+non sicuri durante la materializzazione restano errori e non modificano
+automaticamente le regole.
+
 ### Conferma della copia completa
 
 Hydra materializza ogni file overlay regolare tentando prima il copy-on-write.
@@ -649,6 +705,10 @@ Hydra rifiuta campi sconosciuti e campi appartenenti a una strategy diversa.
 Versiona `.hydra.json`, ma non inserire percorsi assoluti o informazioni
 specifiche della macchina.
 
+Le esclusioni guidate per symlink non sicuri vengono aggiunte come regole
+negative `!/<percorso>` in fondo a `overlay.copy`. La posizione finale è
+intenzionale perché la selezione usa la regola corrispondente più recente.
+
 ---
 
 ## 11. Stato locale: non modificarlo manualmente
@@ -717,6 +777,15 @@ configurazione conosciuta senza cancellare le Head; la relocation assistita non
 Un’operazione Hydra potrebbe essere attiva oppure essersi interrotta. Non
 eliminare automaticamente il lock: prima verifica processi, worktree, branch e
 inventario. La riconciliazione automatica è pianificata.
+
+### “Unsafe overlay symlinks”
+
+Hydra ha selezionato uno o più symlink che non possono essere ricreati dentro
+la Head senza uscire dal progetto o dipendere da un percorso assoluto. Accetta
+il prompt soltanto se quei link non servono alla Head. Hydra aggiornerà
+`.hydra.json`; revisiona e committa la modifica. Se il link è necessario,
+rispondi negativamente e sostituiscilo nel progetto con un symlink relativo che
+risolva interamente dentro la root.
 
 ---
 

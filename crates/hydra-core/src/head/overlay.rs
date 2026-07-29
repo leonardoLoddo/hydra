@@ -151,6 +151,7 @@ pub(super) fn plan_overlays(
         .map(|entry| entry.path.clone())
         .collect::<HashSet<_>>();
     let mut files = Vec::new();
+    let mut unsafe_symlinks = BTreeSet::new();
     visit_directory(
         source_root,
         &canonical_source_root,
@@ -158,7 +159,13 @@ pub(super) fn plan_overlays(
         &matcher,
         &tracked,
         &mut files,
+        &mut unsafe_symlinks,
     )?;
+    if !unsafe_symlinks.is_empty() {
+        return Err(HeadError::UnsafeOverlaySymlinks {
+            paths: unsafe_symlinks.into_iter().collect(),
+        });
+    }
     files.sort_by(|left, right| left.relative.cmp(&right.relative));
     assign_regular_identities(source_root, &mut files)?;
     let mut probe = CopyOnWriteProbe::create(heads_directory)?;
@@ -308,6 +315,7 @@ fn visit_directory(
     matcher: &Gitignore,
     tracked: &HashSet<PathBuf>,
     files: &mut Vec<OverlayFile>,
+    unsafe_symlinks: &mut BTreeSet<PathBuf>,
 ) -> Result<(), HeadError> {
     let mut entries = fs::read_dir(directory)
         .map_err(|source| HeadError::FileSystem {
@@ -352,6 +360,7 @@ fn visit_directory(
                 matcher,
                 tracked,
                 files,
+                unsafe_symlinks,
             )?;
         } else if matcher
             .matched_path_or_any_parents(&relative, false)
@@ -366,8 +375,13 @@ fn visit_directory(
                     requires_full_copy: false,
                 }
             } else if metadata.file_type().is_symlink() {
-                OverlayKind::Symlink {
-                    target: plan_overlay_symlink(canonical_source_root, &source)?,
+                match plan_overlay_symlink(canonical_source_root, &source) {
+                    Ok(target) => OverlayKind::Symlink { target },
+                    Err(HeadError::UnsafeOverlayPath(_)) => {
+                        unsafe_symlinks.insert(relative);
+                        continue;
+                    }
+                    Err(error) => return Err(error),
                 }
             } else {
                 return Err(HeadError::UnsafeOverlayPath(source));

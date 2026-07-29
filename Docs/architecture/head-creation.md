@@ -88,6 +88,34 @@ confirm the fallback. EOF, an empty response, and every other value cancel it
 with a non-zero exit status. Cancellation occurs before branch, worktree, or
 state creation.
 
+Unsafe overlay symlinks use a separate explicit repair prompt. Planning
+collects every selected symlink that is absolute, broken, escaping, or
+unsupported on the current platform and returns relative paths in
+deterministic order. The CLI renders:
+
+```text
+Unsafe overlay symlinks:
+  links/escape
+  public/storage
+Exclude them and update .hydra.json? [y/N]
+```
+
+Only `y` and `yes` authorize the update. A negative answer or EOF leaves
+`.hydra.json`, Git, the Heads directory, and the inventory unchanged. On a
+confirmed retry, the core converts each relative path into a literal,
+root-anchored Gitignore negation such as `!/public/storage`, appends the rules
+to `overlay.copy` so last-match-wins semantics exclude those entries, replaces
+`.hydra.json` atomically, and replans. Metacharacters and spaces are escaped;
+paths that cannot be represented safely in the versioned JSON rules remain
+errors. The resulting `.hydra.json` modification is intentionally visible to
+Git and must be reviewed and committed by the user.
+
+This repair applies only to symlinks rejected during initial overlay planning.
+Tracked collisions, special files, unsafe included-rule paths, and concurrent
+changes during materialization remain hard errors. A symlink that becomes
+unsafe after Git mutation begins also remains an error and triggers normal
+rollback rather than another configuration prompt.
+
 The core API remains independent of stdin, stdout, and process exit status. A
 caller confirms a previously presented full-copy fallback through
 `CreateHeadOptions::confirmed_full_copy`; the core recomputes the plan on the
@@ -185,6 +213,16 @@ The state is read and parsed while that lock is held. Every normal success,
 validation failure, cancellation, and pre-commit operational failure releases
 the lock. A pre-existing lock is not stolen or removed.
 
+A confirmed unsafe-symlink exclusion is persisted while this same lock is
+held. Hydra compares `.hydra.json` byte-for-byte with the version loaded for
+the operation, writes and synchronizes a unique sibling temporary file,
+atomically renames it over the configuration, and synchronizes the parent
+directory on Unix. A concurrent configuration edit is rejected rather than
+overwritten. The configuration update is a separately authorized durable
+result: if a later full-copy prompt is declined or Head creation fails for an
+unrelated reason, the accepted exclusions remain versioned working-tree
+changes.
+
 ---
 
 ## Creation Transaction
@@ -193,6 +231,10 @@ After all predictable validation and overlay planning, the implementation
 performs:
 
 ```text
+persist confirmed unsafe-symlink exclusions, if any
+        ↓
+replan overlays
+        ↓
 create private branch at baseCommit
         ↓
 register worktree without checkout
@@ -320,6 +362,12 @@ Overlay protection rejects:
 - a source that no longer resolves inside the repository at materialization
   time.
 
+Initial planning reports all selected unsafe symlinks together so the CLI can
+offer their exact persistent exclusions. If that repair is not explicitly
+authorized, the protection remains a rejection and no Head artifact is
+created. Safe relative symlinks continue through normal materialization and
+are never proposed for exclusion.
+
 Parent directories are deduplicated and created before regular-file
 materialization. Each source is then revalidated immediately before use. Hydra
 uses the same CoW-first, exclusive-copy fallback as tracked regular files, but
@@ -398,8 +446,11 @@ repositories. Current coverage proves:
 - rejection of unsafe names, unknown refs, missing targets, duplicates,
   existing branches, and existing destinations;
 - preservation and isolation of safe relative overlay symlinks;
-- rejection of tracked-file overlay collisions and absolute or escaping
-  overlay symlinks;
+- explicit, atomic exclusion of multiple absolute or escaping overlay symlinks
+  after confirmation, plus cancellation that preserves configuration and Git
+  state;
+- rejection of tracked-file overlay collisions and unsafe overlay paths not
+  covered by the symlink-exclusion repair;
 - rejection of malformed, obsolete, newer, or unsupported configuration and
   local metadata;
 - stable resolution when creation is invoked from an existing Head;

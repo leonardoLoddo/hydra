@@ -575,6 +575,17 @@ la nuova Head. Questo permette di conservare strutture locali come
 `node_modules/.bin` e `vendor/bin` senza collegare la Head al workspace
 sorgente o a percorsi esterni.
 
+Se la pianificazione seleziona uno o più symlink assoluti, rotti o in uscita
+dal progetto, Hydra deve raccogliere tutti i relativi percorsi portabili prima
+di proporre una correzione. La CLI può chiedere esplicitamente se aggiungere in
+fondo a `overlay.copy` regole di negazione letterali e ancorate per quei soli
+percorsi. Una risposta negativa, EOF o input non riconosciuto non modifica
+configurazione, branch, worktree o stato. Una risposta positiva autorizza una
+scrittura atomica di `.hydra.json` prima di qualunque mutazione Git; la
+configurazione versionata rimane una modifica visibile che l'utente deve
+revisionare e committare. Hydra non deve estendere questa autorizzazione a file
+speciali, collisioni con file tracciati o altri errori di sicurezza.
+
 ---
 
 ## 7. MVP v0.1
@@ -936,6 +947,9 @@ la stessa grammatica concettuale e lo stesso tono operativo di Git:
   mostrati su `stderr` soltanto se `stderr` è un terminale interattivo; pipe,
   file e automazioni non ricevono questi messaggi;
 - un riepilogo informativo non richiede conferma;
+- quando la pianificazione trova symlink overlay non sicuri, la CLI elenca
+  tutti i percorsi relativi e può chiedere se escluderli in modo persistente
+  aggiornando `.hydra.json`;
 - la conferma è riservata a un fallback o a un’azione con un costo o rischio
   materiale che Hydra ha rilevato concretamente.
 

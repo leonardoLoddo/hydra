@@ -29,6 +29,7 @@ pub struct CreateHeadOptions {
     pub from: Option<String>,
     pub target: Option<String>,
     pub confirmed_full_copy: bool,
+    pub exclude_unsafe_overlay_symlinks: bool,
 }
 
 #[derive(Debug)]
@@ -96,10 +97,15 @@ pub fn create_head_with_progress(
     validate_head_name(&options.name)?;
 
     let repository = Repository::discover(source_path)?;
-    let transaction = StateTransaction::open(&repository)?;
+    let mut transaction = StateTransaction::open(&repository)?;
     let mut report_progress = ProgressReporter::new(report_progress);
 
-    let prepared = match prepare_head(&repository, &transaction, &options, &mut report_progress) {
+    let prepared = match prepare_head(
+        &repository,
+        &mut transaction,
+        &options,
+        &mut report_progress,
+    ) {
         Ok(prepared) => prepared,
         Err(error) => return Err(transaction.abort(error)),
     };
@@ -172,7 +178,7 @@ struct PreparedHead {
 
 fn prepare_head(
     repository: &Repository,
-    transaction: &StateTransaction,
+    transaction: &mut StateTransaction,
     options: &CreateHeadOptions,
     report_progress: &mut ProgressReporter<impl FnMut(HeadCreationProgress)>,
 ) -> Result<PreparedHead, HeadError> {
@@ -199,7 +205,21 @@ fn prepare_head(
         &heads_directory,
         transaction.overlay_rules(),
         &tracked_entries,
-    )?;
+    );
+    let overlay_plan = match overlay_plan {
+        Err(HeadError::UnsafeOverlaySymlinks { paths })
+            if options.exclude_unsafe_overlay_symlinks =>
+        {
+            transaction.exclude_unsafe_overlay_symlinks(&paths)?;
+            plan_overlays(
+                &repository.root,
+                &heads_directory,
+                transaction.overlay_rules(),
+                &tracked_entries,
+            )?
+        }
+        result => result?,
+    };
     if overlay_plan.full_copy_file_count() > 0 && !options.confirmed_full_copy {
         return Err(HeadError::OverlayFullCopyConfirmationRequired {
             files: overlay_plan.full_copy_file_count(),
