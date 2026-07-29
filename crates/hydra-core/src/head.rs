@@ -6,10 +6,13 @@ mod overlay;
 mod persistence;
 mod state;
 
-use std::path::{Path, PathBuf};
+use std::{
+    panic::{AssertUnwindSafe, catch_unwind},
+    path::{Path, PathBuf},
+};
 
 pub use error::HeadError;
-use git::Repository;
+use git::{Repository, TrackedEntry};
 pub use inspection::{
     ChangeCounts, HeadInspection, HeadSummary, ProjectInspection, WorktreeHead, head_path,
     inspect_head, inspect_project, list_heads,
@@ -38,6 +41,34 @@ pub struct CreatedHead {
     pub overlay_bytes: u64,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum HeadCreationProgress {
+    PlanningOverlays,
+    MaterializingTrackedEntries { entries: usize },
+    MaterializingOverlayEntries { entries: usize },
+}
+
+struct ProgressReporter<Observer> {
+    observer: Observer,
+    enabled: bool,
+}
+
+impl<Observer: FnMut(HeadCreationProgress)> ProgressReporter<Observer> {
+    fn new(observer: Observer) -> Self {
+        Self {
+            observer,
+            enabled: true,
+        }
+    }
+
+    fn report(&mut self, progress: HeadCreationProgress) {
+        if self.enabled && catch_unwind(AssertUnwindSafe(|| (self.observer)(progress))).is_err() {
+            self.enabled = false;
+        }
+    }
+}
+
 /// Creates an isolated Git worktree and records it as a Hydra Head.
 ///
 /// # Errors
@@ -49,12 +80,26 @@ pub fn create_head(
     source_path: &Path,
     options: CreateHeadOptions,
 ) -> Result<CreatedHead, HeadError> {
+    create_head_with_progress(source_path, options, |_| {})
+}
+
+/// Creates an isolated Git worktree and reports coarse-grained progress.
+///
+/// # Errors
+///
+/// Returns [`HeadError`] under the same conditions as [`create_head`].
+pub fn create_head_with_progress(
+    source_path: &Path,
+    options: CreateHeadOptions,
+    report_progress: impl FnMut(HeadCreationProgress),
+) -> Result<CreatedHead, HeadError> {
     validate_head_name(&options.name)?;
 
     let repository = Repository::discover(source_path)?;
     let transaction = StateTransaction::open(&repository)?;
+    let mut report_progress = ProgressReporter::new(report_progress);
 
-    let prepared = match prepare_head(&repository, &transaction, &options) {
+    let prepared = match prepare_head(&repository, &transaction, &options, &mut report_progress) {
         Ok(prepared) => prepared,
         Err(error) => return Err(transaction.abort(error)),
     };
@@ -64,12 +109,9 @@ pub fn create_head(
     }
     let creation = create_worktree(
         &repository,
-        &prepared.heads_directory,
-        &prepared.head_path,
-        &prepared.branch,
-        &prepared.base_commit,
-        &prepared.overlay_plan,
+        &prepared,
         options.confirmed_full_copy,
+        &mut report_progress,
     );
     let storage_backend = match creation {
         Ok(backend) => backend,
@@ -124,6 +166,7 @@ struct PreparedHead {
     base_commit: String,
     base_ref: String,
     target_ref: String,
+    tracked_entries: Vec<TrackedEntry>,
     overlay_plan: OverlayPlan,
 }
 
@@ -131,6 +174,7 @@ fn prepare_head(
     repository: &Repository,
     transaction: &StateTransaction,
     options: &CreateHeadOptions,
+    report_progress: &mut ProgressReporter<impl FnMut(HeadCreationProgress)>,
 ) -> Result<PreparedHead, HeadError> {
     if transaction.contains_head(&options.name) {
         return Err(HeadError::HeadAlreadyExists(options.name.clone()));
@@ -149,6 +193,7 @@ fn prepare_head(
     let base_ref = git::normalize_ref(repository, requested_base)?;
     let target_ref = resolve_target_ref(repository, options.target.as_deref(), &base_ref)?;
     let tracked_entries = git::tracked_entries(repository, &base_commit)?;
+    report_progress.report(HeadCreationProgress::PlanningOverlays);
     let overlay_plan = plan_overlays(
         &repository.root,
         &heads_directory,
@@ -169,29 +214,47 @@ fn prepare_head(
         base_commit,
         base_ref,
         target_ref,
+        tracked_entries,
         overlay_plan,
     })
 }
 
 fn create_worktree(
     repository: &Repository,
-    heads_directory: &Path,
-    head_path: &Path,
-    branch: &str,
-    base_commit: &str,
-    overlay_plan: &OverlayPlan,
+    prepared: &PreparedHead,
     confirmed_full_copy: bool,
+    report_progress: &mut ProgressReporter<impl FnMut(HeadCreationProgress)>,
 ) -> Result<StorageBackend, HeadError> {
-    git::add_worktree(repository, head_path, branch)?;
-    git::initialize_index(head_path, base_commit)?;
-    let mut backend =
-        materialize_tracked_files(repository, heads_directory, head_path, base_commit)?;
-    if materialize_overlays(repository, overlay_plan, head_path, confirmed_full_copy)?
-        == StorageBackend::FullCopy
+    let reuse_tracked_sources = git::worktree_matches_commit(repository, &prepared.base_commit)?;
+    git::add_worktree(repository, &prepared.head_path, &prepared.branch)?;
+    git::initialize_index(&prepared.head_path, &prepared.base_commit)?;
+    if !prepared.tracked_entries.is_empty() {
+        report_progress.report(HeadCreationProgress::MaterializingTrackedEntries {
+            entries: prepared.tracked_entries.len(),
+        });
+    }
+    let mut backend = materialize_tracked_files(
+        repository,
+        &prepared.heads_directory,
+        &prepared.head_path,
+        &prepared.tracked_entries,
+        reuse_tracked_sources,
+    )?;
+    if prepared.overlay_plan.file_count() > 0 {
+        report_progress.report(HeadCreationProgress::MaterializingOverlayEntries {
+            entries: prepared.overlay_plan.file_count(),
+        });
+    }
+    if materialize_overlays(
+        repository,
+        &prepared.overlay_plan,
+        &prepared.head_path,
+        confirmed_full_copy,
+    )? == StorageBackend::FullCopy
     {
         backend = StorageBackend::FullCopy;
     }
-    git::verify_clean_worktree(head_path)?;
+    git::verify_clean_worktree(&prepared.head_path)?;
     Ok(backend)
 }
 
@@ -262,5 +325,26 @@ fn ensure_destination_absent(path: &Path) -> Result<(), HeadError> {
             path: path.to_path_buf(),
             source,
         }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::Cell;
+
+    use super::{HeadCreationProgress, ProgressReporter};
+
+    #[test]
+    fn a_panicking_progress_observer_is_disabled_after_the_first_panic() {
+        let calls = Cell::new(0);
+        let mut reporter = ProgressReporter::new(|_| {
+            calls.set(calls.get() + 1);
+            panic!("progress observers must not interrupt Head creation");
+        });
+
+        reporter.report(HeadCreationProgress::PlanningOverlays);
+        reporter.report(HeadCreationProgress::PlanningOverlays);
+
+        assert_eq!(calls.get(), 1);
     }
 }

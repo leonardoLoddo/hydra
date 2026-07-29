@@ -103,6 +103,13 @@ Hydra non riclona l’intero repository per ogni Head. Condivide l’object data
 
 L’obiettivo è che ogni Head occupi inizialmente soprattutto lo spazio delle proprie differenze, pur continuando ad apparire come una directory completa a qualunque programma.
 
+Le directory operative con migliaia di file devono essere elaborate senza
+avviare un processo Git per ogni file. Hydra raggruppa l'hashing degli overlay
+in batch limitati, esegue batch indipendenti con un numero limitato di worker e
+riusa un unico flusso Git batch quando deve leggere più blob tracciati,
+preservando ordine dei risultati, controlli di contenuto, isolamento e
+sicurezza.
+
 ### Nessuna sincronizzazione implicita
 
 Una Head nasce da un commit preciso e non cambia automaticamente quando il branch sorgente avanza. Aggiornamento, rebase e integrazione devono essere azioni esplicite.
@@ -259,6 +266,12 @@ Hydra non deve collegare una Head a un particolare path sorgente. Per ogni file 
 Una sorgente può essere modificata dopo la clonazione senza compromettere le Head già create: il filesystem separa automaticamente i blocchi.
 
 Hydra non deve fidarsi soltanto di nome, dimensione o timestamp. Prima del riuso deve verificare che il contenuto corrisponda all’identità attesa.
+
+Quando lo stato tracciato del workspace corrente coincide interamente con il
+`baseCommit`, i suoi file regolari possono essere riusati direttamente come
+sorgenti CoW. Se il confronto rileva una modifica tracciata, Hydra deve
+materializzare dai blob del commit e non deve usare selettivamente contenuti
+non verificati del workspace.
 
 ### Garanzia e ottimizzazione
 
@@ -525,10 +538,16 @@ Durante la creazione di una Head, Hydra:
 2. espande le direttive `... <file>`;
 3. valuta tutte le regole in ordine;
 4. considera soltanto i percorsi esistenti nella sorgente;
-5. calcola quantità, dimensione logica e identità dei contenuti;
-6. mostra un riepilogo e gli eventuali avvisi;
-7. affida i file selezionati al Materializer;
-8. usa CoW o copia completa secondo le capacità del volume.
+5. calcola quantità e dimensione logica, conserva il target dei link simbolici
+   e ordina deterministicamente i percorsi selezionati;
+6. calcola le identità dei file regolari tramite batch Git limitati e worker
+   concorrenti limitati, preservando l'associazione ordinata tra percorso e
+   hash;
+7. verifica per ogni file regolare la capacità CoW verso il volume effettivo
+   delle Head, senza generalizzare il successo di un file agli altri;
+8. mostra un riepilogo e gli eventuali avvisi;
+9. affida i file selezionati al Materializer;
+10. usa CoW o copia completa secondo il piano verificato.
 
 Hydra deve rispettare la semantica dei pattern Git e non interpretarli come semplici glob del filesystem.
 
@@ -540,12 +559,21 @@ Indipendentemente dalla configurazione, Hydra non deve:
 - copiare la directory che contiene le Head;
 - collocare la directory delle Head dentro il working tree principale o dentro un’altra Head;
 - seguire symlink che escono dalla root del progetto;
+- ricreare symlink assoluti, rotti o il cui target finale non rimane nella
+  root della Head;
 - copiare socket, pipe o altri file speciali;
 - sovrascrivere con un overlay un file già tracciato da Git;
 - creare una Head dentro un’altra Head;
 - entrare in ricorsione durante l’espansione dei file di regole.
 
 Poiché `.gitignore` può includere directory molto grandi come `node_modules` o `vendor`, Hydra deve mostrare quantità e dimensione della copia e richiedere conferma oltre soglie di sicurezza. Non deve tuttavia modificare implicitamente le regole scelte dall’utente.
+
+I link simbolici relativi selezionati dagli overlay devono essere preservati
+come link, non dereferenziati. Hydra può ricrearli soltanto quando il target
+risolve all’interno del progetto sorgente e, dopo la materializzazione, dentro
+la nuova Head. Questo permette di conservare strutture locali come
+`node_modules/.bin` e `vendor/bin` senza collegare la Head al workspace
+sorgente o a percorsi esterni.
 
 ---
 
@@ -601,7 +629,12 @@ Hydra:
 
 L’implementazione preferita evita che il checkout standard di Git scriva inutilmente tutti i file prima della materializzazione. Può creare il worktree senza checkout, inizializzare separatamente l’index e delegare la scrittura dei file al Materializer. Se una piattaforma richiede un flusso differente, il risultato Git osservabile deve rimanere equivalente.
 
-Per l’MVP, la sorgente degli overlay deve avere uno stato sufficientemente stabile durante la copia. Hydra rileva eventuali cambiamenti concorrenti e fallisce in modo sicuro anziché produrre una Head parziale non dichiarata.
+Per l’MVP, la sorgente degli overlay deve avere uno stato sufficientemente
+stabile finché il relativo payload non è stato isolato. Hydra confronta ogni
+file materializzato con l'identità pianificata e fallisce in modo sicuro se la
+copia ha osservato contenuto differente, anziché produrre una Head parziale non
+dichiarata. Una modifica della sorgente successiva a un clone CoW già verificato
+non invalida la Head: i blocchi della destinazione sono ormai indipendenti.
 
 ### 7.3 Elenco e stato
 
@@ -899,6 +932,9 @@ la stessa grammatica concettuale e lo stesso tono operativo di Git:
 - i messaggi restano concisi, dichiarativi e orientati all’esito;
 - una creazione riuscita mostra il percorso concreto della nuova Head e, su un
   terminale interattivo compatibile, lo rende apribile come collegamento locale;
+- durante una creazione lunga, gli eventi di avanzamento per fase vengono
+  mostrati su `stderr` soltanto se `stderr` è un terminale interattivo; pipe,
+  file e automazioni non ricevono questi messaggi;
 - un riepilogo informativo non richiede conferma;
 - la conferma è riservata a un fallback o a un’azione con un costo o rischio
   materiale che Hydra ha rilevato concretamente.

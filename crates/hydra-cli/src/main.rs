@@ -113,14 +113,20 @@ fn main() -> ExitCode {
 }
 
 fn create_head(name: &str, from: Option<&str>, target: Option<&str>) -> ExitCode {
+    let progress_enabled = io::stderr().is_terminal();
     let create = |confirmed_full_copy| {
-        hydra_core::create_head(
+        hydra_core::create_head_with_progress(
             Path::new("."),
             hydra_core::CreateHeadOptions {
                 name: name.to_owned(),
                 from: from.map(str::to_owned),
                 target: target.map(str::to_owned),
                 confirmed_full_copy,
+            },
+            |progress| {
+                if progress_enabled {
+                    show_head_creation_progress(progress);
+                }
             },
         )
     };
@@ -146,6 +152,29 @@ fn create_head(name: &str, from: Option<&str>, target: Option<&str>) -> ExitCode
             finish_head_creation(create(true))
         }
         result => finish_head_creation(result),
+    }
+}
+
+fn show_head_creation_progress(progress: hydra_core::HeadCreationProgress) {
+    let stderr = io::stderr();
+    let _ = write_head_creation_progress(&mut stderr.lock(), progress);
+}
+
+fn write_head_creation_progress(
+    output: &mut impl Write,
+    progress: hydra_core::HeadCreationProgress,
+) -> io::Result<()> {
+    match progress {
+        hydra_core::HeadCreationProgress::PlanningOverlays => {
+            writeln!(output, "Planning overlays...")
+        }
+        hydra_core::HeadCreationProgress::MaterializingTrackedEntries { entries } => {
+            writeln!(output, "Materializing {entries} tracked entries...")
+        }
+        hydra_core::HeadCreationProgress::MaterializingOverlayEntries { entries } => {
+            writeln!(output, "Materializing {entries} overlay entries...")
+        }
+        _ => Ok(()),
     }
 }
 
@@ -252,7 +281,9 @@ fn file_uri(_path: &Path) -> Option<String> {
 mod tests {
     use std::{io::Cursor, path::Path};
 
-    use super::{Cli, request_full_copy_confirmation, write_created_head_path};
+    use super::{
+        Cli, request_full_copy_confirmation, write_created_head_path, write_head_creation_progress,
+    };
     use clap::CommandFactory;
 
     #[test]
@@ -272,6 +303,30 @@ mod tests {
         assert_eq!(
             String::from_utf8(output).expect("prompt should be UTF-8"),
             "Full copy required: 2 file(s), 13 byte(s)\nContinue? [y/N] "
+        );
+    }
+
+    #[test]
+    fn interactive_progress_describes_the_current_phase() {
+        let mut output = Vec::new();
+
+        write_head_creation_progress(
+            &mut output,
+            hydra_core::HeadCreationProgress::MaterializingTrackedEntries { entries: 1_840 },
+        )
+        .expect("tracked progress should be written");
+        write_head_creation_progress(
+            &mut output,
+            hydra_core::HeadCreationProgress::MaterializingOverlayEntries { entries: 2_000 },
+        )
+        .expect("progress should be written");
+
+        assert_eq!(
+            String::from_utf8(output).expect("progress should be UTF-8"),
+            concat!(
+                "Materializing 1840 tracked entries...\n",
+                "Materializing 2000 overlay entries...\n"
+            )
         );
     }
 

@@ -38,6 +38,23 @@ textual escapes. A terminal without OSC 8 support still displays the label.
 When `stdout` is a pipe or file, Hydra emits no control sequences and preserves
 the plain-text message exactly.
 
+The core emits typed, coarse-grained progress events for overlay planning,
+tracked materialization, and overlay materialization. The CLI renders one
+short line per active phase to `stderr` only when `stderr` is an interactive
+terminal:
+
+```text
+Planning overlays...
+Materializing <count> tracked entries...
+Materializing <count> overlay entries...
+```
+
+Redirected and captured `stderr` remains free of progress output. Events are
+phase-level rather than per-entry, so reporting overhead does not grow with
+the number of files. Progress is informational: if an observer panics while
+unwinding is available, the core disables that observer instead of allowing it
+to interrupt the creation transaction.
+
 The backend line is `Storage backend: full copy` when any materialized regular
 file required the safe copy fallback.
 
@@ -49,9 +66,13 @@ Overlay: <count> file(s), <bytes> byte(s)
 ```
 
 This summary is informational and never causes a prompt by itself. During
-planning, the core attempts a temporary reflink from each real overlay source
-into the Heads directory. It removes the exact probe immediately. When every
-probe succeeds, creation proceeds without terminal input.
+planning, the core attempts a temporary reflink from every real regular-file
+overlay source into one candidate path inside a uniquely created probe
+directory owned by the operation. It removes that exact candidate after every
+attempt, removes the empty probe directory afterward, and never treats one
+file's success as proof that another file can be cloned. Symlinks do not
+require a copy probe. When every required probe succeeds, creation proceeds
+without terminal input.
 
 The CLI owns terminal interaction. When the core reports that one or more
 overlay files require full-copy fallback, it prints only that fallback
@@ -202,18 +223,49 @@ copy-on-write materialization.
 
 ## Tracked Materialization
 
-Tracked entries come from:
+The expected tracked entries and blob identities come from:
 
 ```text
 git ls-tree -r -z --full-tree <baseCommit>
 ```
 
-They do not come from the source working tree. Uncommitted edits in the source
-therefore remain untouched and do not change the tracked starting content of a
-new Head.
+Hydra reads this tree once during preparation and retains the validated entries
+for materialization and overlay-collision checks.
 
-Regular blobs are streamed from Git into uniquely named temporary files in the
-Heads directory. For each destination Hydra:
+Before creating the worktree, Hydra checks whether the source working tree's
+tracked state matches `baseCommit`:
+
+```text
+git diff --quiet --no-ext-diff <baseCommit> --
+```
+
+When it matches, existing regular working files are safe content sources for
+that exact commit. Hydra validates that each source is a regular file below
+the canonical repository root and attempts a direct CoW clone into the Head.
+This both avoids redundant Git decompression and shares the source file's
+physical blocks. Untracked files do not disable the fast path. A tracked
+change disables it for the complete pass, so uncommitted tracked edits are
+never used as the starting content of a new Head. Missing or non-clonable
+sources fall back to the blob path below, and final clean-worktree verification
+detects a concurrent source change.
+
+Blob fallback uses one lazy, persistent:
+
+```text
+git cat-file --batch
+```
+
+process for the complete materialization pass rather than one Git process per
+entry. Every request is a validated full SHA-1 or SHA-256 object ID. Each
+response must echo that ID, declare type `blob`, provide a valid size, contain
+exactly that many payload bytes, and end with the protocol newline. Regular
+payloads are streamed with a fixed-size buffer; tracked symlink payloads use
+the same reader without altering their bytes. The child error stream is
+drained with bounded capture, unsuccessful exits are reported, and unfinished
+readers terminate and wait for their child defensively.
+
+For a regular entry that needs blob fallback, Hydra streams into a uniquely
+named temporary file in the Heads directory and:
 
 1. creates parent directories;
 2. attempts a native CoW clone from the temporary blob;
@@ -244,11 +296,16 @@ The planner:
 1. reads `overlay.copy` in order;
 2. expands `... <relative-file>` in place;
 3. applies Gitignore matching semantics, including negation and precedence;
-4. walks only existing entries below the repository root;
-5. calculates each selected file's logical size and Git object hash;
+4. walks only existing entries below the canonical repository root;
+5. records each selected entry's logical size and any symlink target;
 6. sorts selected relative paths for deterministic materialization;
-7. probes whether each source can be reflinked to the Heads volume and records
-   the files that need full-copy fallback.
+7. computes regular-file identities with bounded
+   `git hash-object --no-filters --` argument batches executed by at most eight
+   workers, then restores the original path order;
+8. retries an argument batch as smaller ordered halves if the operating system
+   reports an argument-list limit;
+9. probes every regular-file source against the Heads volume and records the
+   exact files that need full-copy fallback.
 
 An absent expanded rules file contributes no rules. An existing expanded file
 must be a regular file at a safe relative path.
@@ -256,17 +313,32 @@ must be a regular file at a safe relative path.
 Overlay protection rejects:
 
 - `.git` and everything below it;
-- selected symlinks and special files;
+- special files;
+- absolute, broken, or escaping overlay symlinks;
 - a selected path that would overwrite a tracked entry;
 - an included rules path that is absolute or contains non-normal components;
 - a source that no longer resolves inside the repository at materialization
   time.
 
-Each source is revalidated immediately before materialization. Hydra uses the
-same CoW-first, exclusive-copy fallback as tracked regular files, but performs
-the fallback only after explicit confirmation. It preserves permissions, then
-hashes both source and destination. A concurrent content change aborts instead
-of publishing a partial Head.
+Parent directories are deduplicated and created before regular-file
+materialization. Each source is then revalidated immediately before use. Hydra
+uses the same CoW-first, exclusive-copy fallback as tracked regular files, but
+performs the fallback only after explicit confirmation. It preserves
+permissions, then hashes every materialized destination in bounded parallel
+batches and compares it with the identity captured during planning. A source
+change that affects the copied payload therefore aborts instead of publishing
+a partial Head. A later source removal or edit does not invalidate a
+destination that already matches the planned identity and has been isolated by
+CoW.
+
+On Unix, a selected symlink is accepted only when its stored target is relative
+and its resolved source remains inside the canonical project root. Regular
+overlay files are materialized first; Hydra then recreates the symlink with the
+same target text instead of dereferencing it. It re-reads the source target
+immediately before creation and verifies afterward that the materialized link
+resolves inside the canonical Head root. This supports dependency launchers
+such as `node_modules/.bin` and `vendor/bin` without linking a Head back to the
+source workspace. Symlinks remain unsupported on non-Unix platforms.
 
 The final `git status --porcelain` must be empty. This proves that tracked
 materialization matches the index and that selected overlays remain ignored by
@@ -314,13 +386,20 @@ repositories. Current coverage proves:
 - the documented nested command and option syntax;
 - default and explicit base/target resolution;
 - tracked content comes from `baseCommit`, not uncommitted source edits;
+- direct CoW reuse of clean tracked working files without per-file Git blob
+  processes, plus blob fallback when tracked content differs;
+- persistent tracked-blob protocol handling for multiple blobs, binary
+  payloads, SHA-1/SHA-256 headers, invalid requests, destination failures,
+  tracked executables, and Unix symlinks;
 - independent worktree, index, private branch, and writable files;
 - metadata fields and clean Git status;
 - Gitignore overlay expansion, negation, conditional fallback confirmation,
   copy, and isolation;
 - rejection of unsafe names, unknown refs, missing targets, duplicates,
   existing branches, and existing destinations;
-- rejection of tracked-file overlay collisions and selected symlinks;
+- preservation and isolation of safe relative overlay symlinks;
+- rejection of tracked-file overlay collisions and absolute or escaping
+  overlay symlinks;
 - rejection of malformed, obsolete, newer, or unsupported configuration and
   local metadata;
 - stable resolution when creation is invoked from an existing Head;
@@ -331,17 +410,36 @@ repositories. Current coverage proves:
   registered worktree;
 - lock release on pre-commit failures;
 - preservation of committed artifacts when only post-commit lock cleanup
-  fails.
+  fails;
+- bounded parallel overlay hashing with ordered results, argument-limit
+  bisection, lossless Unix path-byte handling, isolated exact per-file CoW
+  probes, destination identity verification, permission preservation, and
+  deduplicated parent paths;
+- clean non-interactive `stderr` and phase descriptions for interactive
+  progress.
 
 Tests that mutate Git or the filesystem use only their disposable fixture.
+
+An ignored release-mode performance fixture creates a disposable repository
+with a configurable large overlay set (10,000 files by default) and reports
+complete Head-creation time without asserting a machine-dependent threshold.
+It supplies explicit confirmation when the test volume requires full-copy
+fallback, so non-CoW environments measure that supported path instead of
+failing on non-interactive input:
+
+```bash
+cargo test --release -p hydra-cli \
+  --test head_create_performance -- --ignored --nocapture
+```
 
 ---
 
 ## Known Implementation Gaps
 
-1. **Content-source reuse.** Tracked files currently clone from temporary Git
-   blob files and overlays clone from the current workspace. Hydra does not yet
-   search existing Heads for another source with the same content identity.
+1. **Cross-Head content-source reuse.** Tracked files can reuse the invoking
+   working tree when its tracked state matches `baseCommit`, while overlays
+   clone from that same workspace. Hydra does not yet search existing Heads or
+   a persistent content cache for another matching source.
 2. **Forced fallback coverage in Head creation.** Initialization directly
    verifies both CoW and full-copy behavior. Head-creation tests accept either
    detected backend but do not yet force the per-file fallback path.
@@ -349,7 +447,7 @@ Tests that mutate Git or the filesystem use only their disposable fixture.
    ordinary errors, but process termination between Git/filesystem steps is not
    yet reconciled automatically. A stale state lock is reported and preserved
    for later repair rather than removed heuristically.
-4. **Cross-platform tracked symlinks and durability.** Tracked symlink
+4. **Cross-platform symlinks and durability.** Tracked and overlay symlink
    materialization is implemented only on Unix. Direct runtime evidence for
    this workflow currently comes from the development platform and does not
    establish macOS-and-Linux completion by itself.

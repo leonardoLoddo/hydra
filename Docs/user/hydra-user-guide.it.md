@@ -161,6 +161,18 @@ Storage backend: copy-on-write
 Nei terminali compatibili il percorso è un collegamento `file://` cliccabile.
 Se sono presenti overlay, Hydra mostra prima il loro numero e peso logico.
 
+Se `stderr` è un terminale interattivo, durante le creazioni più lunghe Hydra
+mostra brevi messaggi di avanzamento per fase, per esempio:
+
+```text
+Planning overlays...
+Materializing 1840 tracked entries...
+Materializing 10000 overlay entries...
+```
+
+Questi messaggi non vengono emessi quando `stderr` è rediretto o catturato da
+un'automazione; l'output finale del comando rimane invariato.
+
 Puoi entrare nella Head come in qualunque progetto:
 
 ```bash
@@ -456,10 +468,31 @@ Hydra rifiuta:
 
 - `.git` e qualunque percorso al suo interno;
 - percorsi assoluti o con traversal;
-- symlink e file speciali selezionati;
+- symlink assoluti, rotti o che risolvono fuori dal progetto;
+- file speciali selezionati;
 - un overlay che sovrascriverebbe un file tracciato;
 - una sorgente che esce dal repository;
-- una sorgente modificata durante la materializzazione.
+- un file materializzato che non corrisponde più all'identità calcolata durante
+  la pianificazione.
+
+Su macOS e Linux, Hydra conserva i symlink relativi che rimangono all’interno
+del progetto. Il link viene ricreato nella Head con lo stesso target relativo e
+deve risolvere dentro la Head anche dopo la materializzazione. Directory di
+dipendenze come `node_modules` e `vendor` possono quindi mantenere i launcher
+presenti in `node_modules/.bin` o `vendor/bin` senza riferimenti al workspace
+sorgente. Gli overlay con symlink non sono attualmente supportati sulle altre
+piattaforme.
+
+Directory di dipendenze con migliaia di file vengono pianificate in batch:
+Hydra non avvia un processo Git separato per ogni file e distribuisce i batch
+indipendenti su un numero limitato di worker, mantenendo l'ordine degli hash.
+Ogni file regolare viene comunque provato singolarmente verso il volume delle
+Head, così un successo copy-on-write non nasconde il fallback necessario per
+un altro file. Dopo la copia Hydra confronta il file nella Head con l'identità
+pianificata; una modifica successiva della sorgente non invalida un clone CoW
+già isolato e verificato. La Head contiene file e symlink completi, quindi
+comandi come `composer run dev` o gli script npm possono usare direttamente le
+dipendenze materializzate.
 
 Un overlay può contenere credenziali o configurazioni locali. Hydra lo copia
 nella Head, ma non lo rende sicuro automaticamente: mantieni correttamente
@@ -467,8 +500,10 @@ ignorati i segreti e controlla sempre `git status`.
 
 ### Conferma della copia completa
 
-Hydra tenta il copy-on-write per ogni overlay. Se alcuni file richiedono una
-copia completa, mostra soltanto il sottoinsieme interessato:
+Hydra materializza ogni file overlay regolare tentando prima il copy-on-write.
+Durante la pianificazione prova ogni file senza generalizzare l'esito degli
+altri. Se alcuni file richiedono una copia completa, mostra soltanto il
+sottoinsieme interessato:
 
 ```text
 Full copy required: 2 file(s), 1048576 byte(s)
@@ -498,6 +533,11 @@ Hydra verifica il volume che ospita le Head:
 - su APFS tenta il clone nativo;
 - su filesystem Linux compatibili tenta il reflink;
 - quando il copy-on-write non è disponibile usa una copia completa isolata.
+
+Per i file tracciati, quando il workspace coincide con il commit scelto Hydra
+può riusare direttamente quei file come sorgenti copy-on-write. In presenza di
+modifiche tracciate legge invece i contenuti dal commit Git tramite un unico
+flusso batch; le modifiche locali non finiscono nella nuova Head.
 
 Il backend è una decisione locale. Non viene inserito nella configurazione
 versionata; Hydra registra invece il backend effettivamente usato da ogni Head.

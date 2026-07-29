@@ -305,6 +305,30 @@ pub(super) fn tracked_entries(
     Ok(entries)
 }
 
+pub(super) fn worktree_matches_commit(
+    repository: &Repository,
+    commit: &str,
+) -> Result<bool, HeadError> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(&repository.root)
+        .args(["diff", "--quiet", "--no-ext-diff"])
+        .arg(commit)
+        .arg("--")
+        .output()
+        .map_err(HeadError::GitUnavailable)?;
+    if output.status.success() {
+        Ok(true)
+    } else if output.status.code() == Some(1) {
+        Ok(false)
+    } else {
+        Err(command_failure(
+            "checking reusable tracked working files",
+            &output,
+        ))
+    }
+}
+
 pub(super) fn verify_clean_worktree(path: &Path) -> Result<(), HeadError> {
     let output = run_git(path, &["status", "--porcelain"], "verifying the new Head")?;
     if output.stdout.is_empty() {
@@ -438,7 +462,11 @@ fn bytes_to_path(value: &[u8]) -> Result<PathBuf, HeadError> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_worktree_changes;
+    use std::{fs, path::Path, process::Command};
+
+    use tempfile::tempdir;
+
+    use super::{Repository, parse_worktree_changes, worktree_matches_commit};
 
     #[test]
     fn porcelain_rename_counts_once_as_modified() {
@@ -449,6 +477,95 @@ mod tests {
         assert_eq!(changes.added, 0);
         assert_eq!(changes.deleted, 0);
         assert_eq!(changes.untracked, 0);
+    }
+
+    #[test]
+    fn a_clean_worktree_can_reuse_files_from_the_requested_commit() {
+        let temporary = tempdir().expect("temporary directory should be created");
+        initialize_repository(temporary.path());
+        let repository = test_repository(temporary.path());
+        let commit = git_stdout(temporary.path(), &["rev-parse", "HEAD"]);
+
+        assert!(
+            worktree_matches_commit(&repository, &commit)
+                .expect("clean worktree comparison should succeed")
+        );
+
+        fs::write(temporary.path().join("untracked"), b"ignored by comparison")
+            .expect("untracked fixture should be written");
+        assert!(
+            worktree_matches_commit(&repository, &commit)
+                .expect("untracked files should not affect tracked reuse")
+        );
+    }
+
+    #[test]
+    fn a_tracked_change_disables_worktree_file_reuse() {
+        let temporary = tempdir().expect("temporary directory should be created");
+        initialize_repository(temporary.path());
+        let repository = test_repository(temporary.path());
+        let commit = git_stdout(temporary.path(), &["rev-parse", "HEAD"]);
+        fs::write(temporary.path().join("tracked"), b"changed\n")
+            .expect("tracked fixture should be changed");
+
+        assert!(
+            !worktree_matches_commit(&repository, &commit)
+                .expect("changed worktree comparison should succeed")
+        );
+    }
+
+    fn initialize_repository(path: &Path) {
+        run_git(path, &["init", "--quiet"]);
+        fs::write(path.join("tracked"), b"base\n").expect("tracked fixture should be written");
+        run_git(path, &["add", "tracked"]);
+        run_git(
+            path,
+            &[
+                "-c",
+                "user.name=Hydra Tests",
+                "-c",
+                "user.email=hydra-tests@example.invalid",
+                "commit",
+                "--quiet",
+                "-m",
+                "fixture",
+            ],
+        );
+    }
+
+    fn test_repository(path: &Path) -> Repository {
+        Repository {
+            root: path.to_path_buf(),
+            git_common_directory: path.join(".git"),
+        }
+    }
+
+    fn run_git(path: &Path, arguments: &[&str]) {
+        let output = Command::new("git")
+            .arg("-C")
+            .arg(path)
+            .args(arguments)
+            .output()
+            .expect("Git should run");
+        assert!(
+            output.status.success(),
+            "Git failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    fn git_stdout(path: &Path, arguments: &[&str]) -> String {
+        let output = Command::new("git")
+            .arg("-C")
+            .arg(path)
+            .args(arguments)
+            .output()
+            .expect("Git should run");
+        assert!(output.status.success());
+        String::from_utf8(output.stdout)
+            .expect("Git output should be UTF-8")
+            .trim_end()
+            .to_owned()
     }
 }
 

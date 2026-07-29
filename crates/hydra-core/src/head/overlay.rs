@@ -1,9 +1,10 @@
+mod hash;
+
 use std::{
-    collections::HashSet,
+    collections::{BTreeSet, HashSet},
     fs::{self, File, OpenOptions},
     io::{self, Write},
     path::{Component, Path, PathBuf},
-    process::Command,
 };
 
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
@@ -20,8 +21,85 @@ struct OverlayFile {
     source: PathBuf,
     relative: PathBuf,
     size: u64,
-    identity: String,
-    requires_full_copy: bool,
+    kind: OverlayKind,
+}
+
+struct CopyOnWriteProbe {
+    directory: PathBuf,
+    destination: PathBuf,
+    active: bool,
+}
+
+impl CopyOnWriteProbe {
+    fn create(heads_directory: &Path) -> Result<Self, HeadError> {
+        let directory =
+            heads_directory.join(format!(".hydra-overlay-probe-{}", Uuid::new_v4().simple()));
+        fs::create_dir(&directory).map_err(|source| HeadError::FileSystem {
+            action: "create isolated overlay probe directory",
+            path: directory.clone(),
+            source,
+        })?;
+        Ok(Self {
+            destination: directory.join("candidate"),
+            directory,
+            active: true,
+        })
+    }
+
+    fn assess(&mut self, source: &Path) -> Result<bool, HeadError> {
+        let cloned = reflink_copy::reflink(source, &self.destination).is_ok();
+        match fs::remove_file(&self.destination) {
+            Ok(()) => Ok(cloned),
+            Err(error) if error.kind() == io::ErrorKind::NotFound && !cloned => Ok(false),
+            Err(source) => Err(HeadError::FileSystem {
+                action: "remove temporary overlay probe",
+                path: self.destination.clone(),
+                source,
+            }),
+        }
+    }
+
+    fn finish(&mut self) -> Result<(), HeadError> {
+        fs::remove_dir(&self.directory).map_err(|source| HeadError::FileSystem {
+            action: "remove isolated overlay probe directory",
+            path: self.directory.clone(),
+            source,
+        })?;
+        self.active = false;
+        Ok(())
+    }
+}
+
+impl Drop for CopyOnWriteProbe {
+    fn drop(&mut self) {
+        if self.active {
+            let _ = fs::remove_file(&self.destination);
+            let _ = fs::remove_dir(&self.directory);
+        }
+    }
+}
+
+#[derive(Debug)]
+enum OverlayKind {
+    Regular {
+        identity: Option<String>,
+        requires_full_copy: bool,
+    },
+    Symlink {
+        target: PathBuf,
+    },
+}
+
+impl OverlayFile {
+    fn requires_full_copy(&self) -> bool {
+        matches!(
+            self.kind,
+            OverlayKind::Regular {
+                requires_full_copy: true,
+                ..
+            }
+        )
+    }
 }
 
 #[derive(Debug)]
@@ -42,14 +120,14 @@ impl OverlayPlan {
     pub(super) fn full_copy_file_count(&self) -> usize {
         self.files
             .iter()
-            .filter(|file| file.requires_full_copy)
+            .filter(|file| file.requires_full_copy())
             .count()
     }
 
     pub(super) fn full_copy_bytes(&self) -> u64 {
         self.files
             .iter()
-            .filter(|file| file.requires_full_copy)
+            .filter(|file| file.requires_full_copy())
             .map(|file| file.size)
             .sum()
     }
@@ -61,17 +139,41 @@ pub(super) fn plan_overlays(
     rules: &[String],
     tracked_entries: &[TrackedEntry],
 ) -> Result<OverlayPlan, HeadError> {
+    let canonical_source_root =
+        fs::canonicalize(source_root).map_err(|source| HeadError::FileSystem {
+            action: "resolve overlay source root",
+            path: source_root.to_path_buf(),
+            source,
+        })?;
     let matcher = build_matcher(source_root, rules)?;
     let tracked = tracked_entries
         .iter()
         .map(|entry| entry.path.clone())
         .collect::<HashSet<_>>();
     let mut files = Vec::new();
-    visit_directory(source_root, source_root, &matcher, &tracked, &mut files)?;
+    visit_directory(
+        source_root,
+        &canonical_source_root,
+        source_root,
+        &matcher,
+        &tracked,
+        &mut files,
+    )?;
     files.sort_by(|left, right| left.relative.cmp(&right.relative));
-    classify_copy_fallbacks_with(&mut files, |source| {
-        probe_copy_on_write_to(source, heads_directory)
-    })?;
+    assign_regular_identities(source_root, &mut files)?;
+    let mut probe = CopyOnWriteProbe::create(heads_directory)?;
+    let assessment = classify_copy_fallbacks_with(&mut files, |source| probe.assess(source));
+    let cleanup = probe.finish();
+    match (assessment, cleanup) {
+        (Ok(()), Ok(())) => {}
+        (Err(error), Ok(())) | (Ok(()), Err(error)) => return Err(error),
+        (Err(original), Err(cleanup)) => {
+            return Err(HeadError::RollbackFailed {
+                original: Box::new(original),
+                failures: vec![cleanup.to_string()],
+            });
+        }
+    }
     let total_bytes = files.iter().try_fold(0_u64, |total, file| {
         total
             .checked_add(file.size)
@@ -87,17 +189,28 @@ pub(super) fn materialize_overlays(
     confirmed_full_copy: bool,
 ) -> Result<StorageBackend, HeadError> {
     let mut backend = StorageBackend::CopyOnWrite;
-    for file in &plan.files {
-        validate_overlay_source(&repository.root, &file.source)?;
-        let destination = head_path.join(&file.relative);
-        let parent = destination
-            .parent()
-            .ok_or_else(|| HeadError::UnsafeOverlayPath(file.relative.clone()))?;
-        fs::create_dir_all(parent).map_err(|source| HeadError::FileSystem {
-            action: "create overlay parent directory",
-            path: parent.to_path_buf(),
+    let canonical_repository_root =
+        fs::canonicalize(&repository.root).map_err(|source| HeadError::FileSystem {
+            action: "resolve overlay source root",
+            path: repository.root.clone(),
             source,
         })?;
+    create_overlay_parents(head_path, &plan.files)?;
+    let regular_files = plan
+        .files
+        .iter()
+        .filter(|file| matches!(file.kind, OverlayKind::Regular { .. }))
+        .collect::<Vec<_>>();
+    for file in &regular_files {
+        let OverlayKind::Regular {
+            identity: _,
+            requires_full_copy: _,
+        } = &file.kind
+        else {
+            unreachable!("filtered overlay kind should be regular");
+        };
+        validate_regular_overlay_source(&canonical_repository_root, &file.source)?;
+        let destination = head_path.join(&file.relative);
 
         let file_backend = if reflink_copy::reflink(&file.source, &destination).is_ok() {
             StorageBackend::CopyOnWrite
@@ -132,13 +245,25 @@ pub(super) fn materialize_overlays(
             path: destination.clone(),
             source,
         })?;
-
-        if hash_file(&repository.root, &file.source)? != file.identity
-            || hash_file(&repository.root, &destination)? != file.identity
-        {
-            return Err(HeadError::OverlayChanged(file.source.clone()));
-        }
     }
+    verify_regular_overlay_identities(&repository.root, head_path, regular_files.as_slice())?;
+
+    for file in &plan.files {
+        let OverlayKind::Symlink { target } = &file.kind else {
+            continue;
+        };
+        validate_symlink_overlay_source(&canonical_repository_root, &file.source, target)?;
+        let destination = head_path.join(&file.relative);
+        create_overlay_symlink(target, &destination)?;
+    }
+
+    for file in &plan.files {
+        let OverlayKind::Symlink { target } = &file.kind else {
+            continue;
+        };
+        validate_materialized_symlink(head_path, &head_path.join(&file.relative), target)?;
+    }
+
     Ok(backend)
 }
 
@@ -178,6 +303,7 @@ fn build_matcher(source_root: &Path, rules: &[String]) -> Result<Gitignore, Head
 
 fn visit_directory(
     source_root: &Path,
+    canonical_source_root: &Path,
     directory: &Path,
     matcher: &Gitignore,
     tracked: &HashSet<PathBuf>,
@@ -219,24 +345,89 @@ fn visit_directory(
                 source: source_error,
             })?;
         if metadata.is_dir() {
-            visit_directory(source_root, &source, matcher, tracked, files)?;
+            visit_directory(
+                source_root,
+                canonical_source_root,
+                &source,
+                matcher,
+                tracked,
+                files,
+            )?;
         } else if matcher
             .matched_path_or_any_parents(&relative, false)
             .is_ignore()
         {
-            if !metadata.is_file() || metadata.file_type().is_symlink() {
-                return Err(HeadError::UnsafeOverlayPath(source));
-            }
             if tracked.contains(&relative) {
                 return Err(HeadError::OverlayOverwritesTracked(relative));
             }
+            let kind = if metadata.is_file() {
+                OverlayKind::Regular {
+                    identity: None,
+                    requires_full_copy: false,
+                }
+            } else if metadata.file_type().is_symlink() {
+                OverlayKind::Symlink {
+                    target: plan_overlay_symlink(canonical_source_root, &source)?,
+                }
+            } else {
+                return Err(HeadError::UnsafeOverlayPath(source));
+            };
             files.push(OverlayFile {
-                identity: hash_file(source_root, &source)?,
                 source,
                 relative,
                 size: metadata.len(),
-                requires_full_copy: false,
+                kind,
             });
+        }
+    }
+    Ok(())
+}
+
+fn assign_regular_identities(
+    repository_root: &Path,
+    files: &mut [OverlayFile],
+) -> Result<(), HeadError> {
+    let paths = files
+        .iter()
+        .filter(|file| matches!(file.kind, OverlayKind::Regular { .. }))
+        .map(|file| file.source.clone())
+        .collect::<Vec<_>>();
+    let mut identities = hash::hash_paths(repository_root, &paths)?.into_iter();
+    for file in files {
+        if let OverlayKind::Regular { identity, .. } = &mut file.kind {
+            *identity = Some(
+                identities
+                    .next()
+                    .ok_or(HeadError::InvalidGitOutput("overlay hash batch"))?,
+            );
+        }
+    }
+    if identities.next().is_some() {
+        return Err(HeadError::InvalidGitOutput("overlay hash batch"));
+    }
+    Ok(())
+}
+
+fn verify_regular_overlay_identities(
+    repository_root: &Path,
+    head_path: &Path,
+    files: &[&OverlayFile],
+) -> Result<(), HeadError> {
+    let mut paths = Vec::with_capacity(files.len());
+    for file in files {
+        paths.push(head_path.join(&file.relative));
+    }
+    let hashes = hash::hash_paths(repository_root, &paths)?;
+    for (file, materialized_identity) in files.iter().zip(hashes) {
+        let OverlayKind::Regular {
+            identity: Some(identity),
+            ..
+        } = &file.kind
+        else {
+            return Err(HeadError::InvalidGitOutput("overlay identity"));
+        };
+        if materialized_identity != *identity {
+            return Err(HeadError::OverlayChanged(file.source.clone()));
         }
     }
     Ok(())
@@ -247,24 +438,14 @@ fn classify_copy_fallbacks_with(
     mut can_copy_on_write: impl FnMut(&Path) -> Result<bool, HeadError>,
 ) -> Result<(), HeadError> {
     for file in files {
-        file.requires_full_copy = !can_copy_on_write(&file.source)?;
+        if let OverlayKind::Regular {
+            requires_full_copy, ..
+        } = &mut file.kind
+        {
+            *requires_full_copy = !can_copy_on_write(&file.source)?;
+        }
     }
     Ok(())
-}
-
-fn probe_copy_on_write_to(source: &Path, heads_directory: &Path) -> Result<bool, HeadError> {
-    let destination =
-        heads_directory.join(format!(".hydra-overlay-probe-{}", Uuid::new_v4().simple()));
-    let cloned = reflink_copy::reflink(source, &destination).is_ok();
-    match fs::remove_file(&destination) {
-        Ok(()) => Ok(cloned),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
-        Err(source) => Err(HeadError::FileSystem {
-            action: "remove temporary overlay probe",
-            path: destination,
-            source,
-        }),
-    }
 }
 
 fn remove_failed_reflink_destination(destination: &Path) -> Result<(), HeadError> {
@@ -279,6 +460,33 @@ fn remove_failed_reflink_destination(destination: &Path) -> Result<(), HeadError
     }
 }
 
+fn overlay_parent_paths(files: &[OverlayFile]) -> Result<Vec<PathBuf>, HeadError> {
+    let mut parents = BTreeSet::new();
+    for file in files {
+        let parent = file
+            .relative
+            .parent()
+            .ok_or_else(|| HeadError::UnsafeOverlayPath(file.relative.clone()))?;
+        if !parent.as_os_str().is_empty() {
+            validate_relative_path(parent)?;
+            parents.insert(parent.to_path_buf());
+        }
+    }
+    Ok(parents.into_iter().collect())
+}
+
+fn create_overlay_parents(head_path: &Path, files: &[OverlayFile]) -> Result<(), HeadError> {
+    for relative in overlay_parent_paths(files)? {
+        let parent = head_path.join(&relative);
+        fs::create_dir_all(&parent).map_err(|source| HeadError::FileSystem {
+            action: "create overlay parent directory",
+            path: parent,
+            source,
+        })?;
+    }
+    Ok(())
+}
+
 fn validate_relative_path(path: &Path) -> Result<(), HeadError> {
     if path.as_os_str().is_empty()
         || path
@@ -291,32 +499,120 @@ fn validate_relative_path(path: &Path) -> Result<(), HeadError> {
     }
 }
 
-fn hash_file(repository_root: &Path, path: &Path) -> Result<String, HeadError> {
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(repository_root)
-        .args(["hash-object", "--no-filters", "--"])
-        .arg(path)
-        .output()
-        .map_err(HeadError::GitUnavailable)?;
-    if !output.status.success() {
-        return Err(HeadError::GitCommandFailed {
-            operation: "hashing an overlay file",
-            status: output.status.code(),
-            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
-        });
+fn plan_overlay_symlink(
+    canonical_repository_root: &Path,
+    source: &Path,
+) -> Result<PathBuf, HeadError> {
+    #[cfg(not(unix))]
+    {
+        let _ = canonical_repository_root;
+        return Err(HeadError::UnsafeOverlayPath(source.to_path_buf()));
     }
-    let value = String::from_utf8(output.stdout)
-        .map_err(|_| HeadError::InvalidGitOutput("overlay identity"))?;
-    let value = value.trim_end_matches(['\r', '\n']);
-    if value.is_empty() {
-        Err(HeadError::InvalidGitOutput("overlay identity"))
-    } else {
-        Ok(value.to_owned())
+
+    #[cfg(unix)]
+    {
+        let target = fs::read_link(source).map_err(|source_error| HeadError::FileSystem {
+            action: "read overlay symlink",
+            path: source.to_path_buf(),
+            source: source_error,
+        })?;
+        validate_symlink_resolution(canonical_repository_root, source, &target)?;
+        Ok(target)
     }
 }
 
-fn validate_overlay_source(repository_root: &Path, source: &Path) -> Result<(), HeadError> {
+fn validate_symlink_resolution(
+    canonical_repository_root: &Path,
+    source: &Path,
+    target: &Path,
+) -> Result<(), HeadError> {
+    if target.is_absolute() {
+        return Err(HeadError::UnsafeOverlayPath(source.to_path_buf()));
+    }
+
+    let canonical_target =
+        fs::canonicalize(source).map_err(|_| HeadError::UnsafeOverlayPath(source.to_path_buf()))?;
+    let target_metadata =
+        fs::metadata(source).map_err(|_| HeadError::UnsafeOverlayPath(source.to_path_buf()))?;
+    if !canonical_target.starts_with(canonical_repository_root)
+        || (!target_metadata.is_file() && !target_metadata.is_dir())
+    {
+        return Err(HeadError::UnsafeOverlayPath(source.to_path_buf()));
+    }
+
+    Ok(())
+}
+
+fn validate_symlink_overlay_source(
+    canonical_repository_root: &Path,
+    source: &Path,
+    expected_target: &Path,
+) -> Result<(), HeadError> {
+    let metadata = fs::symlink_metadata(source).map_err(|source_error| HeadError::FileSystem {
+        action: "revalidate overlay symlink",
+        path: source.to_path_buf(),
+        source: source_error,
+    })?;
+    if !metadata.file_type().is_symlink() {
+        return Err(HeadError::UnsafeOverlayPath(source.to_path_buf()));
+    }
+    let target = fs::read_link(source).map_err(|source_error| HeadError::FileSystem {
+        action: "reread overlay symlink",
+        path: source.to_path_buf(),
+        source: source_error,
+    })?;
+    if target != expected_target {
+        return Err(HeadError::OverlayChanged(source.to_path_buf()));
+    }
+    validate_symlink_resolution(canonical_repository_root, source, &target)
+}
+
+#[cfg(unix)]
+fn create_overlay_symlink(target: &Path, destination: &Path) -> Result<(), HeadError> {
+    std::os::unix::fs::symlink(target, destination).map_err(|source| HeadError::FileSystem {
+        action: "create overlay symlink",
+        path: destination.to_path_buf(),
+        source,
+    })
+}
+
+#[cfg(not(unix))]
+fn create_overlay_symlink(_target: &Path, destination: &Path) -> Result<(), HeadError> {
+    Err(HeadError::UnsafeOverlayPath(destination.to_path_buf()))
+}
+
+fn validate_materialized_symlink(
+    head_root: &Path,
+    destination: &Path,
+    expected_target: &Path,
+) -> Result<(), HeadError> {
+    let target = fs::read_link(destination).map_err(|source_error| HeadError::FileSystem {
+        action: "read materialized overlay symlink",
+        path: destination.to_path_buf(),
+        source: source_error,
+    })?;
+    if target != expected_target {
+        return Err(HeadError::OverlayChanged(destination.to_path_buf()));
+    }
+    let canonical_head =
+        fs::canonicalize(head_root).map_err(|source_error| HeadError::FileSystem {
+            action: "resolve materialized Head root",
+            path: head_root.to_path_buf(),
+            source: source_error,
+        })?;
+    let canonical_target = fs::canonicalize(destination)
+        .map_err(|_| HeadError::UnsafeOverlayPath(destination.to_path_buf()))?;
+    if canonical_target.starts_with(canonical_head) {
+        Ok(())
+    } else {
+        Err(HeadError::UnsafeOverlayPath(destination.to_path_buf()))
+    }
+}
+
+fn validate_regular_overlay_source(
+    canonical_repository_root: &Path,
+    source: &Path,
+) -> Result<(), HeadError> {
     let metadata = fs::symlink_metadata(source).map_err(|source_error| HeadError::FileSystem {
         action: "revalidate overlay source",
         path: source.to_path_buf(),
@@ -325,19 +621,13 @@ fn validate_overlay_source(repository_root: &Path, source: &Path) -> Result<(), 
     if !metadata.is_file() || metadata.file_type().is_symlink() {
         return Err(HeadError::UnsafeOverlayPath(source.to_path_buf()));
     }
-    let canonical_root =
-        fs::canonicalize(repository_root).map_err(|source_error| HeadError::FileSystem {
-            action: "resolve overlay source root",
-            path: repository_root.to_path_buf(),
-            source: source_error,
-        })?;
     let canonical_source =
         fs::canonicalize(source).map_err(|source_error| HeadError::FileSystem {
             action: "resolve overlay source",
             path: source.to_path_buf(),
             source: source_error,
         })?;
-    if canonical_source.starts_with(canonical_root) {
+    if canonical_source.starts_with(canonical_repository_root) {
         Ok(())
     } else {
         Err(HeadError::UnsafeOverlayPath(source.to_path_buf()))
@@ -359,15 +649,31 @@ fn copy_exclusive(source: &Path, destination: &Path) -> io::Result<()> {
 mod tests {
     use std::path::PathBuf;
 
-    use super::{OverlayFile, classify_copy_fallbacks_with};
+    use super::{
+        CopyOnWriteProbe, OverlayFile, OverlayKind, classify_copy_fallbacks_with,
+        overlay_parent_paths, verify_regular_overlay_identities,
+    };
 
     fn overlay_file(name: &str, size: u64) -> OverlayFile {
         OverlayFile {
             source: PathBuf::from(name),
             relative: PathBuf::from(name),
             size,
-            identity: "identity".to_owned(),
-            requires_full_copy: false,
+            kind: OverlayKind::Regular {
+                identity: Some("identity".to_owned()),
+                requires_full_copy: false,
+            },
+        }
+    }
+
+    fn overlay_symlink(name: &str, target: &str) -> OverlayFile {
+        OverlayFile {
+            source: PathBuf::from(name),
+            relative: PathBuf::from(name),
+            size: target.len() as u64,
+            kind: OverlayKind::Symlink {
+                target: PathBuf::from(target),
+            },
         }
     }
 
@@ -378,7 +684,7 @@ mod tests {
         classify_copy_fallbacks_with(&mut files, |_| Ok(true))
             .expect("copy-on-write assessment should succeed");
 
-        assert!(files.iter().all(|file| !file.requires_full_copy));
+        assert!(files.iter().all(|file| !file.requires_full_copy()));
     }
 
     #[test]
@@ -391,7 +697,160 @@ mod tests {
         })
         .expect("fallback assessment should succeed");
 
-        assert!(!files[0].requires_full_copy);
-        assert!(files[1].requires_full_copy);
+        assert!(!files[0].requires_full_copy());
+        assert!(files[1].requires_full_copy());
+    }
+
+    #[test]
+    fn symlink_overlays_do_not_require_a_copy_fallback_probe() {
+        let mut files = vec![overlay_symlink(
+            "node_modules/.bin/acorn",
+            "../acorn/bin/acorn",
+        )];
+        let mut probes = 0;
+
+        classify_copy_fallbacks_with(&mut files, |_| {
+            probes += 1;
+            Ok(false)
+        })
+        .expect("symlink assessment should succeed");
+
+        assert_eq!(probes, 0);
+        assert!(!files[0].requires_full_copy());
+    }
+
+    #[test]
+    fn a_successful_probe_does_not_authorize_a_later_file_without_testing_it() {
+        let mut files = vec![overlay_file("deps/one", 7), overlay_file("deps/two", 11)];
+        let mut probes = 0;
+        let mut assessments = [true, false].into_iter();
+
+        classify_copy_fallbacks_with(&mut files, |_| {
+            probes += 1;
+            Ok(assessments.next().expect("one assessment per regular file"))
+        })
+        .expect("per-file assessment should succeed");
+
+        assert_eq!(probes, 2);
+        assert!(!files[0].requires_full_copy());
+        assert!(files[1].requires_full_copy());
+    }
+
+    #[test]
+    fn a_failed_probe_is_not_reused_for_other_files() {
+        let mut files = vec![
+            overlay_file("deps/one", 7),
+            overlay_file("deps/two", 11),
+            overlay_file("deps/three", 13),
+        ];
+        let mut probes = 0;
+
+        classify_copy_fallbacks_with(&mut files, |_| {
+            probes += 1;
+            Ok(false)
+        })
+        .expect("fallback assessment should succeed");
+
+        assert_eq!(probes, 3);
+        assert!(files.iter().all(OverlayFile::requires_full_copy));
+    }
+
+    #[test]
+    fn overlay_parent_directories_are_deduplicated_before_materialization() {
+        let files = vec![
+            overlay_file("deps/one", 7),
+            overlay_file("deps/two", 11),
+            overlay_file("deps/nested/three", 13),
+        ];
+
+        let parents = overlay_parent_paths(&files).expect("overlay parents should be safe");
+
+        assert_eq!(
+            parents,
+            [PathBuf::from("deps"), PathBuf::from("deps/nested"),]
+        );
+    }
+
+    #[test]
+    fn a_materialized_overlay_matching_its_planned_identity_survives_later_source_removal() {
+        let temporary = tempfile::tempdir().expect("temporary directory should be created");
+        let repository = temporary.path().join("repository");
+        let head = temporary.path().join("head");
+        std::fs::create_dir_all(repository.join("deps")).expect("source parent should be created");
+        std::fs::create_dir_all(head.join("deps")).expect("Head parent should be created");
+        let source = repository.join("deps/package");
+        let destination = head.join("deps/package");
+        std::fs::write(&source, b"planned bytes").expect("source should be written");
+        std::fs::write(&destination, b"planned bytes").expect("destination should be written");
+        let identity = super::hash::hash_paths(&repository, std::slice::from_ref(&source))
+            .expect("planned identity should be computed")
+            .remove(0);
+        std::fs::remove_file(&source).expect("source should be removed after materialization");
+        let file = OverlayFile {
+            source,
+            relative: PathBuf::from("deps/package"),
+            size: 13,
+            kind: OverlayKind::Regular {
+                identity: Some(identity),
+                requires_full_copy: false,
+            },
+        };
+
+        verify_regular_overlay_identities(&repository, &head, &[&file])
+            .expect("the verified Head payload should not depend on the later source state");
+    }
+
+    #[test]
+    fn a_materialized_overlay_that_differs_from_its_planned_identity_is_rejected() {
+        let temporary = tempfile::tempdir().expect("temporary directory should be created");
+        let repository = temporary.path().join("repository");
+        let head = temporary.path().join("head");
+        std::fs::create_dir_all(repository.join("deps")).expect("source parent should be created");
+        std::fs::create_dir_all(head.join("deps")).expect("Head parent should be created");
+        let source = repository.join("deps/package");
+        let destination = head.join("deps/package");
+        std::fs::write(&source, b"planned bytes").expect("source should be written");
+        let identity = super::hash::hash_paths(&repository, std::slice::from_ref(&source))
+            .expect("planned identity should be computed")
+            .remove(0);
+        std::fs::write(&destination, b"different bytes")
+            .expect("different destination should be written");
+        let file = OverlayFile {
+            source: source.clone(),
+            relative: PathBuf::from("deps/package"),
+            size: 13,
+            kind: OverlayKind::Regular {
+                identity: Some(identity),
+                requires_full_copy: false,
+            },
+        };
+
+        let error = verify_regular_overlay_identities(&repository, &head, &[&file])
+            .expect_err("a materialized payload mismatch should be rejected");
+
+        assert!(matches!(
+            error,
+            super::HeadError::OverlayChanged(path) if path == source
+        ));
+    }
+
+    #[test]
+    fn copy_on_write_probe_owns_and_removes_an_isolated_directory() {
+        let temporary = tempfile::tempdir().expect("temporary directory should be created");
+        let source = temporary.path().join("source");
+        std::fs::write(&source, b"probe").expect("probe source should be written");
+        let mut probe =
+            CopyOnWriteProbe::create(temporary.path()).expect("probe directory should be created");
+        let directory = probe.directory.clone();
+        let destination = probe.destination.clone();
+
+        let _ = probe
+            .assess(&source)
+            .expect("copy-on-write assessment should complete");
+
+        assert!(directory.is_dir());
+        assert!(!destination.exists());
+        probe.finish().expect("probe directory should be removed");
+        assert!(!directory.exists());
     }
 }

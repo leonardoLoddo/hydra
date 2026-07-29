@@ -31,6 +31,7 @@ Hydra/
     │       ├── cli_contract.rs
     │       ├── head_create_conflicts.rs
     │       ├── head_create_overlay_failures.rs
+    │       ├── head_create_performance.rs
     │       ├── head_create_state_failures.rs
     │       ├── head_create_success.rs
     │       ├── head_inspection.rs
@@ -46,7 +47,11 @@ Hydra/
             │   ├── git.rs
             │   ├── inspection.rs
             │   ├── materializer.rs
+            │   ├── materializer/
+            │   │   └── blob_batch.rs
             │   ├── overlay.rs
+            │   ├── overlay/
+            │   │   └── hash.rs
             │   ├── persistence.rs
             │   ├── state.rs
             │   └── state/
@@ -169,7 +174,9 @@ Head creation follows the same small-orchestrator rule:
 | `head.rs` | Validate and orchestrate the complete creation transaction |
 | `head/git.rs` | Discover Git state and own ref, branch, index, worktree, and verification commands |
 | `head/materializer.rs` | Materialize Git tree entries without a standard checkout |
+| `head/materializer/blob_batch.rs` | Own and validate the persistent `git cat-file --batch` protocol used to stream tracked blobs |
 | `head/overlay.rs` | Expand overlay rules, select safe source files, copy them, and verify content identity |
+| `head/overlay/hash.rs` | Compute overlay identities through bounded parallel `git hash-object` batches and restore deterministic order |
 | `head/state.rs` | Manage the physical inventory transaction and classify commit boundaries |
 | `head/state/configuration.rs` | Parse and validate schema-v2 directory policies and shared Head settings |
 | `head/state/installation.rs` | Resolve the Git-common locator, verify directory ownership and worktree boundaries, and locate the physical inventory |
@@ -180,6 +187,12 @@ The terminal confirmation remains in `hydra-cli`; the core exposes the
 confirmation requirement as data and recomputes the overlay plan after
 confirmation. Detailed workflow ownership is documented in
 [`head-creation.md`](head-creation.md).
+
+The core also owns typed Head-creation phase events, while the CLI owns whether
+and how to render them. The executable writes these events only to interactive
+`stderr`; redirected and machine-consumed output remains unchanged. Progress
+observers are informational and cannot be allowed to interrupt the creation
+transaction.
 
 ### Head inspection module boundaries
 
@@ -210,6 +223,16 @@ Every Git invocation MUST:
   outside a Head;
 - check the exit status before consuming output;
 - validate output before converting it into paths or state.
+
+High-cardinality file operations MUST NOT spawn one Git process per file.
+Overlay hashing uses bounded argument batches with an explicit `--` separator,
+runs independent batches through a worker pool capped at eight processes,
+restores deterministic result order, and retries smaller ordered batches if
+the operating system rejects an argument list. Tracked blob fallback uses a
+persistent `cat-file --batch` child whose request identifiers, response
+headers, payload lengths, error stream, exit status, and lifecycle are
+validated. These optimizations must not weaken arbitrary-path handling,
+content verification, or error propagation.
 
 If Git integration becomes large enough to justify a separate `hydra-git`
 crate, the new crate should own only the Git adapter and Git-specific data

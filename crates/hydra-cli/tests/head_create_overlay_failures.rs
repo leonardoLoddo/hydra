@@ -67,7 +67,7 @@ fn head_create_rejects_an_overlay_that_would_overwrite_a_tracked_file() {
 
 #[cfg(unix)]
 #[test]
-fn head_create_rejects_a_selected_overlay_symlink() {
+fn head_create_rejects_an_absolute_overlay_symlink() {
     use std::os::unix::fs::symlink;
 
     let directory = TestDirectory::new("head-overlay-symlink");
@@ -76,6 +76,35 @@ fn head_create_rejects_a_selected_overlay_symlink() {
     fs::write(&outside, b"outside\n").expect("outside file should be written");
     fs::write(repository.join(".gitignore"), b"escape\n").expect("overlay rules should be written");
     symlink(&outside, repository.join("escape")).expect("overlay symlink should be created");
+
+    let output = hydra_command()
+        .args(["head", "create", "payment"])
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("unsafe"));
+    assert_no_head_creation_artifacts(&repository, "payment");
+    assert_eq!(
+        fs::read(outside).expect("outside file should remain readable"),
+        b"outside\n"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn head_create_rejects_a_relative_overlay_symlink_that_escapes_the_project() {
+    use std::os::unix::fs::symlink;
+
+    let directory = TestDirectory::new("head-overlay-relative-symlink-escape");
+    let repository = create_initialized_project(&directory);
+    let outside = directory.path().join("outside-secret");
+    fs::write(&outside, b"outside\n").expect("outside file should be written");
+    fs::write(repository.join(".gitignore"), b"links/\n").expect("overlay rules should be written");
+    fs::create_dir(repository.join("links")).expect("overlay directory should be created");
+    symlink("../../outside-secret", repository.join("links/escape"))
+        .expect("overlay symlink should be created");
 
     let output = hydra_command()
         .args(["head", "create", "payment"])
