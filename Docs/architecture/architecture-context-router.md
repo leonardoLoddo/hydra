@@ -21,6 +21,7 @@ conventions, which remain in the development domain.
 | [`head-creation.md`](head-creation.md) | `hydra head create`, Head names, base or target refs, private branches, worktree registration, tracked or overlay materialization, Head metadata, state locking, creation rollback, or post-commit cleanup | Implemented Head-creation transaction, CLI/core boundary, Git and filesystem safety rules, verification contracts, and explicitly recorded gaps against the product specification. |
 | [`head-inspection.md`](head-inspection.md) | `hydra status`, `hydra head list`, `hydra head status`, `hydra head path`, read-only inventory access, Git status counting, ahead/behind calculation, or consistency diagnostics | Implemented read-only inspection model, CLI output contracts, trust-boundary validation, Git comparison rules, and verification coverage. |
 | [`head-removal.md`](head-removal.md) | `hydra head remove`, forced removal, worktree deletion, integrated or preserved private branches, inventory removal, or partial-removal recovery | Implemented protected Head-removal transaction, safety validation, branch recoverability, failure boundaries, and regression coverage. |
+| [`head-close.md`](head-close.md) | `hydra head close`, isolated fast-forward or merge integration, target-ref updates, conflict preservation, checked-out targets, or removal after integration | Implemented close transaction, checkout-free integration, compare-and-swap target publication, conflict behavior, and protected-removal composition. |
 
 ---
 
@@ -40,6 +41,8 @@ conventions, which remain in the development domain.
 - Consult `head-removal.md` for every change that can remove a Head worktree,
   inventory entry, or private branch, including behavior reused by `head
   close`.
+- Consult `head-close.md` for every change that integrates a private Head
+  branch into its target or composes integration with protected removal.
 - Consult both documents when initialization work changes a component boundary
   or introduces a new Git, configuration, state, or filesystem component.
 - Combine this router with the product router for user-visible behavior and

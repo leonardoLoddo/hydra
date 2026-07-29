@@ -29,6 +29,7 @@ Hydra/
     │   └── tests/
     │       ├── common/mod.rs
     │       ├── cli_contract.rs
+    │       ├── head_close.rs
     │       ├── head_create_conflicts.rs
     │       ├── head_create_overlay_failures.rs
     │       ├── head_create_performance.rs
@@ -44,6 +45,7 @@ Hydra/
             ├── lib.rs
             ├── head.rs
             ├── head/
+            │   ├── close.rs
             │   ├── error.rs
             │   ├── git.rs
             │   ├── inspection.rs
@@ -145,6 +147,7 @@ initialization, Head creation, and Head inspection, including:
 - tracked and overlay materialization with CoW/copy isolation;
 - transactional Head metadata publication and creation rollback;
 - protected Head removal with recoverable private-branch preservation;
+- checkout-free Head integration with conflict-safe target publication;
 - validated read-only inventory loading and Head path resolution;
 - Git worktree state, change counts, ahead/behind, and consistency diagnostics;
 - typed errors with preserved sources for operational failures.
@@ -180,6 +183,7 @@ Head creation follows the same small-orchestrator rule:
 
 | Module | Responsibility |
 |---|---|
+| `head/close.rs` | Integrate a clean Head into its target without checkout and compose protected removal |
 | `head.rs` | Validate and orchestrate the complete creation transaction |
 | `head/git.rs` | Discover Git state and own ref, branch, index, worktree, and verification commands |
 | `head/materializer.rs` | Materialize Git tree entries without a standard checkout |

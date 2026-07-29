@@ -47,6 +47,24 @@ pub enum HeadError {
         preserved_branch: String,
         source: Box<HeadError>,
     },
+    HeadCloseInconsistent {
+        name: String,
+        reason: String,
+    },
+    HeadCloseTargetCheckedOut {
+        target_ref: String,
+        path: PathBuf,
+    },
+    HeadCloseConflict {
+        name: String,
+        target_ref: String,
+    },
+    HeadIntegratedButRemovalFailed {
+        name: String,
+        target_ref: String,
+        target_commit: String,
+        source: Box<HeadError>,
+    },
     DestinationExists(PathBuf),
     BranchAlreadyExists(String),
     InvalidRef(String),
@@ -124,6 +142,10 @@ impl fmt::Display for HeadError {
             | Self::HeadHasUnintegratedCommits { .. }
             | Self::HeadRemovalInconsistent { .. }
             | Self::HeadRemovalIncomplete { .. } => display_removal_failure(formatter, self),
+            Self::HeadCloseInconsistent { .. }
+            | Self::HeadCloseTargetCheckedOut { .. }
+            | Self::HeadCloseConflict { .. }
+            | Self::HeadIntegratedButRemovalFailed { .. } => display_close_failure(formatter, self),
             Self::DestinationExists(path) => display_destination_exists(formatter, path),
             Self::BranchAlreadyExists(branch) => {
                 write!(formatter, "Head branch {branch:?} already exists")
@@ -207,6 +229,33 @@ fn display_overlay_failure(formatter: &mut fmt::Formatter<'_>, error: &HeadError
             path.display()
         ),
         _ => unreachable!("caller selects overlay failures"),
+    }
+}
+
+fn display_close_failure(formatter: &mut fmt::Formatter<'_>, error: &HeadError) -> fmt::Result {
+    match error {
+        HeadError::HeadCloseInconsistent { name, reason } => {
+            write!(formatter, "Head {name:?} cannot be closed safely: {reason}")
+        }
+        HeadError::HeadCloseTargetCheckedOut { target_ref, path } => write!(
+            formatter,
+            "target {target_ref} is checked out at {}; switch that worktree before closing",
+            path.display()
+        ),
+        HeadError::HeadCloseConflict { name, target_ref } => write!(
+            formatter,
+            "Head {name:?} conflicts with {target_ref}; target and Head were preserved"
+        ),
+        HeadError::HeadIntegratedButRemovalFailed {
+            name,
+            target_ref,
+            target_commit,
+            source,
+        } => write!(
+            formatter,
+            "Head {name:?} was integrated into {target_ref} at {target_commit}, but protected removal failed: {source}"
+        ),
+        _ => unreachable!("caller selects Head-close failures"),
     }
 }
 
@@ -423,6 +472,9 @@ impl Error for HeadError {
             | Self::RollbackFailed { original, .. }
             | Self::HeadCommittedWithCleanupFailure(original)
             | Self::HeadRemovalIncomplete {
+                source: original, ..
+            }
+            | Self::HeadIntegratedButRemovalFailed {
                 source: original, ..
             } => Some(original.as_ref()),
             _ => None,

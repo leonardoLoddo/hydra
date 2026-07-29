@@ -417,6 +417,66 @@ pub(super) fn delete_ref_if_matches(
     .map(|_| ())
 }
 
+pub(super) fn update_ref_if_matches(
+    repository: &Repository,
+    reference: &str,
+    new_commit: &str,
+    expected_commit: &str,
+) -> Result<(), HeadError> {
+    run_git(
+        &repository.root,
+        &["update-ref", reference, new_commit, expected_commit],
+        "updating the integration target",
+    )
+    .map(|_| ())
+}
+
+pub(super) fn merge_tree(
+    repository: &Repository,
+    target_commit: &str,
+    head_commit: &str,
+) -> Result<String, HeadError> {
+    let output = run_git(
+        &repository.root,
+        &["merge-tree", "--write-tree", target_commit, head_commit],
+        "merging the Head without a worktree",
+    )?;
+    let tree = output
+        .stdout
+        .split(|byte| *byte == b'\n')
+        .next()
+        .ok_or(HeadError::InvalidGitOutput("merged tree"))?;
+    std::str::from_utf8(tree)
+        .ok()
+        .filter(|tree| !tree.is_empty())
+        .map(str::to_owned)
+        .ok_or(HeadError::InvalidGitOutput("merged tree"))
+}
+
+pub(super) fn create_merge_commit(
+    repository: &Repository,
+    tree: &str,
+    target_parent: &str,
+    head_parent: &str,
+    message: &str,
+) -> Result<String, HeadError> {
+    let output = run_git(
+        &repository.root,
+        &[
+            "commit-tree",
+            tree,
+            "-p",
+            target_parent,
+            "-p",
+            head_parent,
+            "-m",
+            message,
+        ],
+        "creating the integration commit",
+    )?;
+    stdout_line(&output, "integration commit")
+}
+
 pub(super) fn delete_branch(repository: &Repository, branch: &str) -> Result<(), HeadError> {
     let output = run_git(
         &repository.root,

@@ -15,7 +15,7 @@ mod output;
     version,
     about = "Git-native workspace manager for isolated development Heads",
     long_about = "Git-native workspace manager for isolated development Heads.\n\nHydra creates independent working directories while preserving familiar Git refs, branches, and repository workflows.",
-    after_help = "Command syntax:\n  hydra init [PATH]\n  hydra status\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra <command> --help' for details."
+    after_help = "Command syntax:\n  hydra init [PATH]\n  hydra status\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra <command> --help' for details."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -35,7 +35,7 @@ enum Command {
     Status,
     /// Create and manage Heads
     #[command(
-        after_help = "Command syntax:\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra head <command> --help' for details."
+        after_help = "Command syntax:\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra head <command> --help' for details."
     )]
     Head {
         #[command(subcommand)]
@@ -84,6 +84,15 @@ enum HeadCommand {
         #[arg(long)]
         force: bool,
     },
+    /// Integrate and remove a completed Head
+    #[command(
+        long_about = "Integrate and remove a completed Head.\n\nThe Head must be clean. Hydra updates the recorded target without checking it out, then performs protected removal.",
+        after_help = "Examples:\n  hydra head close payment"
+    )]
+    Close {
+        /// Name of an existing Head
+        name: String,
+    },
 }
 
 fn main() -> ExitCode {
@@ -124,6 +133,25 @@ fn main() -> ExitCode {
         Command::Head {
             command: HeadCommand::Remove { name, force },
         } => remove_head(&name, force),
+        Command::Head {
+            command: HeadCommand::Close { name },
+        } => close_head(&name),
+    }
+}
+
+fn close_head(name: &str) -> ExitCode {
+    match hydra_core::close_head(Path::new("."), name) {
+        Ok(closed) => {
+            println!(
+                "Closed Head {} into {} at {}",
+                closed.name, closed.target_ref, closed.target_commit
+            );
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("error: {error}");
+            ExitCode::FAILURE
+        }
     }
 }
 

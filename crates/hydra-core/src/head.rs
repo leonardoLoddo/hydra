@@ -1,3 +1,4 @@
+mod close;
 mod error;
 mod git;
 mod inspection;
@@ -12,6 +13,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+pub use close::{ClosedHead, close_head};
 pub use error::HeadError;
 use git::{Repository, TrackedEntry};
 pub use inspection::{

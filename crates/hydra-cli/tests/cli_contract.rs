@@ -180,3 +180,19 @@ fn head_remove_help_documents_force_and_safe_default() {
     assert!(stdout.contains("integrated"));
     assert!(stdout.contains("hydra head remove payment --force"));
 }
+
+#[test]
+fn head_close_help_documents_integration_and_protected_removal() {
+    let output = Command::new(env!("CARGO_BIN_EXE_hydra"))
+        .args(["head", "close", "--help"])
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("help output should be UTF-8");
+    assert!(stdout.contains("Usage: hydra head close <NAME>"));
+    assert!(stdout.contains("must be clean"));
+    assert!(stdout.contains("without checking it out"));
+    assert!(stdout.contains("protected removal"));
+    assert!(stdout.contains("hydra head close payment"));
+}

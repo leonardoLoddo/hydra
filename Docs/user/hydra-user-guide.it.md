@@ -41,6 +41,7 @@ hydra head create <NAME> [--from <REF>] [--target <BRANCH>]
 hydra head list
 hydra head status <NAME>
 hydra head path <NAME>
+hydra head close <NAME>
 hydra head remove <NAME> [--force]
 ```
 
@@ -51,10 +52,11 @@ hydra --help
 hydra init --help
 hydra head --help
 hydra head create --help
+hydra head close --help
 hydra head remove --help
 ```
 
-I comandi `open`, `close`, `repair`, `doctor` e il completamento
+I comandi `open`, `repair`, `doctor` e il completamento
 della shell appartengono al contratto MVP, ma non sono ancora implementati.
 
 ---
@@ -353,12 +355,43 @@ Puoi quindi ispezionarla con i normali comandi Git. `--force` non aggira path
 non sicuri, ownership errata, worktree mancanti o non registrate, branch
 divergenti dai metadati o target scomparsi.
 
-### 4.7 Stato attuale del ciclo di vita
+### 4.7 Chiudi e integra una Head
 
-Oggi Hydra crea, registra, ispeziona e rimuove le Head, ma non espone ancora il
-comando per chiuderle integrandole automaticamente. Evita di cancellare
-manualmente una directory Head o di usare `git worktree remove`: l’inventario
-Hydra rimarrebbe incoerente.
+Una Head pulita può essere integrata nel target registrato e rimossa:
+
+```bash
+hydra head close payment
+```
+
+Hydra usa fast-forward quando possibile; per storie divergenti crea un merge
+commit senza eseguire checkout del target. Un conflitto lascia target, branch
+privato, worktree e inventario invariati.
+
+Il target non può essere aperto in un'altra worktree durante la chiusura. Nel
+caso comune in cui `main` o `beta` è attivo nel workspace principale, passa
+temporaneamente a un altro branch:
+
+```bash
+git switch -c parking
+hydra head close payment
+```
+
+Dopo la chiusura puoi tornare al target aggiornato:
+
+```bash
+git switch main
+```
+
+Hydra non cambia implicitamente file o index di un'altra worktree. Se
+l'integrazione riesce ma la rimozione protetta fallisce, l'errore indica il
+commit già pubblicato: non tentare di annullarlo manualmente e ripeti la
+diagnostica sulla Head rimasta.
+
+### 4.8 Stato attuale del ciclo di vita
+
+Oggi Hydra crea, registra, ispeziona, integra e rimuove le Head. Evita comunque
+di cancellare manualmente una directory Head o di usare `git worktree remove`:
+l’inventario Hydra rimarrebbe incoerente.
 
 Fino all’implementazione della chiusura, il flusso supportato termina con il
 lavoro e i commit sul branch privato della Head.
@@ -842,7 +875,7 @@ risolva interamente dentro la root.
 Il contratto MVP comprende:
 
 - apertura tramite comando configurabile;
-- chiusura con merge isolato o adapter configurabile;
+- adapter di chiusura configurabile alternativo all'integrazione Git nativa;
 - completamento della shell per i nomi delle Head;
 - diagnostica del backend storage;
 - repair e riconciliazione;

@@ -799,6 +799,15 @@ prodotti da un adapter arbitrario. Se il comando custom fallisce dopo avere
 modificato la target ref, Hydra conserva la Head, non esegue la rimozione e
 segnala la differenza rispetto allo snapshot iniziale.
 
+L'integrazione nativa implementata non esegue checkout del target: usa
+`merge-tree`, `commit-tree` e un aggiornamento compare-and-swap della ref. Un
+fast-forward aggiorna direttamente la ref; storie divergenti senza conflitti
+producono un merge commit con target e Head come parent. Un conflitto conserva
+entrambe le ref e la Head. Se il target è aperto in una worktree, la versione
+corrente rifiuta la chiusura: spostare soltanto la ref renderebbe incoerenti
+file e index di quella worktree, mentre modificarla implicitamente violerebbe
+l'isolamento.
+
 ### 7.6 Rimozione sicura
 
 ```bash
