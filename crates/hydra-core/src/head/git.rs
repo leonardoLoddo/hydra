@@ -29,6 +29,12 @@ pub(super) struct WorktreeChanges {
     pub(super) untracked: usize,
 }
 
+impl WorktreeChanges {
+    pub(super) fn is_clean(&self) -> bool {
+        self.modified == 0 && self.added == 0 && self.deleted == 0 && self.untracked == 0
+    }
+}
+
 impl Repository {
     pub(super) fn discover(path: &Path) -> Result<Self, HeadError> {
         let root = git_path(path, "--show-toplevel", "repository root")?;
@@ -351,6 +357,64 @@ pub(super) fn remove_worktree(repository: &Repository, path: &Path) -> Result<()
     } else {
         Err(command_failure("removing the incomplete worktree", &output))
     }
+}
+
+pub(super) fn remove_registered_worktree(
+    repository: &Repository,
+    path: &Path,
+    force: bool,
+) -> Result<(), HeadError> {
+    let mut command = Command::new("git");
+    command
+        .arg("-C")
+        .arg(&repository.root)
+        .args(["worktree", "remove"]);
+    if force {
+        command.arg("--force");
+    }
+    let output = command
+        .arg(path)
+        .output()
+        .map_err(HeadError::GitUnavailable)?;
+    ensure_success("removing the Head worktree", &output)
+}
+
+pub(super) fn is_ancestor(
+    repository: &Repository,
+    ancestor: &str,
+    descendant: &str,
+) -> Result<bool, HeadError> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(&repository.root)
+        .args(["merge-base", "--is-ancestor"])
+        .arg(ancestor)
+        .arg(descendant)
+        .output()
+        .map_err(HeadError::GitUnavailable)?;
+    if output.status.success() {
+        Ok(true)
+    } else if output.status.code() == Some(1) {
+        Ok(false)
+    } else {
+        Err(command_failure(
+            "checking whether the Head is integrated",
+            &output,
+        ))
+    }
+}
+
+pub(super) fn delete_ref_if_matches(
+    repository: &Repository,
+    reference: &str,
+    expected_commit: &str,
+) -> Result<(), HeadError> {
+    run_git(
+        &repository.root,
+        &["update-ref", "-d", reference, expected_commit],
+        "deleting the integrated Head branch",
+    )
+    .map(|_| ())
 }
 
 pub(super) fn delete_branch(repository: &Repository, branch: &str) -> Result<(), HeadError> {

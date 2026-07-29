@@ -164,3 +164,19 @@ fn head_help_exposes_every_available_inspection_command() {
         );
     }
 }
+
+#[test]
+fn head_remove_help_documents_force_and_safe_default() {
+    let output = Command::new(env!("CARGO_BIN_EXE_hydra"))
+        .args(["head", "remove", "--help"])
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("help output should be UTF-8");
+    assert!(stdout.contains("Usage: hydra head remove [OPTIONS] <NAME>"));
+    assert!(stdout.contains("--force"));
+    assert!(stdout.contains("must be clean"));
+    assert!(stdout.contains("integrated"));
+    assert!(stdout.contains("hydra head remove payment --force"));
+}

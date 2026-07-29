@@ -15,7 +15,7 @@ mod output;
     version,
     about = "Git-native workspace manager for isolated development Heads",
     long_about = "Git-native workspace manager for isolated development Heads.\n\nHydra creates independent working directories while preserving familiar Git refs, branches, and repository workflows.",
-    after_help = "Command syntax:\n  hydra init [PATH]\n  hydra status\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n\nRun 'hydra <command> --help' for details."
+    after_help = "Command syntax:\n  hydra init [PATH]\n  hydra status\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra <command> --help' for details."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -35,7 +35,7 @@ enum Command {
     Status,
     /// Create and manage Heads
     #[command(
-        after_help = "Command syntax:\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n\nRun 'hydra head <command> --help' for details."
+        after_help = "Command syntax:\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra head <command> --help' for details."
     )]
     Head {
         #[command(subcommand)]
@@ -71,6 +71,18 @@ enum HeadCommand {
     Path {
         /// Name of an existing Head
         name: String,
+    },
+    /// Remove a local Head safely
+    #[command(
+        long_about = "Remove a local Head safely.\n\nWithout --force, the Head must be clean and its commits must already be integrated into its target branch.",
+        after_help = "Examples:\n  hydra head remove payment\n  hydra head remove payment --force"
+    )]
+    Remove {
+        /// Name of an existing Head
+        name: String,
+        /// Discard uncommitted worktree changes
+        #[arg(long)]
+        force: bool,
     },
 }
 
@@ -109,6 +121,31 @@ fn main() -> ExitCode {
         Command::Head {
             command: HeadCommand::Path { name },
         } => inspection::show_head_path(&name),
+        Command::Head {
+            command: HeadCommand::Remove { name, force },
+        } => remove_head(&name, force),
+    }
+}
+
+fn remove_head(name: &str, force: bool) -> ExitCode {
+    match hydra_core::remove_head(
+        Path::new("."),
+        hydra_core::RemoveHeadOptions {
+            name: name.to_owned(),
+            force,
+        },
+    ) {
+        Ok(removed) => {
+            println!("Removed Head {}", removed.name);
+            if let Some(branch) = removed.preserved_branch {
+                println!("Preserved branch {branch} with unintegrated commits");
+            }
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("error: {error}");
+            ExitCode::FAILURE
+        }
     }
 }
 

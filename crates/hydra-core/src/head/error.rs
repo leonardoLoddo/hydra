@@ -33,6 +33,20 @@ pub enum HeadError {
     InvalidName(String),
     HeadAlreadyExists(String),
     HeadNotFound(String),
+    HeadHasUncommittedChanges(String),
+    HeadHasUnintegratedCommits {
+        head_ref: String,
+        target_ref: String,
+    },
+    HeadRemovalInconsistent {
+        name: String,
+        reason: &'static str,
+    },
+    HeadRemovalIncomplete {
+        name: String,
+        preserved_branch: String,
+        source: Box<HeadError>,
+    },
     DestinationExists(PathBuf),
     BranchAlreadyExists(String),
     InvalidRef(String),
@@ -106,6 +120,10 @@ impl fmt::Display for HeadError {
             Self::InvalidName(name) => write!(formatter, "invalid Head name {name:?}"),
             Self::HeadAlreadyExists(name) => write!(formatter, "Head {name:?} already exists"),
             Self::HeadNotFound(name) => write!(formatter, "Head {name:?} does not exist"),
+            Self::HeadHasUncommittedChanges(_)
+            | Self::HeadHasUnintegratedCommits { .. }
+            | Self::HeadRemovalInconsistent { .. }
+            | Self::HeadRemovalIncomplete { .. } => display_removal_failure(formatter, self),
             Self::DestinationExists(path) => display_destination_exists(formatter, path),
             Self::BranchAlreadyExists(branch) => {
                 write!(formatter, "Head branch {branch:?} already exists")
@@ -120,28 +138,13 @@ impl fmt::Display for HeadError {
                 formatter,
                 "--target is required when --from does not resolve to a local branch"
             ),
-            Self::OverlayFullCopyConfirmationRequired { files, bytes } => write!(
-                formatter,
-                "copying {files} overlay file(s) ({bytes} byte(s)) requires confirmation"
-            ),
-            Self::UnsafeOverlaySymlinks { paths } => write!(
-                formatter,
-                "{} unsafe overlay symlink(s) require exclusion",
-                paths.len()
-            ),
-            Self::OverlayRules(error) => write!(formatter, "overlay rules are invalid: {error}"),
-            Self::UnsafeOverlayPath(path) => display_unsafe_path(formatter, "overlay", path),
+            Self::OverlayFullCopyConfirmationRequired { .. }
+            | Self::UnsafeOverlaySymlinks { .. }
+            | Self::OverlayRules(_)
+            | Self::UnsafeOverlayPath(_)
+            | Self::OverlayOverwritesTracked(_)
+            | Self::OverlayChanged(_) => display_overlay_failure(formatter, self),
             Self::UnsafeHeadPath(path) => display_unsafe_path(formatter, "recorded Head", path),
-            Self::OverlayOverwritesTracked(path) => write!(
-                formatter,
-                "overlay path {} would overwrite a tracked file",
-                path.display()
-            ),
-            Self::OverlayChanged(path) => write!(
-                formatter,
-                "overlay source {} changed during materialization",
-                path.display()
-            ),
             Self::UnsafeProjectFile(path) => {
                 write!(
                     formatter,
@@ -177,6 +180,64 @@ impl fmt::Display for HeadError {
                 display_rollback_failure(formatter, original, failures)
             }
         }
+    }
+}
+
+fn display_overlay_failure(formatter: &mut fmt::Formatter<'_>, error: &HeadError) -> fmt::Result {
+    match error {
+        HeadError::OverlayFullCopyConfirmationRequired { files, bytes } => write!(
+            formatter,
+            "copying {files} overlay file(s) ({bytes} byte(s)) requires confirmation"
+        ),
+        HeadError::UnsafeOverlaySymlinks { paths } => write!(
+            formatter,
+            "{} unsafe overlay symlink(s) require exclusion",
+            paths.len()
+        ),
+        HeadError::OverlayRules(error) => write!(formatter, "overlay rules are invalid: {error}"),
+        HeadError::UnsafeOverlayPath(path) => display_unsafe_path(formatter, "overlay", path),
+        HeadError::OverlayOverwritesTracked(path) => write!(
+            formatter,
+            "overlay path {} would overwrite a tracked file",
+            path.display()
+        ),
+        HeadError::OverlayChanged(path) => write!(
+            formatter,
+            "overlay source {} changed during materialization",
+            path.display()
+        ),
+        _ => unreachable!("caller selects overlay failures"),
+    }
+}
+
+fn display_removal_failure(formatter: &mut fmt::Formatter<'_>, error: &HeadError) -> fmt::Result {
+    match error {
+        HeadError::HeadHasUncommittedChanges(name) => write!(
+            formatter,
+            "Head {name:?} has uncommitted changes; use --force to discard them"
+        ),
+        HeadError::HeadHasUnintegratedCommits {
+            head_ref,
+            target_ref,
+        } => write!(
+            formatter,
+            "Head branch {head_ref} has commits not integrated into {target_ref}"
+        ),
+        HeadError::HeadRemovalInconsistent { name, reason } => {
+            write!(
+                formatter,
+                "Head {name:?} cannot be removed safely: {reason}"
+            )
+        }
+        HeadError::HeadRemovalIncomplete {
+            name,
+            preserved_branch,
+            source,
+        } => write!(
+            formatter,
+            "Head {name:?} removal is incomplete; branch {preserved_branch} was preserved: {source}"
+        ),
+        _ => unreachable!("caller selects Head-removal failures"),
     }
 }
 
@@ -360,7 +421,10 @@ impl Error for HeadError {
             Self::FileSystem { source, .. } => Some(source),
             Self::ConfigurationCommittedWithCleanupFailure(original)
             | Self::RollbackFailed { original, .. }
-            | Self::HeadCommittedWithCleanupFailure(original) => Some(original.as_ref()),
+            | Self::HeadCommittedWithCleanupFailure(original)
+            | Self::HeadRemovalIncomplete {
+                source: original, ..
+            } => Some(original.as_ref()),
             _ => None,
         }
     }

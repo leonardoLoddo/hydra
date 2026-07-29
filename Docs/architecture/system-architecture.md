@@ -35,6 +35,7 @@ Hydra/
     │       ├── head_create_state_failures.rs
     │       ├── head_create_success.rs
     │       ├── head_inspection.rs
+    │       ├── head_remove.rs
     │       ├── init_conflicts.rs
     │       ├── init_git_errors.rs
     │       └── init_success.rs
@@ -53,6 +54,7 @@ Hydra/
             │   ├── overlay/
             │   │   └── hash.rs
             │   ├── persistence.rs
+            │   ├── removal.rs
             │   ├── state.rs
             │   └── state/
             │       ├── configuration.rs
@@ -142,6 +144,7 @@ initialization, Head creation, and Head inspection, including:
 - private branch and no-checkout worktree creation;
 - tracked and overlay materialization with CoW/copy isolation;
 - transactional Head metadata publication and creation rollback;
+- protected Head removal with recoverable private-branch preservation;
 - validated read-only inventory loading and Head path resolution;
 - Git worktree state, change counts, ahead/behind, and consistency diagnostics;
 - typed errors with preserved sources for operational failures.
@@ -183,11 +186,12 @@ Head creation follows the same small-orchestrator rule:
 | `head/materializer/blob_batch.rs` | Own and validate the persistent `git cat-file --batch` protocol used to stream tracked blobs |
 | `head/overlay.rs` | Expand overlay rules, select safe source files, copy them, and verify content identity |
 | `head/overlay/hash.rs` | Compute overlay identities through bounded parallel `git hash-object` batches and restore deterministic order |
+| `head/removal.rs` | Validate and orchestrate protected worktree, inventory, and private-branch removal |
 | `head/state.rs` | Manage the physical inventory transaction and classify commit boundaries |
 | `head/state/configuration.rs` | Parse and validate schema-v2 directory policies and shared Head settings |
 | `head/state/installation.rs` | Resolve the Git-common locator, verify directory ownership and worktree boundaries, and locate the physical inventory |
 | `head/persistence.rs` | Acquire and release the state lock and replace local state atomically |
-| `head/error.rs` | Define and render typed creation, rollback, and post-commit cleanup failures |
+| `head/error.rs` | Define and render typed lifecycle, rollback, partial-removal, and post-commit cleanup failures |
 
 The terminal confirmation remains in `hydra-cli`; the core exposes the
 confirmation requirement as data and recomputes the overlay plan after

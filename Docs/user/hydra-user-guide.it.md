@@ -41,6 +41,7 @@ hydra head create <NAME> [--from <REF>] [--target <BRANCH>]
 hydra head list
 hydra head status <NAME>
 hydra head path <NAME>
+hydra head remove <NAME> [--force]
 ```
 
 Puoi verificare la sintassi installata con:
@@ -50,9 +51,10 @@ hydra --help
 hydra init --help
 hydra head --help
 hydra head create --help
+hydra head remove --help
 ```
 
-I comandi `open`, `close`, `remove`, `repair`, `doctor` e il completamento
+I comandi `open`, `close`, `repair`, `doctor` e il completamento
 della shell appartengono al contratto MVP, ma non sono ancora implementati.
 
 ---
@@ -313,11 +315,50 @@ directory o una ref manca, `status` segnala l'incoerenza senza correggerla. Un
 percorso registrato che esce dalla directory delle Head posseduta viene
 rifiutato.
 
-### 4.6 Stato attuale del ciclo di vita
+### 4.6 Rimuovi una Head
 
-Oggi Hydra crea, registra e ispeziona le Head, ma non espone ancora i comandi
-per chiuderle o rimuoverle. Evita di cancellare manualmente una directory Head
-o di usare `git worktree remove`: l’inventario Hydra rimarrebbe incoerente.
+La rimozione ordinaria è protetta:
+
+```bash
+hydra head remove payment
+```
+
+Hydra procede soltanto se la worktree è pulita e tutti i commit del branch
+privato sono già integrati nel target registrato. In questo caso elimina
+worktree, voce di inventario e branch privato:
+
+```text
+Removed Head payment
+```
+
+Modifiche tracked, staged o untracked bloccano il comando. Anche commit non
+integrati bloccano la rimozione ordinaria.
+
+Per scartare esplicitamente le modifiche non committate:
+
+```bash
+hydra head remove payment --force
+```
+
+`--force` può eliminare definitivamente quei file, ma non cancella commit
+recuperabili. Se il branch contiene commit non integrati, Hydra conserva la
+ref:
+
+```text
+Removed Head payment
+Preserved branch refs/heads/hydra/payment with unintegrated commits
+```
+
+Puoi quindi ispezionarla con i normali comandi Git. `--force` non aggira path
+non sicuri, ownership errata, worktree mancanti o non registrate, branch
+divergenti dai metadati o target scomparsi.
+
+### 4.7 Stato attuale del ciclo di vita
+
+Oggi Hydra crea, registra, ispeziona e rimuove le Head, ma non espone ancora il
+comando per chiuderle integrandole automaticamente. Evita di cancellare
+manualmente una directory Head o di usare `git worktree remove`: l’inventario
+Hydra rimarrebbe incoerente.
 
 Fino all’implementazione della chiusura, il flusso supportato termina con il
 lavoro e i commit sul branch privato della Head.
@@ -778,6 +819,13 @@ Un’operazione Hydra potrebbe essere attiva oppure essersi interrotta. Non
 eliminare automaticamente il lock: prima verifica processi, worktree, branch e
 inventario. La riconciliazione automatica è pianificata.
 
+### “Head removal is incomplete”
+
+Git ha già rimosso la worktree, ma Hydra non ha completato inventario o pulizia
+del branch. Non cancellare manualmente il branch indicato: contiene il punto di
+recupero. Ispeziona `git worktree list`, `git show <branch>` e l'output di
+`hydra status`; il comando guidato `hydra repair` è ancora pianificato.
+
 ### “Unsafe overlay symlinks”
 
 Hydra ha selezionato uno o più symlink che non possono essere ricreati dentro
@@ -795,7 +843,6 @@ Il contratto MVP comprende:
 
 - apertura tramite comando configurabile;
 - chiusura con merge isolato o adapter configurabile;
-- rimozione protetta;
 - completamento della shell per i nomi delle Head;
 - diagnostica del backend storage;
 - repair e riconciliazione;

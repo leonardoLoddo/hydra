@@ -816,6 +816,14 @@ Senza `--force`, Hydra rifiuta la rimozione se:
 
 Worktree e branch sono entità separate. La rimozione ordinaria elimina il worktree secondo una politica esplicita e non deve cancellare automaticamente un branch che contiene lavoro recuperabile.
 
+L'implementazione corrente interpreta `--force` come autorizzazione a
+scartare modifiche tracked, staged e untracked del worktree, non come
+autorizzazione a ignorare ownership o incoerenze dei metadati. Se il branch
+privato contiene commit non integrati, una rimozione forzata elimina worktree e
+inventario ma conserva la ref e ne mostra il nome. Un branch viene eliminato
+soltanto quando il relativo commit è ancora raggiungibile dal target e la ref
+punta ancora al commit validato.
+
 ### 7.7 Completamento della shell
 
 Hydra deve offrire completamento tramite Tab per la gerarchia dei comandi,

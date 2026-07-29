@@ -27,7 +27,7 @@ struct LocalState {
     heads: BTreeMap<String, HeadMetadata>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct HeadMetadata {
     worktree_path: String,
@@ -170,6 +170,13 @@ impl StateTransaction {
         self.state.heads.contains_key(name)
     }
 
+    pub(super) fn head(&self, name: &str) -> Result<&HeadMetadata, HeadError> {
+        self.state
+            .heads
+            .get(name)
+            .ok_or_else(|| HeadError::HeadNotFound(name.to_owned()))
+    }
+
     pub(super) fn branch_prefix(&self) -> &str {
         self.configuration.branch_prefix()
     }
@@ -191,6 +198,20 @@ impl StateTransaction {
 
     pub(super) fn commit(mut self, name: String, metadata: HeadMetadata) -> Result<(), HeadError> {
         self.state.heads.insert(name, metadata);
+        let result = serde_json::to_vec_pretty(&self.state)
+            .map_err(HeadError::SerializeState)
+            .and_then(|mut bytes| {
+                bytes.push(b'\n');
+                replace_state_atomically(&self.state_path, &self.original_state, &bytes)
+            });
+        self.finish_commit(result)
+    }
+
+    pub(super) fn remove(mut self, name: &str) -> Result<(), HeadError> {
+        self.state
+            .heads
+            .remove(name)
+            .ok_or_else(|| HeadError::HeadNotFound(name.to_owned()))?;
         let result = serde_json::to_vec_pretty(&self.state)
             .map_err(HeadError::SerializeState)
             .and_then(|mut bytes| {

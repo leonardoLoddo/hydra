@@ -4,6 +4,7 @@ mod inspection;
 mod materializer;
 mod overlay;
 mod persistence;
+mod removal;
 mod state;
 
 use std::{
@@ -19,6 +20,7 @@ pub use inspection::{
 };
 use materializer::materialize_tracked_files;
 use overlay::{OverlayPlan, materialize_overlays, plan_overlays};
+pub use removal::{RemoveHeadOptions, RemovedHead, remove_head};
 use state::{HeadMetadata, StateTransaction};
 
 use crate::StorageBackend;
