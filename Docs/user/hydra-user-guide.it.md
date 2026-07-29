@@ -1018,6 +1018,8 @@ risolva interamente dentro la root.
 Il contratto MVP comprende:
 
 - adapter di chiusura configurabile alternativo all'integrazione Git nativa;
+- installazione automatica del completamento tramite futuri pacchetti o
+  installer, senza modificare silenziosamente i file personali della shell;
 - output JSON per automazioni;
 - una skill installabile che insegni agli agenti AI a usare questi flussi senza
   aggirare le protezioni di Hydra.

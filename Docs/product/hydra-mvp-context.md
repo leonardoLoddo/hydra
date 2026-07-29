@@ -872,6 +872,13 @@ Il primo supporto deve coprire almeno le shell principali dell’ambiente di
 sviluppo del progetto. L’elenco esatto delle shell supportate e il contratto del
 comando interno per i candidati vanno fissati prima dell’implementazione.
 
+In una fase successiva, i pacchetti e gli installer ufficiali potranno
+registrare automaticamente gli script nei percorsi standard delle shell
+supportate. Questa integrazione non appartiene al comando di completamento:
+deve rispettare le convenzioni del package manager, non modificare
+silenziosamente i file di configurazione personali e mantenere disponibile la
+registrazione manuale.
+
 ### 7.8 Repair e riconciliazione
 
 ```bash
