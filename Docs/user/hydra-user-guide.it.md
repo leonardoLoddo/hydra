@@ -38,6 +38,7 @@ Il binario corrente espone:
 hydra init [PATH]
 hydra status
 hydra repair
+hydra doctor storage
 hydra head create <NAME> [--from <REF>] [--target <BRANCH>]
 hydra head list
 hydra head status <NAME>
@@ -53,6 +54,7 @@ Puoi verificare la sintassi installata con:
 hydra --help
 hydra init --help
 hydra repair --help
+hydra doctor storage --help
 hydra head --help
 hydra head create --help
 hydra head open --help
@@ -60,8 +62,8 @@ hydra head close --help
 hydra head remove --help
 ```
 
-I comandi `doctor` e il completamento
-della shell appartengono al contratto MVP, ma non sono ancora implementati.
+Il completamento della shell appartiene al contratto MVP, ma non è ancora
+implementato.
 
 ---
 
@@ -727,6 +729,30 @@ Hydra verifica il volume che ospita le Head:
 - su filesystem Linux compatibili tenta il reflink;
 - quando il copy-on-write non è disponibile usa una copia completa isolata.
 
+Per eseguire una diagnostica esplicita sul volume realmente gestito:
+
+```bash
+hydra doctor storage
+```
+
+Il comando crea una directory temporanea dentro la directory delle Head,
+verifica i byte prodotti dal clone nativo e, separatamente quando necessario,
+il fallback a copia completa. Un risultato tipico su APFS è:
+
+```text
+Storage backend: copy-on-write
+Native primitive: APFS clone
+Fallback: full copy (verified)
+Mutable hard links: disabled
+Isolation: supported
+```
+
+Se il clone nativo non è disponibile, Hydra mostra `Storage backend: full
+copy` e `Native primitive: unavailable`. Gli hard link mutabili non vengono
+mai usati come fallback. Il comando richiede un progetto Hydra inizializzato,
+non acquisisce il lock dell’inventario e rimuove tutti gli artefatti della
+prova; un fallimento di cleanup viene segnalato con il percorso rimasto.
+
 Per i file tracciati, quando il workspace coincide con il commit scelto Hydra
 può riusare direttamente quei file come sorgenti copy-on-write. In presenza di
 modifiche tracciate legge invece i contenuti dal commit Git tramite un unico
@@ -961,7 +987,6 @@ Il contratto MVP comprende:
 
 - adapter di chiusura configurabile alternativo all'integrazione Git nativa;
 - completamento della shell per i nomi delle Head;
-- diagnostica del backend storage;
 - output JSON per automazioni;
 - una skill installabile che insegni agli agenti AI a usare questi flussi senza
   aggirare le protezioni di Hydra.

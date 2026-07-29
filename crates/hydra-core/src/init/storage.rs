@@ -17,10 +17,20 @@ pub enum StorageBackend {
     FullCopy,
 }
 
-pub(super) fn probe_storage(destination: &Path) -> Result<StorageBackend, InitError> {
+pub(crate) fn probe_storage(destination: &Path) -> Result<StorageBackend, InitError> {
     probe_storage_with(destination, |source, target| {
         reflink_copy::reflink(source, target)
     })
+}
+
+pub(crate) fn probe_full_copy(destination: &Path) -> Result<(), InitError> {
+    probe_storage_with(destination, |_, _| {
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "native clone intentionally bypassed for fallback verification",
+        ))
+    })
+    .map(|_| ())
 }
 
 fn probe_storage_with(

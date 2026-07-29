@@ -27,9 +27,14 @@ pub use open::{OpenedHead, open_head};
 use overlay::{OverlayPlan, materialize_overlays, plan_overlays};
 pub use removal::{RemoveHeadOptions, RemovedHead, remove_head};
 pub use repair::{RepairIssue, RepairPlan, RepairResult, apply_repairs, plan_repairs};
-use state::{HeadMetadata, StateTransaction};
+use state::{HeadMetadata, StateSnapshot, StateTransaction};
 
 use crate::StorageBackend;
+
+pub(crate) fn validated_heads_directory(source_path: &Path) -> Result<PathBuf, HeadError> {
+    let repository = Repository::discover(source_path)?;
+    StateSnapshot::load(&repository)?.heads_directory()
+}
 
 #[derive(Debug)]
 pub struct CreateHeadOptions {

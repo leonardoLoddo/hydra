@@ -3,7 +3,7 @@ mod configuration;
 mod error;
 mod git;
 mod persistence;
-mod storage;
+pub(crate) mod storage;
 
 use std::{
     fs,

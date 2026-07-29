@@ -1,8 +1,10 @@
 //! Core domain behavior for Hydra.
 
+mod doctor;
 mod head;
 mod init;
 
+pub use doctor::{DoctorError, NativeStoragePrimitive, StorageDiagnostics, diagnose_storage};
 pub use head::{
     ChangeCounts, ClosedHead, CreateHeadOptions, CreatedHead, HeadCreationProgress, HeadError,
     HeadInspection, HeadSummary, OpenedHead, ProjectInspection, RemoveHeadOptions, RemovedHead,

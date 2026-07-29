@@ -226,3 +226,18 @@ fn head_open_help_documents_the_configured_adapter() {
     assert!(stdout.contains("configured command"));
     assert!(stdout.contains("hydra head open payment"));
 }
+
+#[test]
+fn doctor_storage_help_documents_the_real_volume_probe() {
+    let output = Command::new(env!("CARGO_BIN_EXE_hydra"))
+        .args(["doctor", "storage", "--help"])
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("help output should be UTF-8");
+    assert!(stdout.contains("Usage: hydra doctor storage"));
+    assert!(stdout.contains("real"));
+    assert!(stdout.contains("Heads volume"));
+    assert!(stdout.contains("hydra doctor storage"));
+}

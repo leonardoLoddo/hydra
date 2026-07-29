@@ -29,6 +29,7 @@ Hydra/
     │   └── tests/
     │       ├── common/mod.rs
     │       ├── cli_contract.rs
+    │       ├── doctor_storage.rs
     │       ├── head_close.rs
     │       ├── head_create_conflicts.rs
     │       ├── head_create_overlay_failures.rs
@@ -44,6 +45,7 @@ Hydra/
     │       └── repair.rs
     └── hydra-core/
         └── src/
+            ├── doctor.rs
             ├── lib.rs
             ├── head.rs
             ├── head/
@@ -145,6 +147,7 @@ initialization, Head creation, and Head inspection, including:
 - derivation and validation of initialization paths;
 - configuration and local-state serialization;
 - real storage capability probing on the Heads volume;
+- explicit storage diagnostics with native and fallback verification;
 - atomic publication of state files;
 - rollback of artifacts created by a failed initialization;
 - private branch and no-checkout worktree creation;
@@ -182,6 +185,11 @@ internal responsibilities remain separated:
 These are private implementation modules, not independent services or crates.
 They may depend on one another only through narrow `pub(super)` functions and
 types. The public API continues to be re-exported by `hydra-core/src/lib.rs`.
+
+`doctor.rs` reuses the same `init/storage.rs` capability adapter after resolving
+the validated managed Heads directory through the Head state boundary. It owns
+only diagnostic-directory lifecycle, report classification, and combined
+probe/cleanup errors; it does not duplicate the clone or copy implementation.
 
 ### Head creation module boundaries
 

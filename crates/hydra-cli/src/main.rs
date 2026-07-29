@@ -15,7 +15,7 @@ mod output;
     version,
     about = "Git-native workspace manager for isolated development Heads",
     long_about = "Git-native workspace manager for isolated development Heads.\n\nHydra creates independent working directories while preserving familiar Git refs, branches, and repository workflows.",
-    after_help = "Command syntax:\n  hydra init [PATH]\n  hydra status\n  hydra repair\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head open <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra <command> --help' for details."
+    after_help = "Command syntax:\n  hydra init [PATH]\n  hydra status\n  hydra repair\n  hydra doctor storage\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head open <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra <command> --help' for details."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -39,6 +39,14 @@ enum Command {
         after_help = "Examples:\n  hydra repair"
     )]
     Repair,
+    /// Diagnose project capabilities
+    #[command(
+        after_help = "Command syntax:\n  hydra doctor storage\n\nRun 'hydra doctor <command> --help' for details."
+    )]
+    Doctor {
+        #[command(subcommand)]
+        command: DoctorCommand,
+    },
     /// Create and manage Heads
     #[command(
         after_help = "Command syntax:\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head open <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra head <command> --help' for details."
@@ -47,6 +55,16 @@ enum Command {
         #[command(subcommand)]
         command: HeadCommand,
     },
+}
+
+#[derive(Subcommand)]
+enum DoctorCommand {
+    /// Run a real storage probe on the Heads volume
+    #[command(
+        long_about = "Run a real storage probe on the Heads volume.\n\nHydra verifies the native copy-on-write primitive and the isolated full-copy fallback with temporary files.",
+        after_help = "Examples:\n  hydra doctor storage"
+    )]
+    Storage,
 }
 
 #[derive(Subcommand)]
@@ -134,6 +152,9 @@ fn main() -> ExitCode {
         },
         Command::Status => inspection::show_project_status(),
         Command::Repair => repair(),
+        Command::Doctor {
+            command: DoctorCommand::Storage,
+        } => doctor_storage(),
         Command::Head {
             command: HeadCommand::Create { name, from, target },
         } => create_head(&name, from.as_deref(), target.as_deref()),
@@ -155,6 +176,48 @@ fn main() -> ExitCode {
         Command::Head {
             command: HeadCommand::Close { name },
         } => close_head(&name),
+    }
+}
+
+fn doctor_storage() -> ExitCode {
+    match hydra_core::diagnose_storage(Path::new(".")) {
+        Ok(diagnostics) => {
+            match diagnostics.storage_backend {
+                hydra_core::StorageBackend::CopyOnWrite => {
+                    println!("Storage backend: copy-on-write");
+                }
+                hydra_core::StorageBackend::FullCopy => {
+                    println!("Storage backend: full copy");
+                }
+            }
+            let primitive = match diagnostics.native_primitive {
+                hydra_core::NativeStoragePrimitive::ApfsClone => "APFS clone",
+                hydra_core::NativeStoragePrimitive::LinuxReflink => "Linux reflink",
+                hydra_core::NativeStoragePrimitive::NativeClone => "native clone",
+                hydra_core::NativeStoragePrimitive::Unavailable => "unavailable",
+            };
+            println!("Native primitive: {primitive}");
+            if diagnostics.full_copy_fallback_verified {
+                println!("Fallback: full copy (verified)");
+            }
+            let hard_links = if diagnostics.mutable_hard_links_enabled {
+                "enabled"
+            } else {
+                "disabled"
+            };
+            println!("Mutable hard links: {hard_links}");
+            let isolation = if diagnostics.isolation_supported {
+                "supported"
+            } else {
+                "unsupported"
+            };
+            println!("Isolation: {isolation}");
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("error: {error}");
+            ExitCode::FAILURE
+        }
     }
 }
 

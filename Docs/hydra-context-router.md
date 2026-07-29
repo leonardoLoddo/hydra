@@ -98,6 +98,7 @@ Docs/
 ├── hydra-context-router.md
 ├── architecture/
 │   ├── architecture-context-router.md
+│   ├── doctor-storage.md
 │   ├── head-close.md
 │   ├── head-creation.md
 │   ├── head-inspection.md
