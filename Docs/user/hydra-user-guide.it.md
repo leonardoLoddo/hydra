@@ -42,6 +42,7 @@ hydra head create <NAME> [--from <REF>] [--target <BRANCH>]
 hydra head list
 hydra head status <NAME>
 hydra head path <NAME>
+hydra head open <NAME>
 hydra head close <NAME>
 hydra head remove <NAME> [--force]
 ```
@@ -54,11 +55,12 @@ hydra init --help
 hydra repair --help
 hydra head --help
 hydra head create --help
+hydra head open --help
 hydra head close --help
 hydra head remove --help
 ```
 
-I comandi `open`, `doctor` e il completamento
+I comandi `doctor` e il completamento
 della shell appartengono al contratto MVP, ma non sono ancora implementati.
 
 ---
@@ -319,7 +321,34 @@ directory o una ref manca, `status` segnala l'incoerenza senza correggerla. Un
 percorso registrato che esce dalla directory delle Head posseduta viene
 rifiutato.
 
-### 4.6 Rimuovi una Head
+### 4.6 Apri una Head
+
+Hydra non sceglie implicitamente un editor. Configura prima un adapter
+condiviso in `.hydra.json`, per esempio:
+
+```json
+{
+  "commands": {
+    "open": {
+      "program": "code",
+      "args": ["{path}"]
+    }
+  }
+}
+```
+
+Poi esegui:
+
+```bash
+hydra head open payment
+```
+
+Prima di avviare il programma, Hydra verifica che path, registrazione Git e
+branch della worktree corrispondano ai metadati. Il processo parte dalla
+directory della Head. Hydra attende il suo esito: un exit code non-zero rende
+fallito il comando ma non modifica Head, branch o inventario.
+
+### 4.7 Rimuovi una Head
 
 La rimozione ordinaria è protetta:
 
@@ -357,7 +386,7 @@ Puoi quindi ispezionarla con i normali comandi Git. `--force` non aggira path
 non sicuri, ownership errata, worktree mancanti o non registrate, branch
 divergenti dai metadati o target scomparsi.
 
-### 4.7 Chiudi e integra una Head
+### 4.8 Chiudi e integra una Head
 
 Una Head pulita può essere integrata nel target registrato e rimossa:
 
@@ -389,7 +418,7 @@ l'integrazione riesce ma la rimozione protetta fallisce, l'errore indica il
 commit già pubblicato: non tentare di annullarlo manualmente e ripeti la
 diagnostica sulla Head rimasta.
 
-### 4.8 Ripara inventario e worktree
+### 4.9 Ripara inventario e worktree
 
 Per confrontare lo stato locale di Hydra con le worktree e i branch Git:
 
@@ -423,7 +452,7 @@ base, target, backend e intenzione originaria.
 `repair` non elimina lock stale, non corregge ownership o locator e non
 ricostruisce un inventario completamente perso.
 
-### 4.9 Stato attuale del ciclo di vita
+### 4.10 Stato attuale del ciclo di vita
 
 Oggi Hydra crea, registra, ispeziona, integra, rimuove e riconcilia le Head.
 Evita comunque di cancellare manualmente una directory Head o di usare
@@ -809,6 +838,21 @@ Regole:
 - `storage.mode` accetta oggi soltanto `auto`;
 - `overlay.copy` contiene regole Gitignore e direttive `...`.
 
+Per `commands.open`, `program` e ogni valore di `args` vengono passati
+separatamente al processo, senza costruire una stringa di shell. Puoi usare:
+
+- `{name}`;
+- `{path}`;
+- `{headRef}`;
+- `{baseRef}`;
+- `{targetRef}`.
+
+I placeholder possono essere parte di un argomento, per esempio
+`"--folder={path}"`. Graffe non riconosciute o non bilanciate nel template
+vengono rifiutate. Le graffe che appartengono al valore espanso di un percorso
+rimangono invece letterali. Il programma configurato è codice fidato del
+progetto e non viene eseguito in una sandbox.
+
 Hydra rifiuta campi sconosciuti e campi appartenenti a una strategy diversa.
 Versiona `.hydra.json`, ma non inserire percorsi assoluti o informazioni
 specifiche della macchina.
@@ -915,7 +959,6 @@ risolva interamente dentro la root.
 
 Il contratto MVP comprende:
 
-- apertura tramite comando configurabile;
 - adapter di chiusura configurabile alternativo all'integrazione Git nativa;
 - completamento della shell per i nomi delle Head;
 - diagnostica del backend storage;

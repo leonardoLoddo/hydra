@@ -101,6 +101,7 @@ Docs/
 │   ├── head-close.md
 │   ├── head-creation.md
 │   ├── head-inspection.md
+│   ├── head-open.md
 │   ├── head-removal.md
 │   ├── project-initialization.md
 │   ├── repair.md

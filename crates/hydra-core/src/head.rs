@@ -3,6 +3,7 @@ mod error;
 mod git;
 mod inspection;
 mod materializer;
+mod open;
 mod overlay;
 mod persistence;
 mod removal;
@@ -22,6 +23,7 @@ pub use inspection::{
     inspect_head, inspect_project, list_heads,
 };
 use materializer::materialize_tracked_files;
+pub use open::{OpenedHead, open_head};
 use overlay::{OverlayPlan, materialize_overlays, plan_overlays};
 pub use removal::{RemoveHeadOptions, RemovedHead, remove_head};
 pub use repair::{RepairIssue, RepairPlan, RepairResult, apply_repairs, plan_repairs};

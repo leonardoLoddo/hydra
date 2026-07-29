@@ -36,6 +36,7 @@ Hydra/
     │       ├── head_create_state_failures.rs
     │       ├── head_create_success.rs
     │       ├── head_inspection.rs
+    │       ├── head_open.rs
     │       ├── head_remove.rs
     │       ├── init_conflicts.rs
     │       ├── init_git_errors.rs
@@ -56,6 +57,7 @@ Hydra/
             │   ├── overlay.rs
             │   ├── overlay/
             │   │   └── hash.rs
+            │   ├── open.rs
             │   ├── persistence.rs
             │   ├── repair.rs
             │   ├── removal.rs
@@ -150,6 +152,7 @@ initialization, Head creation, and Head inspection, including:
 - transactional Head metadata publication and creation rollback;
 - protected Head removal with recoverable private-branch preservation;
 - checkout-free Head integration with conflict-safe target publication;
+- validated execution of configured Head-open adapters without a shell;
 - guided reconciliation of inventory, worktree paths, and private branches;
 - validated read-only inventory loading and Head path resolution;
 - Git worktree state, change counts, ahead/behind, and consistency diagnostics;
@@ -193,6 +196,7 @@ Head creation follows the same small-orchestrator rule:
 | `head/materializer/blob_batch.rs` | Own and validate the persistent `git cat-file --batch` protocol used to stream tracked blobs |
 | `head/overlay.rs` | Expand overlay rules, select safe source files, copy them, and verify content identity |
 | `head/overlay/hash.rs` | Compute overlay identities through bounded parallel `git hash-object` batches and restore deterministic order |
+| `head/open.rs` | Validate an existing Head, expand configured placeholders, and execute the open adapter without a shell |
 | `head/removal.rs` | Validate and orchestrate protected worktree, inventory, and private-branch removal |
 | `head/repair.rs` | Compare inventory with Git and filesystem state, classify inconsistencies, and apply only confirmed deterministic repairs |
 | `head/state.rs` | Manage the physical inventory transaction and classify commit boundaries |

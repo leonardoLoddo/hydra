@@ -15,7 +15,7 @@ mod output;
     version,
     about = "Git-native workspace manager for isolated development Heads",
     long_about = "Git-native workspace manager for isolated development Heads.\n\nHydra creates independent working directories while preserving familiar Git refs, branches, and repository workflows.",
-    after_help = "Command syntax:\n  hydra init [PATH]\n  hydra status\n  hydra repair\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra <command> --help' for details."
+    after_help = "Command syntax:\n  hydra init [PATH]\n  hydra status\n  hydra repair\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head open <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra <command> --help' for details."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -41,7 +41,7 @@ enum Command {
     Repair,
     /// Create and manage Heads
     #[command(
-        after_help = "Command syntax:\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra head <command> --help' for details."
+        after_help = "Command syntax:\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head open <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra head <command> --help' for details."
     )]
     Head {
         #[command(subcommand)]
@@ -75,6 +75,15 @@ enum HeadCommand {
     },
     /// Print the absolute path of a local Head
     Path {
+        /// Name of an existing Head
+        name: String,
+    },
+    /// Open a local Head with the configured command
+    #[command(
+        long_about = "Open a local Head with the configured command.\n\nThe Head path and Git branch are validated before the configured adapter is started.",
+        after_help = "Examples:\n  hydra head open payment"
+    )]
+    Open {
         /// Name of an existing Head
         name: String,
     },
@@ -138,11 +147,31 @@ fn main() -> ExitCode {
             command: HeadCommand::Path { name },
         } => inspection::show_head_path(&name),
         Command::Head {
+            command: HeadCommand::Open { name },
+        } => open_head(&name),
+        Command::Head {
             command: HeadCommand::Remove { name, force },
         } => remove_head(&name, force),
         Command::Head {
             command: HeadCommand::Close { name },
         } => close_head(&name),
+    }
+}
+
+fn open_head(name: &str) -> ExitCode {
+    match hydra_core::open_head(Path::new("."), name) {
+        Ok(opened) => {
+            println!(
+                "Opened Head {} at {}",
+                opened.name,
+                safe_path_label(&opened.path)
+            );
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("error: {error}");
+            ExitCode::FAILURE
+        }
     }
 }
 

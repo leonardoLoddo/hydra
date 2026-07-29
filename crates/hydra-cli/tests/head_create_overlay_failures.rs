@@ -138,6 +138,22 @@ fn head_create_can_exclude_all_unsafe_overlay_symlinks_and_update_configuration(
 
     let directory = TestDirectory::new("head-overlay-exclude-unsafe-symlinks");
     let repository = create_initialized_project(&directory);
+    let configuration_path = repository.join(".hydra.json");
+    let mut configured: serde_json::Value = serde_json::from_slice(
+        &fs::read(&configuration_path).expect("configuration should be readable"),
+    )
+    .expect("configuration should be valid JSON");
+    configured["commands"] = serde_json::json!({
+        "open": {
+            "program": "code",
+            "args": ["{path}"]
+        }
+    });
+    fs::write(
+        &configuration_path,
+        serde_json::to_vec_pretty(&configured).expect("configuration should serialize"),
+    )
+    .expect("configured opener should be written");
     let outside = directory.path().join("outside-secret");
     fs::write(&outside, b"outside\n").expect("outside file should be written");
     fs::create_dir_all(repository.join("public")).expect("public directory should be created");
@@ -190,6 +206,7 @@ fn head_create_can_exclude_all_unsafe_overlay_symlinks_and_update_configuration(
         configuration["overlay"]["copy"],
         serde_json::json!(["... .gitignore", "!/links/escape", "!/public/storage"])
     );
+    assert_eq!(configuration["commands"], configured["commands"]);
 
     let head = heads_directory(&repository).join("payment");
     assert!(head.is_dir());

@@ -212,3 +212,17 @@ fn repair_help_documents_reconciliation_and_confirmation() {
     assert!(stdout.contains("confirmation"));
     assert!(stdout.contains("hydra repair"));
 }
+
+#[test]
+fn head_open_help_documents_the_configured_adapter() {
+    let output = Command::new(env!("CARGO_BIN_EXE_hydra"))
+        .args(["head", "open", "--help"])
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("help output should be UTF-8");
+    assert!(stdout.contains("Usage: hydra head open <NAME>"));
+    assert!(stdout.contains("configured command"));
+    assert!(stdout.contains("hydra head open payment"));
+}

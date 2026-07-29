@@ -22,6 +22,8 @@ pub(super) struct ProjectConfiguration {
     #[serde(rename = "storage")]
     _storage: StorageConfiguration,
     overlay: OverlayConfiguration,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    commands: Option<CommandConfiguration>,
     #[serde(skip)]
     path: PathBuf,
     #[serde(skip)]
@@ -68,6 +70,29 @@ struct OverlayConfiguration {
     copy: Vec<String>,
 }
 
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct CommandConfiguration {
+    open: Option<OpenCommandConfiguration>,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(in crate::head) struct OpenCommandConfiguration {
+    program: String,
+    args: Vec<String>,
+}
+
+impl OpenCommandConfiguration {
+    pub(in crate::head) fn program(&self) -> &str {
+        &self.program
+    }
+
+    pub(in crate::head) fn args(&self) -> &[String] {
+        &self.args
+    }
+}
+
 impl ProjectConfiguration {
     pub(super) fn load(repository_root: &Path) -> Result<Self, HeadError> {
         let path = repository_root.join(CONFIG_FILE_NAME);
@@ -102,6 +127,12 @@ impl ProjectConfiguration {
 
     pub(super) fn overlay_rules(&self) -> &[String] {
         &self.overlay.copy
+    }
+
+    pub(super) fn open_command(&self) -> Option<&OpenCommandConfiguration> {
+        self.commands
+            .as_ref()
+            .and_then(|commands| commands.open.as_ref())
     }
 
     pub(super) fn exclude_unsafe_overlay_symlinks(

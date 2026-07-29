@@ -33,6 +33,20 @@ pub enum HeadError {
     InvalidName(String),
     HeadAlreadyExists(String),
     HeadNotFound(String),
+    OpenCommandNotConfigured,
+    InvalidOpenCommand(String),
+    OpenCommandUnavailable {
+        program: String,
+        source: std::io::Error,
+    },
+    OpenCommandFailed {
+        program: String,
+        status: Option<i32>,
+    },
+    HeadOpenInconsistent {
+        name: String,
+        reason: &'static str,
+    },
     HeadHasUncommittedChanges(String),
     HeadHasUnintegratedCommits {
         head_ref: String,
@@ -138,6 +152,11 @@ impl fmt::Display for HeadError {
             Self::InvalidName(name) => write!(formatter, "invalid Head name {name:?}"),
             Self::HeadAlreadyExists(name) => write!(formatter, "Head {name:?} already exists"),
             Self::HeadNotFound(name) => write!(formatter, "Head {name:?} does not exist"),
+            Self::OpenCommandNotConfigured
+            | Self::InvalidOpenCommand(_)
+            | Self::OpenCommandUnavailable { .. }
+            | Self::OpenCommandFailed { .. }
+            | Self::HeadOpenInconsistent { .. } => display_open_failure(formatter, self),
             Self::HeadHasUncommittedChanges(_)
             | Self::HeadHasUnintegratedCommits { .. }
             | Self::HeadRemovalInconsistent { .. }
@@ -229,6 +248,34 @@ fn display_overlay_failure(formatter: &mut fmt::Formatter<'_>, error: &HeadError
             path.display()
         ),
         _ => unreachable!("caller selects overlay failures"),
+    }
+}
+
+fn display_open_failure(formatter: &mut fmt::Formatter<'_>, error: &HeadError) -> fmt::Result {
+    match error {
+        HeadError::OpenCommandNotConfigured => {
+            write!(formatter, "open command is not configured in .hydra.json")
+        }
+        HeadError::InvalidOpenCommand(reason) => {
+            write!(formatter, "open command is invalid: {reason}")
+        }
+        HeadError::OpenCommandUnavailable { program, source } => {
+            write!(
+                formatter,
+                "could not start open command {program:?}: {source}"
+            )
+        }
+        HeadError::OpenCommandFailed { program, status } => {
+            let status = status.map_or_else(|| "unknown".to_owned(), |code| code.to_string());
+            write!(
+                formatter,
+                "open command failed: {program:?} exited with status {status}"
+            )
+        }
+        HeadError::HeadOpenInconsistent { name, reason } => {
+            write!(formatter, "Head {name:?} cannot be opened safely: {reason}")
+        }
+        _ => unreachable!("caller selects Head-open failures"),
     }
 }
 
@@ -467,7 +514,9 @@ impl Error for HeadError {
             | Self::InvalidLocalMetadata { source, .. } => Some(source),
             Self::SerializeConfiguration(error) | Self::SerializeState(error) => Some(error),
             Self::Timestamp(error) => Some(error),
-            Self::FileSystem { source, .. } => Some(source),
+            Self::FileSystem { source, .. } | Self::OpenCommandUnavailable { source, .. } => {
+                Some(source)
+            }
             Self::ConfigurationCommittedWithCleanupFailure(original)
             | Self::RollbackFailed { original, .. }
             | Self::HeadCommittedWithCleanupFailure(original)
