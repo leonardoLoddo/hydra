@@ -4,6 +4,9 @@ use std::{fs, path::Path, process::Command};
 
 use common::{TestDirectory, hydra_command};
 
+const SCHEMA_URI: &str =
+    "https://raw.githubusercontent.com/leonardoLoddo/hydra/main/schemas/v2/hydra.schema.json";
+
 fn initialize_repository(path: &Path) {
     let git = Command::new("git")
         .args(["init", "--quiet"])
@@ -43,6 +46,7 @@ fn init_creates_project_configuration_heads_directory_and_local_state() {
     )
     .expect("project configuration should be valid JSON");
 
+    assert_eq!(config["$schema"], SCHEMA_URI);
     assert_eq!(config["version"], 2);
     assert_eq!(
         config["headsDirectory"],

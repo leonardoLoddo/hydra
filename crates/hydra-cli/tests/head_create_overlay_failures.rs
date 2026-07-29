@@ -206,6 +206,7 @@ fn head_create_can_exclude_all_unsafe_overlay_symlinks_and_update_configuration(
         configuration["overlay"]["copy"],
         serde_json::json!(["... .gitignore", "!/links/escape", "!/public/storage"])
     );
+    assert_eq!(configuration["$schema"], configured["$schema"]);
     assert_eq!(configuration["commands"], configured["commands"]);
 
     let head = heads_directory(&repository).join("payment");

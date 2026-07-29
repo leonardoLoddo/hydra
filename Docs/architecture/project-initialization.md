@@ -109,10 +109,11 @@ resolving the policy against its own root.
 
 ## Initial Persisted Data
 
-The project configuration is JSON schema version 2:
+The project configuration uses Hydra's project schema version 2:
 
 ```json
 {
+  "$schema": "https://raw.githubusercontent.com/leonardoLoddo/hydra/main/schemas/v2/hydra.schema.json",
   "version": 2,
   "projectId": "example-5b8d9f430d5543eca3aa967dd484bf41",
   "headsDirectory": {
@@ -130,6 +131,13 @@ The project configuration is JSON schema version 2:
   }
 }
 ```
+
+`$schema` points editors to Hydra's version-2 JSON Schema. The development
+build uses the schema stored on the `main` branch; release packaging may
+replace that annotation with an immutable tag URL. Hydra recognizes and
+preserves the annotation but never downloads or evaluates the remote schema
+at runtime. Runtime deserialization remains the authoritative trust-boundary
+validation.
 
 The Git common directory receives the local locator:
 

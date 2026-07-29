@@ -221,6 +221,37 @@ fn head_create_rejects_the_obsolete_version_one_configuration() {
 }
 
 #[test]
+fn head_create_still_rejects_unknown_top_level_configuration_fields() {
+    let directory = TestDirectory::new("head-unknown-config-field");
+    let repository = create_initialized_project(&directory);
+    let configuration_path = repository.join(".hydra.json");
+    let mut configuration: serde_json::Value = serde_json::from_slice(
+        &fs::read(&configuration_path).expect("configuration should be readable"),
+    )
+    .expect("configuration should be valid JSON");
+    configuration["comment"] = "not a supported JSON Schema annotation".into();
+    fs::write(
+        &configuration_path,
+        serde_json::to_vec_pretty(&configuration).expect("configuration should serialize"),
+    )
+    .expect("configuration with an unknown field should be written");
+
+    let output = hydra_command()
+        .args(["head", "create", "payment"])
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(!output.status.success());
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("unknown field `comment`"),
+        "the error should identify the unsupported field, got: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_no_head_creation_artifacts(&repository, "payment");
+}
+
+#[test]
 fn head_create_rejects_an_unknown_storage_mode_before_mutation() {
     let directory = TestDirectory::new("head-storage-mode");
     let repository = create_initialized_project(&directory);

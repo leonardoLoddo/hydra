@@ -354,6 +354,7 @@ fisico dipendente dalla macchina:
 
 ```json
 {
+  "$schema": "https://raw.githubusercontent.com/leonardoLoddo/hydra/main/schemas/v2/hydra.schema.json",
   "version": 2,
   "projectId": "heimdall-a84f2c",
   "headsDirectory": {
@@ -443,6 +444,14 @@ versione 1 sperimentale non è compatibile e viene rifiutata esplicitamente:
 poiché Hydra non è ancora stata distribuita, mantenere un parser o una
 migrazione per quel formato aggiungerebbe complessità senza proteggere utenti
 reali.
+
+La configurazione rimane JSON standard e non accetta commenti. Hydra pubblica
+invece uno schema descrittivo versionato in
+`schemas/v2/hydra.schema.json`; il campo standard `$schema` permette agli
+editor di mostrare descrizioni, completamento e diagnostica senza introdurre
+una sintassi JSON proprietaria. Hydra riconosce e conserva l'annotazione ma non
+scarica né interpreta lo schema durante l'esecuzione. Gli altri campi
+sconosciuti rimangono errori.
 
 Con `storage.mode: "auto"`, Hydra prova il clone CoW sul volume di destinazione e usa la copia completa se non è supportato. Modalità più rigide potranno essere esposte per test e automazioni, ma il default deve privilegiare compatibilità e sicurezza.
 

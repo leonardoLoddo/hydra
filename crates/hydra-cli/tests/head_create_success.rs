@@ -154,6 +154,70 @@ fn head_create_resolves_explicit_base_and_target_branches() {
 }
 
 #[test]
+fn head_create_accepts_the_documented_json_schema_annotation() {
+    let directory = TestDirectory::new("head-schema-annotation");
+    let repository = create_initialized_project(&directory);
+    let configuration_path = repository.join(".hydra.json");
+    let mut configuration: serde_json::Value = serde_json::from_slice(
+        &fs::read(&configuration_path).expect("configuration should be readable"),
+    )
+    .expect("configuration should be valid JSON");
+    configuration["$schema"] = serde_json::Value::String(
+        "https://raw.githubusercontent.com/leonardoLoddo/hydra/main/schemas/v2/hydra.schema.json"
+            .to_owned(),
+    );
+    fs::write(
+        &configuration_path,
+        serde_json::to_vec_pretty(&configuration).expect("configuration should serialize"),
+    )
+    .expect("schema-annotated configuration should be written");
+
+    let output = hydra_command()
+        .args(["head", "create", "payment"])
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(
+        output.status.success(),
+        "the standard JSON Schema annotation should be accepted, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn head_create_keeps_supporting_version_two_configuration_without_schema_annotation() {
+    let directory = TestDirectory::new("head-without-schema-annotation");
+    let repository = create_initialized_project(&directory);
+    let configuration_path = repository.join(".hydra.json");
+    let mut configuration: serde_json::Value = serde_json::from_slice(
+        &fs::read(&configuration_path).expect("configuration should be readable"),
+    )
+    .expect("configuration should be valid JSON");
+    configuration
+        .as_object_mut()
+        .expect("configuration should be an object")
+        .remove("$schema");
+    fs::write(
+        &configuration_path,
+        serde_json::to_vec_pretty(&configuration).expect("configuration should serialize"),
+    )
+    .expect("configuration without an annotation should be written");
+
+    let output = hydra_command()
+        .args(["head", "create", "payment"])
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(
+        output.status.success(),
+        "existing version-two configurations should remain compatible, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 fn head_create_uses_the_same_heads_directory_when_invoked_from_a_head() {
     let directory = TestDirectory::new("head-create-from-head");
     let repository = create_initialized_project(&directory);

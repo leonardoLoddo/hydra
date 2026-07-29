@@ -867,6 +867,7 @@ Un `.hydra.json` completo generato oggi ha questa forma:
 
 ```json
 {
+  "$schema": "https://raw.githubusercontent.com/leonardoLoddo/hydra/main/schemas/v2/hydra.schema.json",
   "version": 2,
   "projectId": "shop-0123456789abcdef0123456789abcdef",
   "headsDirectory": {
@@ -887,6 +888,8 @@ Un `.hydra.json` completo generato oggi ha questa forma:
 
 Regole:
 
+- `$schema` abilita descrizioni, validazione e completamento negli editor
+  compatibili; Hydra non lo scarica durante l'esecuzione;
 - `version` deve essere `2`; il formato sperimentale v1 non è supportato;
 - `projectId` identifica il progetto tra dispositivi e non deve essere
   modificato;
@@ -914,6 +917,12 @@ progetto e non viene eseguito in una sandbox.
 Hydra rifiuta campi sconosciuti e campi appartenenti a una strategy diversa.
 Versiona `.hydra.json`, ma non inserire percorsi assoluti o informazioni
 specifiche della macchina.
+
+Il file resta JSON standard, quindi non inserire commenti `//` o `/* ... */`.
+Le spiegazioni dei campi si trovano nello schema versionato nel repository
+Hydra. La configurazione funziona anche offline: in quel caso l'editor potrebbe
+non mostrare temporaneamente gli aiuti, ma Hydra continua a usare soltanto i
+dati locali.
 
 Le esclusioni guidate per symlink non sicuri vengono aggiunte come regole
 negative `!/<percorso>` in fondo a `overlay.copy`. La posizione finale è
