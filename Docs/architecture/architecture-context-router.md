@@ -19,6 +19,7 @@ conventions, which remain in the development domain.
 | [`system-architecture.md`](system-architecture.md) | Cargo workspace structure, crate responsibilities, dependency direction, CLI/core separation, introduction of a new crate, or placement of Git and filesystem behavior | Current structural architecture and rules for evolving component boundaries without premature fragmentation. |
 | [`project-initialization.md`](project-initialization.md) | `hydra init`, Git repository discovery, initial configuration or local state, default Heads directory creation, atomic persistence, initialization rollback, or initialization errors | Implemented initialization workflow, persistence sequence, failure behavior, verification contracts, and explicitly recorded gaps against the product specification. |
 | [`head-creation.md`](head-creation.md) | `hydra head create`, Head names, base or target refs, private branches, worktree registration, tracked or overlay materialization, Head metadata, state locking, creation rollback, or post-commit cleanup | Implemented Head-creation transaction, CLI/core boundary, Git and filesystem safety rules, verification contracts, and explicitly recorded gaps against the product specification. |
+| [`head-inspection.md`](head-inspection.md) | `hydra status`, `hydra head list`, `hydra head status`, `hydra head path`, read-only inventory access, Git status counting, ahead/behind calculation, or consistency diagnostics | Implemented read-only inspection model, CLI output contracts, trust-boundary validation, Git comparison rules, and verification coverage. |
 
 ---
 
@@ -32,6 +33,9 @@ conventions, which remain in the development domain.
 - Consult `head-creation.md` for every change that can affect Head creation,
   overlay confirmation or selection, private branch/worktree setup, Head
   metadata, or creation rollback.
+- Consult `head-inspection.md` for every change that affects how existing Heads
+  are listed, resolved, compared with Git, summarized, or diagnosed without
+  mutation.
 - Consult both documents when initialization work changes a component boundary
   or introduces a new Git, configuration, state, or filesystem component.
 - Combine this router with the product router for user-visible behavior and

@@ -71,6 +71,63 @@ impl HeadMetadata {
             created_at,
         })
     }
+
+    pub(super) fn worktree_path(&self) -> &str {
+        &self.worktree_path
+    }
+
+    pub(super) fn head_ref(&self) -> &str {
+        &self.head_ref
+    }
+
+    pub(super) fn base_ref(&self) -> &str {
+        &self.base_ref
+    }
+
+    pub(super) fn base_commit(&self) -> &str {
+        &self.base_commit
+    }
+
+    pub(super) fn target_ref(&self) -> &str {
+        &self.target_ref
+    }
+
+    pub(super) fn materialization_backend(&self) -> &str {
+        &self.materialization_backend
+    }
+
+    pub(super) fn created_at(&self) -> &str {
+        &self.created_at
+    }
+}
+
+pub(super) struct StateSnapshot {
+    state: LocalState,
+    state_path: PathBuf,
+}
+
+impl StateSnapshot {
+    pub(super) fn load(repository: &Repository) -> Result<Self, HeadError> {
+        let configuration = ProjectConfiguration::load(&repository.root)?;
+        let state_path = installation::inventory_path(&configuration, repository)?;
+        let state = read_local_state(&state_path)?;
+        Ok(Self { state, state_path })
+    }
+
+    pub(super) fn heads(&self) -> &BTreeMap<String, HeadMetadata> {
+        &self.state.heads
+    }
+
+    pub(super) fn head(&self, name: &str) -> Result<&HeadMetadata, HeadError> {
+        self.state
+            .heads
+            .get(name)
+            .ok_or_else(|| HeadError::HeadNotFound(name.to_owned()))
+    }
+
+    pub(super) fn heads_directory(&self) -> Result<PathBuf, HeadError> {
+        heads_directory_from_state_path(&self.state_path)
+    }
 }
 
 pub(super) struct StateTransaction {
@@ -86,23 +143,7 @@ impl StateTransaction {
         let configuration = ProjectConfiguration::load(&repository.root)?;
         let state_path = installation::inventory_path(&configuration, repository)?;
         let lock = StateLock::acquire(&state_path)?;
-        let loaded_state = (|| {
-            let original_state = fs::read(&state_path).map_err(|source| HeadError::FileSystem {
-                action: "read local Hydra state",
-                path: state_path.clone(),
-                source,
-            })?;
-            let state: LocalState = serde_json::from_slice(&original_state).map_err(|source| {
-                HeadError::InvalidState {
-                    path: state_path.clone(),
-                    source,
-                }
-            })?;
-            if state.version != SUPPORTED_LOCAL_METADATA_VERSION {
-                return Err(HeadError::UnsupportedStateVersion(state.version));
-            }
-            Ok((original_state, state))
-        })();
+        let loaded_state = read_local_state_bytes(&state_path);
         let (original_state, state) = match loaded_state {
             Ok(loaded_state) => loaded_state,
             Err(original) => {
@@ -138,11 +179,7 @@ impl StateTransaction {
     }
 
     pub(super) fn heads_directory(&self) -> Result<PathBuf, HeadError> {
-        self.state_path
-            .parent()
-            .and_then(Path::parent)
-            .map(Path::to_path_buf)
-            .ok_or_else(|| HeadError::UnsafeHeadsDirectory(self.state_path.clone()))
+        heads_directory_from_state_path(&self.state_path)
     }
 
     pub(super) fn commit(mut self, name: String, metadata: HeadMetadata) -> Result<(), HeadError> {
@@ -186,4 +223,33 @@ impl StateTransaction {
             }),
         }
     }
+}
+
+fn read_local_state(path: &Path) -> Result<LocalState, HeadError> {
+    read_local_state_bytes(path).map(|(_, state)| state)
+}
+
+fn read_local_state_bytes(path: &Path) -> Result<(Vec<u8>, LocalState), HeadError> {
+    let original_state = fs::read(path).map_err(|source| HeadError::FileSystem {
+        action: "read local Hydra state",
+        path: path.to_path_buf(),
+        source,
+    })?;
+    let state: LocalState =
+        serde_json::from_slice(&original_state).map_err(|source| HeadError::InvalidState {
+            path: path.to_path_buf(),
+            source,
+        })?;
+    if state.version != SUPPORTED_LOCAL_METADATA_VERSION {
+        return Err(HeadError::UnsupportedStateVersion(state.version));
+    }
+    Ok((original_state, state))
+}
+
+fn heads_directory_from_state_path(state_path: &Path) -> Result<PathBuf, HeadError> {
+    state_path
+        .parent()
+        .and_then(Path::parent)
+        .map(Path::to_path_buf)
+        .ok_or_else(|| HeadError::UnsafeHeadsDirectory(state_path.to_path_buf()))
 }

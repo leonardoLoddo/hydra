@@ -1,5 +1,6 @@
 mod error;
 mod git;
+mod inspection;
 mod materializer;
 mod overlay;
 mod persistence;
@@ -9,6 +10,10 @@ use std::path::{Path, PathBuf};
 
 pub use error::HeadError;
 use git::Repository;
+pub use inspection::{
+    ChangeCounts, HeadInspection, HeadSummary, ProjectInspection, head_path, inspect_head,
+    inspect_project, list_heads,
+};
 use materializer::materialize_tracked_files;
 use overlay::{OverlayPlan, materialize_overlays, plan_overlays};
 use state::{HeadMetadata, StateTransaction};
@@ -229,7 +234,7 @@ fn resolve_target_ref(
     }
 }
 
-fn validate_head_name(name: &str) -> Result<(), HeadError> {
+pub(super) fn validate_head_name(name: &str) -> Result<(), HeadError> {
     let mut characters = name.chars();
     let Some(first) = characters.next() else {
         return Err(HeadError::InvalidName(name.to_owned()));

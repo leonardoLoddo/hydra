@@ -36,7 +36,11 @@ Il binario corrente espone:
 
 ```text
 hydra init [PATH]
+hydra status
 hydra head create <NAME> [--from <REF>] [--target <BRANCH>]
+hydra head list
+hydra head status <NAME>
+hydra head path <NAME>
 ```
 
 Puoi verificare la sintassi installata con:
@@ -48,9 +52,8 @@ hydra head --help
 hydra head create --help
 ```
 
-I comandi `status`, `path`, `open`, `close`, `remove`, `repair`, `doctor` e il
-completamento della shell appartengono al contratto MVP, ma non sono ancora
-implementati.
+I comandi `open`, `close`, `remove`, `repair`, `doctor` e il completamento
+della shell appartengono al contratto MVP, ma non sono ancora implementati.
 
 ---
 
@@ -194,11 +197,93 @@ venga creata nella stessa directory:
 
 La posizione non viene ricalcolata rispetto a `payment`.
 
-### 4.5 Stato attuale del ciclo di vita
+### 4.5 Elenca e ispeziona le Head
 
-Oggi Hydra crea e registra le Head, ma non espone ancora i comandi per
-chiuderle o rimuoverle. Evita di cancellare manualmente una directory Head o di
-usare `git worktree remove`: l’inventario Hydra rimarrebbe incoerente.
+Per ottenere i nomi delle Head locali in ordine alfabetico:
+
+```bash
+hydra head list
+```
+
+L'output contiene un nome per riga ed è quindi facile da usare in shell:
+
+```text
+auth
+payment
+```
+
+Per una sintesi dell'intero progetto:
+
+```bash
+hydra status
+```
+
+Esempio:
+
+```text
+Project: /workspace/Shop
+Heads directory: /workspace/Shop.heads
+Heads: 2
+  auth  clean
+  payment  modified
+```
+
+Lo stato sintetico può essere:
+
+- `clean`, quando Git non rileva modifiche;
+- `modified`, quando esistono modifiche tracked, staged o untracked;
+- `inconsistent`, quando inventario, Git e filesystem non concordano.
+
+Per ispezionare una singola Head:
+
+```bash
+hydra head status payment
+```
+
+Hydra mostra nome, percorso, branch e commit correnti, base e target registrati,
+conteggi delle modifiche, ahead/behind, presenza della worktree e coerenza:
+
+```text
+Head: payment
+Path: /workspace/Shop.heads/payment
+Branch: refs/heads/hydra/payment
+Commit: 8f22a84...
+Base: refs/heads/main (619be35...)
+Target: refs/heads/main
+Changes: 1 modified, 0 added, 0 deleted, 1 untracked
+Ahead/behind: 2/1
+Worktree: present
+Consistency: ok
+```
+
+Ahead/behind confronta il branch della Head con lo stato corrente della
+`baseRef`. Il commit tra parentesi nella riga `Base` è invece il commit esatto
+usato durante la creazione. Se la base ref non esiste più, Hydra segnala
+l'incoerenza e usa quel commit esatto come riferimento di fallback.
+
+Per ottenere soltanto il percorso assoluto registrato:
+
+```bash
+hydra head path payment
+```
+
+Questo formato è intenzionalmente componibile:
+
+```bash
+cd "$(hydra head path payment)"
+```
+
+I quattro comandi di ispezione sono read-only: non creano il lock
+`heads.json.lock`, non aggiornano i metadati e non eseguono repair. Se una
+directory o una ref manca, `status` segnala l'incoerenza senza correggerla. Un
+percorso registrato che esce dalla directory delle Head posseduta viene
+rifiutato.
+
+### 4.6 Stato attuale del ciclo di vita
+
+Oggi Hydra crea, registra e ispeziona le Head, ma non espone ancora i comandi
+per chiuderle o rimuoverle. Evita di cancellare manualmente una directory Head
+o di usare `git worktree remove`: l’inventario Hydra rimarrebbe incoerente.
 
 Fino all’implementazione della chiusura, il flusso supportato termina con il
 lavoro e i commit sul branch privato della Head.
@@ -582,8 +667,6 @@ inventario. La riconciliazione automatica è pianificata.
 
 Il contratto MVP comprende:
 
-- elenco e stato delle Head;
-- risoluzione e apertura del percorso di una Head;
 - apertura tramite comando configurabile;
 - chiusura con merge isolato o adapter configurabile;
 - rimozione protetta;
@@ -617,4 +700,5 @@ Per intenti di prodotto e dettagli tecnici:
 
 - [contesto MVP](../product/hydra-mvp-context.md);
 - [inizializzazione](../architecture/project-initialization.md);
-- [creazione delle Head](../architecture/head-creation.md).
+- [creazione delle Head](../architecture/head-creation.md);
+- [ispezione delle Head](../architecture/head-inspection.md).

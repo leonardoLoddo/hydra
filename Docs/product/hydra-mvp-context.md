@@ -566,7 +566,8 @@ Hydra:
 3. genera un `projectId` stabile;
 4. determina come default la directory sorella `<nome-progetto>.heads`;
 5. verifica che la destinazione sia esterna al working tree e non appartenga a un altro progetto;
-6. genera `.hydra.json` con il percorso concreto delle Head;
+6. genera `.hydra.json` con la politica portabile della directory delle Head e
+   registra il percorso concreto soltanto nel locator locale;
 7. inizializza lo stato locale;
 8. verifica le capacità di materializzazione del volume;
 9. non modifica i file applicativi del progetto.
@@ -623,6 +624,22 @@ Lo stato mostra almeno:
 - commit ahead/behind rispetto alla base;
 - presenza o assenza del worktree;
 - eventuali incoerenze tra Git e i metadati Hydra.
+
+`hydra head list` restituisce i nomi delle Head locali in ordine stabile.
+`hydra head path` restituisce soltanto il percorso assoluto registrato, così da
+poter essere composto con shell, IDE e automazioni.
+
+`hydra status` mostra il progetto, la directory fisica delle Head e una sintesi
+`clean`, `modified` o `inconsistent` per ogni Head. `hydra head status` espone
+il dettaglio. I conteggi ahead/behind confrontano il branch della Head con la
+`baseRef` corrente; il `baseCommit` resta visibile separatamente come commit
+esatto dal quale la Head è stata creata.
+
+Questi comandi sono strettamente read-only: non acquisiscono il lock destinato
+alle mutazioni, non riscrivono l'inventario e non tentano repair impliciti.
+Un'incoerenza ispezionabile, come una directory mancante o una target ref
+scomparsa, viene mostrata senza correggerla. Metadati che indirizzano fuori
+dalla directory delle Head posseduta vengono invece rifiutati come non sicuri.
 
 ### 7.4 Apertura
 

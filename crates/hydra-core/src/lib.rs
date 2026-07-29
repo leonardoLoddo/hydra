@@ -3,5 +3,8 @@
 mod head;
 mod init;
 
-pub use head::{CreateHeadOptions, CreatedHead, HeadError, create_head};
+pub use head::{
+    ChangeCounts, CreateHeadOptions, CreatedHead, HeadError, HeadInspection, HeadSummary,
+    ProjectInspection, create_head, head_path, inspect_head, inspect_project, list_heads,
+};
 pub use init::{InitError, InitializedProject, StorageBackend, initialize};

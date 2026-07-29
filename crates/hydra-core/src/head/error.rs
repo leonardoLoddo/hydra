@@ -32,6 +32,7 @@ pub enum HeadError {
     DirectoryPolicyMismatch(PathBuf),
     InvalidName(String),
     HeadAlreadyExists(String),
+    HeadNotFound(String),
     DestinationExists(PathBuf),
     BranchAlreadyExists(String),
     InvalidRef(String),
@@ -42,6 +43,7 @@ pub enum HeadError {
     },
     OverlayRules(String),
     UnsafeOverlayPath(PathBuf),
+    UnsafeHeadPath(PathBuf),
     OverlayOverwritesTracked(PathBuf),
     OverlayChanged(PathBuf),
     UnsafeProjectFile(PathBuf),
@@ -97,6 +99,7 @@ impl fmt::Display for HeadError {
             Self::DirectoryPolicyMismatch(path) => display_policy_mismatch(formatter, path),
             Self::InvalidName(name) => write!(formatter, "invalid Head name {name:?}"),
             Self::HeadAlreadyExists(name) => write!(formatter, "Head {name:?} already exists"),
+            Self::HeadNotFound(name) => write!(formatter, "Head {name:?} does not exist"),
             Self::DestinationExists(path) => display_destination_exists(formatter, path),
             Self::BranchAlreadyExists(branch) => {
                 write!(formatter, "Head branch {branch:?} already exists")
@@ -116,9 +119,8 @@ impl fmt::Display for HeadError {
                 "copying {files} overlay file(s) ({bytes} byte(s)) requires confirmation"
             ),
             Self::OverlayRules(error) => write!(formatter, "overlay rules are invalid: {error}"),
-            Self::UnsafeOverlayPath(path) => {
-                write!(formatter, "overlay path {} is unsafe", path.display())
-            }
+            Self::UnsafeOverlayPath(path) => display_unsafe_path(formatter, "overlay", path),
+            Self::UnsafeHeadPath(path) => display_unsafe_path(formatter, "recorded Head", path),
             Self::OverlayOverwritesTracked(path) => write!(
                 formatter,
                 "overlay path {} would overwrite a tracked file",
@@ -201,6 +203,14 @@ fn display_invalid_json(
         "Hydra {kind} {} is invalid: {source}",
         path.display()
     )
+}
+
+fn display_unsafe_path(
+    formatter: &mut fmt::Formatter<'_>,
+    kind: &str,
+    path: &std::path::Path,
+) -> fmt::Result {
+    write!(formatter, "{kind} path {} is unsafe", path.display())
 }
 
 fn display_invalid_configuration(

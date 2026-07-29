@@ -21,6 +21,14 @@ pub(super) struct TrackedEntry {
     pub(super) path: PathBuf,
 }
 
+#[derive(Debug, Default)]
+pub(super) struct WorktreeChanges {
+    pub(super) modified: usize,
+    pub(super) added: usize,
+    pub(super) deleted: usize,
+    pub(super) untracked: usize,
+}
+
 impl Repository {
     pub(super) fn discover(path: &Path) -> Result<Self, HeadError> {
         let root = git_path(path, "--show-toplevel", "repository root")?;
@@ -52,6 +60,81 @@ pub(super) fn worktree_paths(repository: &Repository) -> Result<Vec<PathBuf>, He
     } else {
         Ok(paths)
     }
+}
+
+pub(super) fn ref_exists(repository: &Repository, reference: &str) -> Result<bool, HeadError> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(&repository.root)
+        .args(["show-ref", "--verify", "--quiet"])
+        .arg(reference)
+        .output()
+        .map_err(HeadError::GitUnavailable)?;
+    if output.status.success() {
+        Ok(true)
+    } else if output.status.code() == Some(1) {
+        Ok(false)
+    } else {
+        Err(command_failure("checking the Head ref", &output))
+    }
+}
+
+pub(super) fn commit_for_ref(
+    repository: &Repository,
+    reference: &str,
+) -> Result<String, HeadError> {
+    let revision = format!("{reference}^{{commit}}");
+    let output = run_git(
+        &repository.root,
+        &["rev-parse", "--verify", "--end-of-options", &revision],
+        "resolving the Head commit",
+    )?;
+    stdout_line(&output, "Head commit")
+}
+
+pub(super) fn ahead_behind(
+    repository: &Repository,
+    base: &str,
+    head_ref: &str,
+) -> Result<(usize, usize), HeadError> {
+    let range = format!("{base}...{head_ref}");
+    let output = run_git(
+        &repository.root,
+        &["rev-list", "--left-right", "--count", &range],
+        "calculating Head ahead/behind",
+    )?;
+    let value = stdout_line(&output, "ahead/behind counts")?;
+    let mut counts = value.split_ascii_whitespace();
+    let behind = counts
+        .next()
+        .and_then(|count| count.parse::<usize>().ok())
+        .ok_or(HeadError::InvalidGitOutput("behind count"))?;
+    let ahead = counts
+        .next()
+        .and_then(|count| count.parse::<usize>().ok())
+        .ok_or(HeadError::InvalidGitOutput("ahead count"))?;
+    if counts.next().is_some() {
+        return Err(HeadError::InvalidGitOutput("ahead/behind counts"));
+    }
+    Ok((ahead, behind))
+}
+
+pub(super) fn worktree_changes(path: &Path) -> Result<WorktreeChanges, HeadError> {
+    let output = run_git(
+        path,
+        &["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+        "reading Head status",
+    )?;
+    parse_worktree_changes(&output.stdout)
+}
+
+pub(super) fn symbolic_head(path: &Path) -> Result<String, HeadError> {
+    let output = run_git(
+        path,
+        &["symbolic-ref", "--quiet", "HEAD"],
+        "reading the Head branch",
+    )?;
+    stdout_line(&output, "Head branch")
 }
 
 pub(super) fn resolve_commit(
@@ -299,10 +382,57 @@ fn stdout_record(output: &Output, field: &'static str) -> Result<Vec<u8>, HeadEr
     }
 }
 
+fn parse_worktree_changes(bytes: &[u8]) -> Result<WorktreeChanges, HeadError> {
+    let mut records = bytes
+        .split(|byte| *byte == 0)
+        .filter(|record| !record.is_empty());
+    let mut changes = WorktreeChanges::default();
+    while let Some(record) = records.next() {
+        if record.len() < 3 || record[2] != b' ' {
+            return Err(HeadError::InvalidGitOutput("worktree status"));
+        }
+        let index = record[0];
+        let worktree = record[1];
+        if index == b'?' && worktree == b'?' {
+            changes.untracked += 1;
+            continue;
+        }
+        if index == b'D' || worktree == b'D' {
+            changes.deleted += 1;
+        } else if index == b'A' || worktree == b'A' {
+            changes.added += 1;
+        } else {
+            changes.modified += 1;
+        }
+        if matches!(index, b'R' | b'C') || matches!(worktree, b'R' | b'C') {
+            records
+                .next()
+                .ok_or(HeadError::InvalidGitOutput("renamed worktree path"))?;
+        }
+    }
+    Ok(changes)
+}
+
 #[cfg(unix)]
 #[allow(clippy::unnecessary_wraps)]
 fn bytes_to_path(value: &[u8]) -> Result<PathBuf, HeadError> {
     Ok(PathBuf::from(OsString::from_vec(value.to_vec())))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_worktree_changes;
+
+    #[test]
+    fn porcelain_rename_counts_once_as_modified() {
+        let changes = parse_worktree_changes(b"R  new name\0old name\0")
+            .expect("a NUL-delimited rename should be valid");
+
+        assert_eq!(changes.modified, 1);
+        assert_eq!(changes.added, 0);
+        assert_eq!(changes.deleted, 0);
+        assert_eq!(changes.untracked, 0);
+    }
 }
 
 #[cfg(not(unix))]

@@ -123,3 +123,44 @@ fn head_help_exposes_the_complete_create_syntax() {
         "head help should expose the complete create syntax, got: {stdout:?}"
     );
 }
+
+#[test]
+fn help_exposes_the_complete_inspection_syntax() {
+    let output = Command::new(env!("CARGO_BIN_EXE_hydra"))
+        .arg("--help")
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout).expect("help output should be UTF-8");
+    for syntax in [
+        "hydra status",
+        "hydra head list",
+        "hydra head status <NAME>",
+        "hydra head path <NAME>",
+    ] {
+        assert!(
+            stdout.contains(syntax),
+            "top-level help should expose {syntax:?}, got: {stdout:?}"
+        );
+    }
+}
+
+#[test]
+fn head_help_exposes_every_available_inspection_command() {
+    let output = Command::new(env!("CARGO_BIN_EXE_hydra"))
+        .args(["head", "--help"])
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout).expect("help output should be UTF-8");
+    for command in ["list", "status", "path"] {
+        assert!(
+            stdout.contains(command),
+            "head help should list {command:?}, got: {stdout:?}"
+        );
+    }
+}

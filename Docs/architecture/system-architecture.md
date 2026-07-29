@@ -22,7 +22,9 @@ Hydra/
 ├── rust-toolchain.toml
 └── crates/
     ├── hydra-cli/
-    │   ├── src/main.rs
+    │   ├── src/
+    │   │   ├── inspection.rs
+    │   │   └── main.rs
     │   └── tests/
     │       ├── common/mod.rs
     │       ├── cli_contract.rs
@@ -30,6 +32,7 @@ Hydra/
     │       ├── head_create_overlay_failures.rs
     │       ├── head_create_state_failures.rs
     │       ├── head_create_success.rs
+    │       ├── head_inspection.rs
     │       ├── init_conflicts.rs
     │       ├── init_git_errors.rs
     │       └── init_success.rs
@@ -40,6 +43,7 @@ Hydra/
             ├── head/
             │   ├── error.rs
             │   ├── git.rs
+            │   ├── inspection.rs
             │   ├── materializer.rs
             │   ├── overlay.rs
             │   ├── persistence.rs
@@ -113,9 +117,9 @@ temporary repositories.
 
 ## `hydra-core` Responsibilities
 
-`hydra-core` owns product rules and state-changing workflows independent of the
-terminal interface. It currently owns project initialization and Head
-creation, including:
+`hydra-core` owns product rules, state-changing workflows, and read-only
+inspection independent of the terminal interface. It currently owns project
+initialization, Head creation, and Head inspection, including:
 
 - Git repository and common-directory discovery;
 - derivation and validation of initialization paths;
@@ -126,6 +130,8 @@ creation, including:
 - private branch and no-checkout worktree creation;
 - tracked and overlay materialization with CoW/copy isolation;
 - transactional Head metadata publication and creation rollback;
+- validated read-only inventory loading and Head path resolution;
+- Git worktree state, change counts, ahead/behind, and consistency diagnostics;
 - typed errors with preserved sources for operational failures.
 
 Public core APIs return data or typed errors. They do not print, terminate the
@@ -173,6 +179,20 @@ The terminal confirmation remains in `hydra-cli`; the core exposes the
 confirmation requirement as data and recomputes the overlay plan after
 confirmation. Detailed workflow ownership is documented in
 [`head-creation.md`](head-creation.md).
+
+### Head inspection module boundaries
+
+| Module | Responsibility |
+|---|---|
+| `head/inspection.rs` | Compose validated inventory metadata, filesystem presence, Git refs, worktree registration, changes, and ahead/behind into public read-only models |
+| `head/git.rs` | Execute and parse the Git queries shared by creation and inspection |
+| `head/state.rs` | Load the versioned inventory without taking the mutation lock and expose metadata through narrow internal accessors |
+| `hydra-cli/src/inspection.rs` | Render project summaries, detailed Head status, ordered names, paths, and command exit status |
+
+Inspection reuses the same configuration, locator, ownership, and directory
+policy validation as creation. It does not acquire `heads.json.lock`, write
+state, or repair inconsistencies. Detailed behavior is documented in
+[`head-inspection.md`](head-inspection.md).
 
 ---
 

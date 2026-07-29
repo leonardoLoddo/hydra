@@ -99,6 +99,7 @@ Docs/
 ├── architecture/
 │   ├── architecture-context-router.md
 │   ├── head-creation.md
+│   ├── head-inspection.md
 │   ├── project-initialization.md
 │   └── system-architecture.md
 ├── development/

@@ -6,13 +6,15 @@ use std::{
 
 use clap::{Parser, Subcommand};
 
+mod inspection;
+
 #[derive(Parser)]
 #[command(
     name = "hydra",
     version,
     about = "Git-native workspace manager for isolated development Heads",
     long_about = "Git-native workspace manager for isolated development Heads.\n\nHydra creates independent working directories while preserving familiar Git refs, branches, and repository workflows.",
-    after_help = "Command syntax:\n  hydra init [PATH]\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n\nRun 'hydra <command> --help' for details."
+    after_help = "Command syntax:\n  hydra init [PATH]\n  hydra status\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n\nRun 'hydra <command> --help' for details."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -28,9 +30,11 @@ enum Command {
         #[arg(default_value = ".")]
         path: PathBuf,
     },
+    /// Show the project and local Heads
+    Status,
     /// Create and manage Heads
     #[command(
-        after_help = "Command syntax:\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n\nRun 'hydra head create --help' for details."
+        after_help = "Command syntax:\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n\nRun 'hydra head <command> --help' for details."
     )]
     Head {
         #[command(subcommand)]
@@ -54,6 +58,18 @@ enum HeadCommand {
         /// Set the local branch used for integration
         #[arg(long, value_name = "BRANCH")]
         target: Option<String>,
+    },
+    /// List local Heads
+    List,
+    /// Show the state of a local Head
+    Status {
+        /// Name of an existing Head
+        name: String,
+    },
+    /// Print the absolute path of a local Head
+    Path {
+        /// Name of an existing Head
+        name: String,
     },
 }
 
@@ -79,9 +95,19 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        Command::Status => inspection::show_project_status(),
         Command::Head {
             command: HeadCommand::Create { name, from, target },
         } => create_head(&name, from.as_deref(), target.as_deref()),
+        Command::Head {
+            command: HeadCommand::List,
+        } => inspection::list_heads(),
+        Command::Head {
+            command: HeadCommand::Status { name },
+        } => inspection::show_head_status(&name),
+        Command::Head {
+            command: HeadCommand::Path { name },
+        } => inspection::show_head_path(&name),
     }
 }
 
