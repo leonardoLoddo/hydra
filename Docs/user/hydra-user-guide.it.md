@@ -867,7 +867,6 @@ Un `.hydra.json` completo generato oggi ha questa forma:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/leonardoLoddo/hydra/main/schemas/v2/hydra.schema.json",
   "version": 2,
   "projectId": "shop-0123456789abcdef0123456789abcdef",
   "headsDirectory": {
@@ -888,8 +887,6 @@ Un `.hydra.json` completo generato oggi ha questa forma:
 
 Regole:
 
-- `$schema` abilita descrizioni, validazione e completamento negli editor
-  compatibili; Hydra non lo scarica durante l'esecuzione;
 - `version` deve essere `2`; il formato sperimentale v1 non è supportato;
 - `projectId` identifica il progetto tra dispositivi e non deve essere
   modificato;
@@ -919,10 +916,10 @@ Versiona `.hydra.json`, ma non inserire percorsi assoluti o informazioni
 specifiche della macchina.
 
 Il file resta JSON standard, quindi non inserire commenti `//` o `/* ... */`.
-Le spiegazioni dei campi si trovano nello schema versionato nel repository
-Hydra. La configurazione funziona anche offline: in quel caso l'editor potrebbe
-non mostrare temporaneamente gli aiuti, ma Hydra continua a usare soltanto i
-dati locali.
+Hydra non pubblica ancora uno schema per editor: `$schema` non viene generato
+e viene rifiutato come qualunque altro campo sconosciuto. Validazione,
+completamento e descrizioni automatiche saranno ripristinati soltanto dopo la
+futura pubblicazione dello schema ufficiale tramite SchemaStore.
 
 Le esclusioni guidate per symlink non sicuri vengono aggiunte come regole
 negative `!/<percorso>` in fondo a `overlay.copy`. La posizione finale è
@@ -969,6 +966,13 @@ il repair corrente non reinizializza il progetto.
 Il formato v1 era sperimentale e non viene migrato. Poiché Hydra non è ancora
 distribuito, ricrea il progetto o fixture di sviluppo e inizializzalo con il
 binario corrente.
+
+### “unknown field `$schema`”
+
+Una build di sviluppo precedente poteva aggiungere questa annotazione a
+`.hydra.json`. Hydra non pubblica ancora lo schema indicato: rimuovi la sola
+riga `$schema` dalla configurazione versionata e revisiona la modifica prima
+di commetterla.
 
 ### “--target is required”
 
@@ -1027,6 +1031,8 @@ risolva interamente dentro la root.
 Il contratto MVP comprende:
 
 - adapter di chiusura configurabile alternativo all'integrazione Git nativa;
+- pubblicazione dello schema ufficiale della configurazione tramite
+  SchemaStore, seguita dalla reintroduzione sicura degli aiuti per editor;
 - installazione automatica del completamento tramite futuri pacchetti o
   installer, senza modificare silenziosamente i file personali della shell;
 - output JSON per automazioni;

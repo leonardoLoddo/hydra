@@ -109,8 +109,8 @@ to `overlay.copy` so last-match-wins semantics exclude those entries, replaces
 paths that cannot be represented safely in the versioned JSON rules remain
 errors. The resulting `.hydra.json` modification is intentionally visible to
 Git and must be reviewed and committed by the user.
-Serialization preserves the optional `$schema` editor annotation while
-retaining strict rejection of every other unknown top-level field.
+Serialization retains strict rejection of every unknown top-level field,
+including the unavailable `$schema` editor annotation.
 
 This repair applies only to symlinks rejected during initial overlay planning.
 Tracked collisions, special files, unsafe included-rule paths, and concurrent

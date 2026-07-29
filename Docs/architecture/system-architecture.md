@@ -208,7 +208,7 @@ Head creation follows the same small-orchestrator rule:
 | `head/removal.rs` | Validate and orchestrate protected worktree, inventory, and private-branch removal |
 | `head/repair.rs` | Compare inventory with Git and filesystem state, classify inconsistencies, and apply only confirmed deterministic repairs |
 | `head/state.rs` | Manage the physical inventory transaction and classify commit boundaries |
-| `head/state/configuration.rs` | Parse and validate schema-v2 directory policies, the optional JSON Schema annotation, and shared Head settings |
+| `head/state/configuration.rs` | Parse and validate version-2 directory policies and shared Head settings |
 | `head/state/installation.rs` | Resolve the Git-common locator, verify directory ownership and worktree boundaries, and locate the physical inventory |
 | `head/persistence.rs` | Acquire and release the state lock and replace local state atomically |
 | `head/error.rs` | Define and render typed lifecycle, rollback, partial-removal, and post-commit cleanup failures |

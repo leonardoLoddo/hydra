@@ -229,7 +229,7 @@ fn head_create_still_rejects_unknown_top_level_configuration_fields() {
         &fs::read(&configuration_path).expect("configuration should be readable"),
     )
     .expect("configuration should be valid JSON");
-    configuration["comment"] = "not a supported JSON Schema annotation".into();
+    configuration["comment"] = "not a supported configuration field".into();
     fs::write(
         &configuration_path,
         serde_json::to_vec_pretty(&configuration).expect("configuration should serialize"),

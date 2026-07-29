@@ -5,14 +5,9 @@ use uuid::Uuid;
 
 use super::InitError;
 
-const CONFIGURATION_SCHEMA_URI: &str =
-    "https://raw.githubusercontent.com/leonardoLoddo/hydra/main/schemas/v2/hydra.schema.json";
-
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ProjectConfiguration {
-    #[serde(rename = "$schema")]
-    schema: &'static str,
     version: u32,
     project_id: String,
     heads_directory: HeadsDirectoryPolicy,
@@ -79,7 +74,6 @@ pub(super) fn serialize_initial_metadata(
     let heads_directory = path_as_json_string(heads_directory)?;
 
     let configuration = serialize_json(&ProjectConfiguration {
-        schema: CONFIGURATION_SCHEMA_URI,
         version: 2,
         project_id: project_id.clone(),
         heads_directory: HeadsDirectoryPolicy::Sibling {

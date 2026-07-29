@@ -354,7 +354,6 @@ fisico dipendente dalla macchina:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/leonardoLoddo/hydra/main/schemas/v2/hydra.schema.json",
   "version": 2,
   "projectId": "heimdall-a84f2c",
   "headsDirectory": {
@@ -445,13 +444,12 @@ poiché Hydra non è ancora stata distribuita, mantenere un parser o una
 migrazione per quel formato aggiungerebbe complessità senza proteggere utenti
 reali.
 
-La configurazione rimane JSON standard e non accetta commenti. Hydra pubblica
-invece uno schema descrittivo versionato in
-`schemas/v2/hydra.schema.json`; il campo standard `$schema` permette agli
-editor di mostrare descrizioni, completamento e diagnostica senza introdurre
-una sintassi JSON proprietaria. Hydra riconosce e conserva l'annotazione ma non
-scarica né interpreta lo schema durante l'esecuzione. Gli altri campi
-sconosciuti rimangono errori.
+La configurazione rimane JSON standard, non accetta commenti e rifiuta tutti i
+campi sconosciuti. Hydra non pubblica ancora uno schema per editor e non
+genera né accetta l'annotazione `$schema`. La pubblicazione dello schema
+ufficiale tramite SchemaStore è pianificata per una fase successiva; soltanto
+dopo che l'URL pubblico sarà disponibile Hydra potrà reintrodurre
+l'annotazione e gli aiuti dell'editor.
 
 Con `storage.mode: "auto"`, Hydra prova il clone CoW sul volume di destinazione e usa la copia completa se non è supportato. Modalità più rigide potranno essere esposte per test e automazioni, ma il default deve privilegiare compatibilità e sicurezza.
 
@@ -1271,6 +1269,7 @@ Per l’MVP, file JSON e scritture atomiche sono sufficienti. SQLite e dipendenz
 | Repair e riconciliazione | MVP |
 | Guida utente italiana mantenuta | MVP |
 | Skill operativa installabile per agenti AI | MVP |
+| Schema della configurazione pubblicato tramite SchemaStore | Successivo |
 | Head Recipe condivisibili e materializzabili | Successivo |
 | Hook o comando di setup | v0.2 |
 | Adapter per agenti | v0.2 |

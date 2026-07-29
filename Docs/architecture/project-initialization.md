@@ -113,7 +113,6 @@ The project configuration uses Hydra's project schema version 2:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/leonardoLoddo/hydra/main/schemas/v2/hydra.schema.json",
   "version": 2,
   "projectId": "example-5b8d9f430d5543eca3aa967dd484bf41",
   "headsDirectory": {
@@ -132,12 +131,12 @@ The project configuration uses Hydra's project schema version 2:
 }
 ```
 
-`$schema` points editors to Hydra's version-2 JSON Schema. The development
-build uses the schema stored on the `main` branch; release packaging may
-replace that annotation with an immutable tag URL. Hydra recognizes and
-preserves the annotation but never downloads or evaluates the remote schema
-at runtime. Runtime deserialization remains the authoritative trust-boundary
-validation.
+Hydra does not currently publish an editor schema, and initialization neither
+generates nor accepts a `$schema` annotation. Runtime deserialization remains
+the authoritative trust-boundary validation and rejects every unknown
+top-level field. Publishing the configuration schema through SchemaStore is a
+planned follow-up; editor annotations must not return before that stable
+public distribution exists.
 
 The Git common directory receives the local locator:
 
@@ -334,7 +333,7 @@ Coverage currently proves:
 - executable version output and internal Clap command consistency;
 - defaulting the optional path to the current directory;
 - rejection outside a Git repository without creating `.hydra.json`;
-- creation of schema-v2 configuration, sibling Heads directory, locator,
+- creation of version-2 configuration, sibling Heads directory, locator,
   ownership marker, and physical inventory;
 - real storage probing with visible backend selection and verified full-copy
   fallback;

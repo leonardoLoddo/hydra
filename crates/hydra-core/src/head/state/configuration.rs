@@ -15,8 +15,6 @@ const SUPPORTED_CONFIGURATION_VERSION: u32 = 2;
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ProjectConfiguration {
-    #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
-    schema: Option<String>,
     version: u32,
     project_id: String,
     heads_directory: HeadsDirectoryPolicy,
