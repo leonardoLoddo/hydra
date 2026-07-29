@@ -12,6 +12,7 @@ rust-version = "1.97.1"
 
 [workspace.dependencies]
 clap = { version = "4.6.4", features = ["derive"] }
+clap_complete = { version = "=4.6.4", features = ["unstable-dynamic"] }
 ignore = "0.4.31"
 reflink-copy = "0.1.30"
 serde = { version = "1.0.229", features = ["derive"] }

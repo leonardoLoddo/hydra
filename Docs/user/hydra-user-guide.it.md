@@ -39,6 +39,7 @@ hydra init [PATH]
 hydra status
 hydra repair
 hydra doctor storage
+hydra completions <SHELL>
 hydra head create <NAME> [--from <REF>] [--target <BRANCH>]
 hydra head list
 hydra head status <NAME>
@@ -55,6 +56,7 @@ hydra --help
 hydra init --help
 hydra repair --help
 hydra doctor storage --help
+hydra completions --help
 hydra head --help
 hydra head create --help
 hydra head open --help
@@ -62,8 +64,38 @@ hydra head close --help
 hydra head remove --help
 ```
 
-Il completamento della shell appartiene al contratto MVP, ma non è ancora
-implementato.
+### Completamento della shell
+
+Hydra supporta Bash, Zsh e Fish. Carica la registrazione ad ogni avvio della
+shell, così rimane allineata con il binario installato.
+
+Per Bash, aggiungi a `~/.bashrc`:
+
+```bash
+source <(hydra completions bash)
+```
+
+Per Zsh, aggiungi a `~/.zshrc`:
+
+```zsh
+source <(hydra completions zsh)
+```
+
+Per Fish, aggiungi a `~/.config/fish/config.fish`:
+
+```fish
+hydra completions fish | source
+```
+
+Il completamento propone comandi e opzioni. Nei comandi `head status`, `head
+path`, `head open`, `head close` e `head remove` propone anche i nomi delle
+Head del progetto corrente. Non propone Head esistenti per `head create`,
+perché quel comando richiede un nome nuovo.
+
+Fuori da un progetto Hydra, oppure quando lo stato locale non è leggibile, la
+ricerca dinamica non mostra errori: restituisce semplicemente zero nomi. Dopo
+un aggiornamento di Hydra riavvia la shell o ricarica il relativo file di
+configurazione.
 
 ---
 
@@ -986,7 +1018,6 @@ risolva interamente dentro la root.
 Il contratto MVP comprende:
 
 - adapter di chiusura configurabile alternativo all'integrazione Git nativa;
-- completamento della shell per i nomi delle Head;
 - output JSON per automazioni;
 - una skill installabile che insegni agli agenti AI a usare questi flussi senza
   aggirare le protezioni di Hydra.
@@ -1015,4 +1046,5 @@ Per intenti di prodotto e dettagli tecnici:
 - [contesto MVP](../product/hydra-mvp-context.md);
 - [inizializzazione](../architecture/project-initialization.md);
 - [creazione delle Head](../architecture/head-creation.md);
-- [ispezione delle Head](../architecture/head-inspection.md).
+- [ispezione delle Head](../architecture/head-inspection.md);
+- [completamento della shell](../architecture/shell-completions.md).

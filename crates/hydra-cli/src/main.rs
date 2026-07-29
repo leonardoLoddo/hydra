@@ -1,10 +1,16 @@
 use std::{
+    ffi::OsStr,
     io::{self, BufRead, IsTerminal, Write},
     path::{Path, PathBuf},
     process::ExitCode,
 };
 
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory as _, Parser, Subcommand, ValueEnum};
+use clap_complete::{
+    CompleteEnv,
+    engine::{ArgValueCompleter, CompletionCandidate},
+    env::{Bash, EnvCompleter, Fish, Shells, Zsh},
+};
 
 mod inspection;
 mod output;
@@ -15,7 +21,7 @@ mod output;
     version,
     about = "Git-native workspace manager for isolated development Heads",
     long_about = "Git-native workspace manager for isolated development Heads.\n\nHydra creates independent working directories while preserving familiar Git refs, branches, and repository workflows.",
-    after_help = "Command syntax:\n  hydra init [PATH]\n  hydra status\n  hydra repair\n  hydra doctor storage\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head open <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra <command> --help' for details."
+    after_help = "Command syntax:\n  hydra init [PATH]\n  hydra status\n  hydra repair\n  hydra doctor storage\n  hydra completions <SHELL>\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head open <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra <command> --help' for details."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -47,6 +53,16 @@ enum Command {
         #[command(subcommand)]
         command: DoctorCommand,
     },
+    /// Print shell registration for dynamic completions
+    #[command(
+        long_about = "Print shell registration for Hydra's static and dynamic completions.\n\nThe generated registration completes commands and reads the local Head inventory when an existing Head name is expected.",
+        after_help = "Examples:\n  source <(hydra completions bash)\n  source <(hydra completions zsh)\n  hydra completions fish | source"
+    )]
+    Completions {
+        /// Shell that will load the completion registration
+        #[arg(value_enum)]
+        shell: CompletionShell,
+    },
     /// Create and manage Heads
     #[command(
         after_help = "Command syntax:\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head open <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra head <command> --help' for details."
@@ -55,6 +71,23 @@ enum Command {
         #[command(subcommand)]
         command: HeadCommand,
     },
+    #[command(name = "__complete", hide = true)]
+    Complete {
+        #[command(subcommand)]
+        command: CompletionCommand,
+    },
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum CompletionShell {
+    Bash,
+    Zsh,
+    Fish,
+}
+
+#[derive(Subcommand)]
+enum CompletionCommand {
+    Heads,
 }
 
 #[derive(Subcommand)]
@@ -89,11 +122,13 @@ enum HeadCommand {
     /// Show the state of a local Head
     Status {
         /// Name of an existing Head
+        #[arg(add = ArgValueCompleter::new(complete_head_names))]
         name: String,
     },
     /// Print the absolute path of a local Head
     Path {
         /// Name of an existing Head
+        #[arg(add = ArgValueCompleter::new(complete_head_names))]
         name: String,
     },
     /// Open a local Head with the configured command
@@ -103,6 +138,7 @@ enum HeadCommand {
     )]
     Open {
         /// Name of an existing Head
+        #[arg(add = ArgValueCompleter::new(complete_head_names))]
         name: String,
     },
     /// Remove a local Head safely
@@ -112,6 +148,7 @@ enum HeadCommand {
     )]
     Remove {
         /// Name of an existing Head
+        #[arg(add = ArgValueCompleter::new(complete_head_names))]
         name: String,
         /// Discard uncommitted worktree changes
         #[arg(long)]
@@ -124,11 +161,17 @@ enum HeadCommand {
     )]
     Close {
         /// Name of an existing Head
+        #[arg(add = ArgValueCompleter::new(complete_head_names))]
         name: String,
     },
 }
 
 fn main() -> ExitCode {
+    let supported_shells: [&dyn EnvCompleter; 3] = [&Bash, &Zsh, &Fish];
+    CompleteEnv::with_factory(Cli::command)
+        .shells(Shells(&supported_shells))
+        .complete();
+
     let cli = Cli::parse();
 
     match cli.command {
@@ -155,6 +198,7 @@ fn main() -> ExitCode {
         Command::Doctor {
             command: DoctorCommand::Storage,
         } => doctor_storage(),
+        Command::Completions { shell } => print_completions(shell),
         Command::Head {
             command: HeadCommand::Create { name, from, target },
         } => create_head(&name, from.as_deref(), target.as_deref()),
@@ -176,7 +220,44 @@ fn main() -> ExitCode {
         Command::Head {
             command: HeadCommand::Close { name },
         } => close_head(&name),
+        Command::Complete {
+            command: CompletionCommand::Heads,
+        } => print_head_candidates(),
     }
+}
+
+fn print_completions(shell: CompletionShell) -> ExitCode {
+    match shell {
+        CompletionShell::Bash => println!("source <(COMPLETE=bash hydra)"),
+        CompletionShell::Zsh => println!("source <(COMPLETE=zsh hydra)"),
+        CompletionShell::Fish => println!("COMPLETE=fish hydra | source"),
+    }
+    ExitCode::SUCCESS
+}
+
+fn head_names() -> Vec<String> {
+    let mut names = hydra_core::list_heads(Path::new(".")).unwrap_or_default();
+    names.sort_unstable();
+    names.dedup();
+    names
+}
+
+fn complete_head_names(current: &OsStr) -> Vec<CompletionCandidate> {
+    let Some(prefix) = current.to_str() else {
+        return Vec::new();
+    };
+    head_names()
+        .into_iter()
+        .filter(|name| name.starts_with(prefix))
+        .map(CompletionCandidate::new)
+        .collect()
+}
+
+fn print_head_candidates() -> ExitCode {
+    for name in head_names() {
+        println!("{name}");
+    }
+    ExitCode::SUCCESS
 }
 
 fn doctor_storage() -> ExitCode {

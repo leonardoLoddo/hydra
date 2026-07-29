@@ -106,6 +106,7 @@ Docs/
 │   ├── head-removal.md
 │   ├── project-initialization.md
 │   ├── repair.md
+│   ├── shell-completions.md
 │   └── system-architecture.md
 ├── development/
 │   ├── commit-conventions.md

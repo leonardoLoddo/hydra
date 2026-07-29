@@ -25,6 +25,7 @@ conventions, which remain in the development domain.
 | [`head-open.md`](head-open.md) | `hydra head open`, configured open adapters, command placeholders, process argument separation, opener failures, or pre-launch worktree validation | Implemented open-command configuration, validated process launch, placeholder expansion, CLI output, and read-only lifecycle boundary. |
 | [`repair.md`](repair.md) | `hydra repair`, inventory/worktree reconciliation, stale entries, moved or missing worktrees, untracked Hydra branches, guided recovery, or repair limitations | Implemented read-only repair planning, explicitly confirmed deterministic corrections, report-only inconsistencies, and race-safety boundaries. |
 | [`doctor-storage.md`](doctor-storage.md) | `hydra doctor storage`, real Heads-volume capability probes, native clone reporting, full-copy verification, mutable-hard-link policy, diagnostic cleanup, or storage-doctor errors | Implemented storage diagnostic boundary, shared probe behavior, output model, isolation claims, and cleanup contract. |
+| [`shell-completions.md`](shell-completions.md) | `hydra completions`, shell registration, static command completion, dynamic Head-name candidates, completion failure behavior, or the hidden candidate protocol | Implemented Bash, Zsh, and Fish registration, reusable read-only Head candidates, completion-engine boundary, and verification contract. |
 
 ---
 
@@ -52,6 +53,9 @@ conventions, which remain in the development domain.
   Hydra inventory, worktree paths, or recoverable branch state.
 - Consult `doctor-storage.md` for every change that diagnoses the active
   storage volume or reports clone, fallback, hard-link, and isolation support.
+- Consult `shell-completions.md` for every change that generates shell
+  registration, changes which arguments complete existing entities, or changes
+  completion candidate discovery and failure behavior.
 - Consult both documents when initialization work changes a component boundary
   or introduces a new Git, configuration, state, or filesystem component.
 - Combine this router with the product router for user-visible behavior and
