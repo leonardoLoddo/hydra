@@ -1311,8 +1311,8 @@ La skill deve guidare almeno questi comportamenti:
 - creare la Head e spostare il proprio contesto operativo nella directory
   restituita;
 - lavorare e committare soltanto sul branch privato della Head;
-- usare i futuri comandi `status`, `path`, `open`, `close` e `remove` quando
-  saranno implementati, senza anticiparne la sintassi;
+- usare i comandi disponibili `status`, `path`, `open`, `close` e `remove`
+  verificandone prima la sintassi nell'help del binario installato;
 - non modificare manualmente locator, marker, inventario o lock;
 - non sostituire i comandi protetti di Hydra con cancellazioni filesystem o
   rimozioni worktree distruttive;
@@ -1324,10 +1324,12 @@ La skill deve derivarne comandi, vincoli e procedure senza creare una seconda
 specifica divergente. Ogni modifica a un workflow rilevante aggiorna nello
 stesso intervento codice, help, test, guida e skill.
 
-La prima skill può essere confezionata per uno specifico ecosistema di agenti,
-ma le istruzioni canoniche devono restare il più possibile indipendenti dal
-vendor, così da poter produrre varianti per altri agenti senza ridefinire il
-comportamento di Hydra.
+La prima skill è distribuita in `skills/hydra/` nel formato installabile da
+Codex. Le istruzioni operative restano indipendenti dal vendor, così da poter
+produrre varianti per altri agenti senza ridefinire il comportamento di Hydra.
+La skill non integra o rimuove automaticamente una Head: lascia per default il
+workspace disponibile alla revisione e richiede un'autorizzazione esplicita
+prima delle operazioni che aggiornano il target o possono scartare file.
 
 ### Head Recipe condivisibili
 

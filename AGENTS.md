@@ -446,12 +446,18 @@ User documentation MUST:
 - avoid asking users to edit local Hydra metadata or perform unsafe Git or
   filesystem recovery manually.
 
-Once an installable Hydra skill for AI agents exists, any change to a workflow,
-command, configuration field, safety rule, or recovery procedure used by that
-skill MUST update the skill in the same task. Before the skill exists, every
-such change must still assess and preserve its documented MVP requirements.
+Hydra distributes its installable AI-agent skill from `skills/hydra/`. Every
+non-trivial task MUST assess its impact on that skill. Any change to a workflow,
+command, option, default, output, configuration field, installation step,
+safety rule, troubleshooting action, or recovery procedure that an agent can
+use MUST update the skill in the same task. A task is incomplete when the
+skill, CLI help, implemented behavior, canonical product documentation, and
+Italian user guide disagree.
+
 The skill is an operational projection of Hydra's canonical product and user
-documentation, not an independent source of product behavior.
+documentation, not an independent source of product behavior. Follow the
+Development documentation route for its packaging, synchronization triggers,
+and required verification.
 
 If no documentation update is needed, state why in the final report.
 
@@ -471,8 +477,8 @@ A task is not complete when any applicable item is missing:
 - existing behavior and compatibility were preserved;
 - Rust formatting, compilation, lint, and test gates passed;
 - documentation impact was assessed and routed docs were updated when needed;
-- user documentation and AI-agent skill impact were assessed when behavior is
-  externally observable;
+- user documentation and AI-agent skill impact were assessed, and the Hydra
+  skill was updated in the same task whenever agent-operable behavior changed;
 - changed documentation links and router topology were verified;
 - limitations, assumptions, and unverified areas were reported.
 
@@ -491,7 +497,7 @@ A task is not complete when any applicable item is missing:
 - [ ] Destructive behavior tested only in disposable environments
 - [ ] Documentation impact assessed
 - [ ] Italian user documentation updated for user-visible changes
-- [ ] AI-agent skill impact assessed and the skill updated when present
+- [ ] Hydra AI-agent skill impact assessed and the skill updated when required
 - [ ] Routers updated for documentation topology changes
 - [ ] Commit convention followed when a commit was created or proposed
 - [ ] Remaining assumptions or limitations reported

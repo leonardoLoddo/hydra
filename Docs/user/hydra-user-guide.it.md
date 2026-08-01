@@ -118,6 +118,40 @@ command -v hydra
 La guida non definisce ancora un processo di aggiornamento o distribuzione
 stabile.
 
+### 3.1 Installa la skill per agenti AI
+
+Il repository distribuisce la skill operativa in `skills/hydra/`. Per provarla
+localmente con Codex, dalla root del repository verifica prima che non esista
+già una skill omonima, quindi copiala nella directory delle skill personali:
+
+```bash
+skill_root="${CODEX_HOME:-$HOME/.codex}/skills"
+test ! -e "$skill_root/hydra" &&
+  mkdir -p "$skill_root" &&
+  cp -R skills/hydra "$skill_root/hydra"
+```
+
+Se il primo controllo fallisce, non sovrascrivere la skill esistente: rimuovila
+o aggiornala soltanto dopo averne verificato origine e modifiche locali.
+
+Riavvia la sessione dell'agente dopo l'installazione. Puoi invocarla
+esplicitamente con `$hydra`, per esempio:
+
+```text
+Usa $hydra per sviluppare questa attività in una Head isolata basata su main.
+```
+
+La skill verifica i comandi realmente installati, crea o seleziona una Head e
+sposta il lavoro nella directory restituita da `hydra head path`. Non cattura
+le modifiche non committate del workspace di partenza: una nuova Head nasce
+dal commit risolto tramite `--from`.
+
+Per sicurezza, al termine lascia normalmente la Head disponibile alla
+revisione. Non esegue automaticamente `hydra head close`,
+`hydra head remove --force`, modifiche ai metadati locali o cancellazioni
+manuali di worktree. Integrazione e scarto di file richiedono
+un'autorizzazione esplicita.
+
 ---
 
 ## 4. Flusso base
@@ -1191,8 +1225,6 @@ Il contratto MVP comprende:
 - installazione automatica del completamento tramite futuri pacchetti o
   installer, senza modificare silenziosamente i file personali della shell;
 - output JSON per automazioni;
-- una skill installabile che insegni agli agenti AI a usare questi flussi senza
-  aggirare le protezioni di Hydra.
 
 La sintassi definitiva verrà aggiunta a questa guida soltanto insieme
 all’implementazione e all’help del binario.
