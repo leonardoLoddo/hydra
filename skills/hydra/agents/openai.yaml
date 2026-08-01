@@ -1,0 +1,4 @@
+interface:
+  display_name: "Hydra"
+  short_description: "Run isolated AI work safely with Hydra"
+  default_prompt: "Use $hydra to create and work safely in an isolated Hydra Head for this task."
