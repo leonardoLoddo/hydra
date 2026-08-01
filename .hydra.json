@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "projectId": "hydra-13e49b7170f54a8aab77c53a3cbd0f72",
+  "headsDirectory": {
+    "strategy": "sibling",
+    "suffix": ".heads"
+  },
+  "branchPrefix": "hydra/",
+  "storage": {
+    "mode": "auto"
+  },
+  "overlay": {
+    "copy": [
+      "... .gitignore"
+    ]
+  }
+}
