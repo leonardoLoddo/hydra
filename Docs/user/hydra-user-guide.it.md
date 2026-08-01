@@ -237,24 +237,28 @@ hydra/payment
 Da questo momento puoi modificare file, eseguire test e creare commit senza
 condividere working tree o index con il repository originale o con altre Head.
 
-### 4.4 Crea un’altra Head da una Head esistente
+### 4.4 Usa Hydra da una Head esistente
 
-Se `.hydra.json` è stato committato ed è quindi presente nella Head, Hydra può
-essere eseguito anche da lì:
+Se `.hydra.json` è stato committato ed è quindi presente nella Head, tutti i
+comandi Hydra possono essere eseguiti anche da lì. Il locator nel Git common
+directory identifica sempre lo stesso progetto e lo stesso inventario locale.
+Per esempio:
 
 ```bash
 cd /workspace/Shop.heads/payment
 hydra head create auth
 ```
 
-Il locator locale condiviso tramite il Git common directory fa sì che `auth`
-venga creata nella stessa directory:
+`auth` viene creata nella stessa directory delle Head:
 
 ```text
 /workspace/Shop.heads/auth
 ```
 
-La posizione non viene ricalcolata rispetto a `payment`.
+La posizione non viene ricalcolata rispetto a `payment`: le Head sono sorelle
+del progetto principale e non formano una gerarchia annidata. Una Head non può
+quindi possedere proprie sotto-Head indipendenti; può soltanto operare sulle
+Head dello stesso progetto Hydra.
 
 ### 4.5 Elenca e ispeziona le Head
 
@@ -428,27 +432,33 @@ Una Head pulita può essere integrata nel target registrato e rimossa:
 hydra head close payment
 ```
 
-Hydra usa fast-forward quando possibile; per storie divergenti crea un merge
-commit senza eseguire checkout del target. Un conflitto lascia target, branch
-privato, worktree e inventario invariati.
+Hydra sceglie dinamicamente la strategia. Se il target, per esempio `main`, è
+attivo in una worktree registrata e pulita, integra direttamente lì mantenendo
+allineati ref, index e file. Se il target non è attivo in nessuna worktree,
+integra senza checkout. Usa fast-forward quando possibile e crea un merge
+commit per storie divergenti.
 
-Il target non può essere aperto in un'altra worktree durante la chiusura. Nel
-caso comune in cui `main` o `beta` è attivo nel workspace principale, passa
-temporaneamente a un altro branch:
+Una worktree target con modifiche staged, modificate, eliminate o non tracciate,
+oppure con un merge, rebase o altra operazione Git in corso, blocca la chiusura:
+Hydra descrive il motivo e non modifica né il target né la Head. Non serve
+creare un branch temporaneo quando il target è già pulito.
 
-```bash
-git switch -c parking
-hydra head close payment
+Un conflitto lascia target, branch privato, worktree e inventario invariati.
+Puoi eseguire `head close` dal progetto principale o da qualunque Head dello
+stesso progetto che contenga la configurazione versionata, inclusa la Head da
+chiudere.
+
+Al successo Hydra indica sia dove ha integrato sia il risultato:
+
+```text
+Closed Head payment into refs/heads/main at <commit>
+Integration strategy: target worktree /workspace/Shop
+Integration result: fast-forward
 ```
 
-Dopo la chiusura puoi tornare al target aggiornato:
-
-```bash
-git switch main
-```
-
-Hydra non cambia implicitamente file o index di un'altra worktree. Se
-l'integrazione riesce ma la rimozione protetta fallisce, l'errore indica il
+Quando il target non è checkoutato, la strategia riportata è `checkout-free`;
+il risultato può essere `already integrated`, `fast-forward` o `merge commit`.
+Se l'integrazione riesce ma la rimozione protetta fallisce, l'errore indica il
 commit già pubblicato: non tentare di annullarlo manualmente e ripeti la
 diagnostica sulla Head rimasta.
 

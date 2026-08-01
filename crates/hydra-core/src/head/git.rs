@@ -202,6 +202,38 @@ pub(super) fn worktree_commit(path: &Path) -> Result<String, HeadError> {
     stdout_line(&output, "worktree commit")
 }
 
+pub(super) fn worktree_operation(path: &Path) -> Result<Option<&'static str>, HeadError> {
+    const OPERATIONS: [(&str, &str); 8] = [
+        ("MERGE_HEAD", "merge"),
+        ("CHERRY_PICK_HEAD", "cherry-pick"),
+        ("REVERT_HEAD", "revert"),
+        ("rebase-merge", "rebase"),
+        ("rebase-apply", "rebase"),
+        ("BISECT_START", "bisect"),
+        ("BISECT_LOG", "bisect"),
+        ("sequencer", "sequenced Git"),
+    ];
+    for (marker, operation) in OPERATIONS {
+        let output = run_git(
+            path,
+            &["rev-parse", "--path-format=absolute", "--git-path", marker],
+            "locating Git operation state",
+        )?;
+        let marker_path = bytes_to_path(&stdout_record(&output, "Git operation path")?)?;
+        if marker_path
+            .try_exists()
+            .map_err(|source| HeadError::FileSystem {
+                action: "inspect Git operation state",
+                path: marker_path,
+                source,
+            })?
+        {
+            return Ok(Some(operation));
+        }
+    }
+    Ok(None)
+}
+
 pub(super) fn resolve_commit(
     repository: &Repository,
     reference: &str,
@@ -485,6 +517,15 @@ pub(super) fn update_ref_if_matches(
         &repository.root,
         &["update-ref", reference, new_commit, expected_commit],
         "updating the integration target",
+    )
+    .map(|_| ())
+}
+
+pub(super) fn fast_forward_worktree(path: &Path, head_commit: &str) -> Result<(), HeadError> {
+    run_git(
+        path,
+        &["merge", "--ff-only", "--no-edit", "--", head_commit],
+        "fast-forwarding the checked-out integration target",
     )
     .map(|_| ())
 }

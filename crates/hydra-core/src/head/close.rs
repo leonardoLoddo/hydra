@@ -1,4 +1,8 @@
-use std::{collections::BTreeMap, path::Path, process::Command};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 use super::{
     HeadError,
@@ -20,12 +24,27 @@ pub struct ClosedHead {
 pub enum CloseOutcome {
     Integrated {
         target_commit: String,
+        strategy: IntegrationStrategy,
+        result: IntegrationResult,
     },
     CommandCompleted {
         target_before: String,
         target_after: Option<String>,
         removed: bool,
     },
+}
+
+#[derive(Debug)]
+pub enum IntegrationStrategy {
+    CheckoutFree,
+    TargetWorktree { path: PathBuf },
+}
+
+#[derive(Debug)]
+pub enum IntegrationResult {
+    AlreadyIntegrated,
+    FastForward,
+    MergeCommit,
 }
 
 /// Runs the configured close adapter, or integrates and removes a clean Head.
@@ -67,8 +86,6 @@ fn close_with_merge(
     if changes.modified > 0 || changes.added > 0 || changes.deleted > 0 || changes.untracked > 0 {
         return Err(HeadError::HeadCloseHasUncommittedChanges(name.to_owned()));
     }
-    ensure_target_not_checked_out(repository, &inspection.target_ref)?;
-
     let head_commit = inspection
         .commit
         .ok_or_else(|| HeadError::HeadCloseInconsistent {
@@ -76,50 +93,31 @@ fn close_with_merge(
             reason: "worktree commit is unavailable".to_owned(),
         })?;
     let target_before = git::commit_for_ref(repository, &inspection.target_ref)?;
-    let target_commit = if git::is_ancestor(repository, &head_commit, &target_before)? {
-        target_before
-    } else if git::is_ancestor(repository, &target_before, &head_commit)? {
-        git::update_ref_if_matches(
+    let target_worktree = checked_out_target(repository, &inspection.target_ref)?;
+    let removal_source =
+        stable_control_worktree(repository, &inspection.path, target_worktree.as_deref())?;
+    let (target_commit, strategy, result) = match target_worktree {
+        Some(path) => integrate_in_target_worktree(
             repository,
+            name,
+            &inspection.recorded_head_ref,
             &inspection.target_ref,
-            &head_commit,
-            &target_before,
-        )?;
-        head_commit.clone()
-    } else {
-        let tree =
-            git::merge_tree(repository, &target_before, &head_commit).map_err(
-                |error| match error {
-                    HeadError::GitCommandFailed {
-                        status: Some(1), ..
-                    } => HeadError::HeadCloseConflict {
-                        name: name.to_owned(),
-                        target_ref: inspection.target_ref.clone(),
-                    },
-                    other => other,
-                },
-            )?;
-        let merge_commit = git::create_merge_commit(
-            repository,
-            &tree,
             &target_before,
             &head_commit,
-            &format!(
-                "Merge {} into {}",
-                inspection.recorded_head_ref, inspection.target_ref
-            ),
-        )?;
-        git::update_ref_if_matches(
+            path,
+        )?,
+        None => integrate_checkout_free(
             repository,
+            name,
+            &inspection.recorded_head_ref,
             &inspection.target_ref,
-            &merge_commit,
             &target_before,
-        )?;
-        merge_commit
+            &head_commit,
+        )?,
     };
 
     if let Err(source) = remove_head(
-        source_path,
+        &removal_source,
         RemoveHeadOptions {
             name: name.to_owned(),
             force: false,
@@ -136,8 +134,112 @@ fn close_with_merge(
     Ok(ClosedHead {
         name: name.to_owned(),
         target_ref: inspection.target_ref,
-        outcome: CloseOutcome::Integrated { target_commit },
+        outcome: CloseOutcome::Integrated {
+            target_commit,
+            strategy,
+            result,
+        },
     })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn integrate_in_target_worktree(
+    repository: &Repository,
+    name: &str,
+    head_ref: &str,
+    target_ref: &str,
+    target_before: &str,
+    head_commit: &str,
+    path: PathBuf,
+) -> Result<(String, IntegrationStrategy, IntegrationResult), HeadError> {
+    verify_target_worktree(&path, target_ref, target_before)?;
+    let (target_commit, result) = if git::is_ancestor(repository, head_commit, target_before)? {
+        (
+            target_before.to_owned(),
+            IntegrationResult::AlreadyIntegrated,
+        )
+    } else if git::is_ancestor(repository, target_before, head_commit)? {
+        verify_target_worktree(&path, target_ref, target_before)?;
+        git::fast_forward_worktree(&path, head_commit)?;
+        verify_target_worktree(&path, target_ref, head_commit)?;
+        (head_commit.to_owned(), IntegrationResult::FastForward)
+    } else {
+        let merge_commit = prepare_merge_commit(
+            repository,
+            name,
+            head_ref,
+            target_ref,
+            target_before,
+            head_commit,
+        )?;
+        verify_target_worktree(&path, target_ref, target_before)?;
+        git::fast_forward_worktree(&path, &merge_commit)?;
+        verify_target_worktree(&path, target_ref, &merge_commit)?;
+        (merge_commit, IntegrationResult::MergeCommit)
+    };
+    Ok((
+        target_commit,
+        IntegrationStrategy::TargetWorktree { path },
+        result,
+    ))
+}
+
+fn integrate_checkout_free(
+    repository: &Repository,
+    name: &str,
+    head_ref: &str,
+    target_ref: &str,
+    target_before: &str,
+    head_commit: &str,
+) -> Result<(String, IntegrationStrategy, IntegrationResult), HeadError> {
+    let (target_commit, result) = if git::is_ancestor(repository, head_commit, target_before)? {
+        (
+            target_before.to_owned(),
+            IntegrationResult::AlreadyIntegrated,
+        )
+    } else if git::is_ancestor(repository, target_before, head_commit)? {
+        git::update_ref_if_matches(repository, target_ref, head_commit, target_before)?;
+        (head_commit.to_owned(), IntegrationResult::FastForward)
+    } else {
+        let merge_commit = prepare_merge_commit(
+            repository,
+            name,
+            head_ref,
+            target_ref,
+            target_before,
+            head_commit,
+        )?;
+        git::update_ref_if_matches(repository, target_ref, &merge_commit, target_before)?;
+        (merge_commit, IntegrationResult::MergeCommit)
+    };
+    Ok((target_commit, IntegrationStrategy::CheckoutFree, result))
+}
+
+fn prepare_merge_commit(
+    repository: &Repository,
+    name: &str,
+    head_ref: &str,
+    target_ref: &str,
+    target_commit: &str,
+    head_commit: &str,
+) -> Result<String, HeadError> {
+    let tree =
+        git::merge_tree(repository, target_commit, head_commit).map_err(|error| match error {
+            HeadError::GitCommandFailed {
+                status: Some(1), ..
+            } => HeadError::HeadCloseConflict {
+                name: name.to_owned(),
+                target_ref: target_ref.to_owned(),
+            },
+            other => other,
+        })?;
+    git::create_merge_commit(
+        repository,
+        &tree,
+        target_commit,
+        head_commit,
+        &format!("Merge {head_ref} into {target_ref}"),
+    )
 }
 
 fn close_with_command(
@@ -163,6 +265,7 @@ fn close_with_command(
     if changes.modified > 0 || changes.added > 0 || changes.deleted > 0 || changes.untracked > 0 {
         return Err(HeadError::HeadCloseHasUncommittedChanges(name.to_owned()));
     }
+    let removal_source = stable_control_worktree(repository, &inspection.path, None)?;
     let target_before = git::commit_for_ref(repository, &inspection.target_ref)?;
     let path = inspection
         .path
@@ -209,7 +312,7 @@ fn close_with_command(
     }
     if remove_on_success
         && let Err(source) = remove_head(
-            source_path,
+            &removal_source,
             RemoveHeadOptions {
                 name: name.to_owned(),
                 force: false,
@@ -285,17 +388,80 @@ fn unsupported_placeholder(template: &str) -> HeadError {
     HeadError::InvalidCloseCommand(format!("unsupported placeholder in {template:?}"))
 }
 
-fn ensure_target_not_checked_out(
+fn checked_out_target(
     repository: &Repository,
     target_ref: &str,
-) -> Result<(), HeadError> {
-    for path in git::worktree_paths(repository)? {
-        if git::symbolic_head(&path)?.as_deref() == Some(target_ref) {
-            return Err(HeadError::HeadCloseTargetCheckedOut {
-                target_ref: target_ref.to_owned(),
-                path,
-            });
+) -> Result<Option<PathBuf>, HeadError> {
+    let mut target_worktree = None;
+    for worktree in git::registered_worktrees(repository)? {
+        if worktree.branch.as_deref() == Some(target_ref) {
+            if target_worktree.is_some() {
+                return Err(HeadError::HeadCloseInconsistent {
+                    name: target_ref.to_owned(),
+                    reason: "target branch is checked out in multiple worktrees".to_owned(),
+                });
+            }
+            target_worktree = Some(worktree.path);
         }
+    }
+    Ok(target_worktree)
+}
+
+fn stable_control_worktree(
+    repository: &Repository,
+    closing_head_path: &Path,
+    target_worktree: Option<&Path>,
+) -> Result<PathBuf, HeadError> {
+    if repository.root != closing_head_path {
+        return Ok(repository.root.clone());
+    }
+    if let Some(path) = target_worktree {
+        return Ok(path.to_path_buf());
+    }
+    git::worktree_paths(repository)?
+        .into_iter()
+        .find(|path| path != closing_head_path)
+        .ok_or_else(|| HeadError::HeadCloseInconsistent {
+            name: closing_head_path.display().to_string(),
+            reason: "no stable worktree remains available to complete removal".to_owned(),
+        })
+}
+
+fn verify_target_worktree(
+    path: &Path,
+    target_ref: &str,
+    expected_commit: &str,
+) -> Result<(), HeadError> {
+    let observed_ref = git::symbolic_head(path)?;
+    if observed_ref.as_deref() != Some(target_ref) {
+        return Err(HeadError::HeadCloseInconsistent {
+            name: target_ref.to_owned(),
+            reason: "target worktree branch changed during close".to_owned(),
+        });
+    }
+    if git::worktree_commit(path)? != expected_commit {
+        return Err(HeadError::HeadCloseInconsistent {
+            name: target_ref.to_owned(),
+            reason: "target worktree commit changed during close".to_owned(),
+        });
+    }
+    if let Some(operation) = git::worktree_operation(path)? {
+        return Err(HeadError::HeadCloseTargetWorktreeOperation {
+            target_ref: target_ref.to_owned(),
+            path: path.to_path_buf(),
+            operation,
+        });
+    }
+    let changes = git::worktree_changes(path)?;
+    if !changes.is_clean() {
+        return Err(HeadError::HeadCloseTargetWorktreeDirty {
+            target_ref: target_ref.to_owned(),
+            path: path.to_path_buf(),
+            modified: changes.modified,
+            added: changes.added,
+            deleted: changes.deleted,
+            untracked: changes.untracked,
+        });
     }
     Ok(())
 }

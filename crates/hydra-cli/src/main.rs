@@ -156,7 +156,7 @@ enum HeadCommand {
     },
     /// Integrate and remove a completed Head
     #[command(
-        long_about = "Integrate or run the configured close adapter for a completed Head.\n\nThe Head must be clean. By default, Hydra updates the recorded target without checking it out, then performs protected removal. When .hydra.json defines commands.close, Hydra runs that adapter instead; removeOnSuccess controls whether protected removal follows a successful command.",
+        long_about = "Integrate or run the configured close adapter for a completed Head.\n\nThe Head must be clean. By default, Hydra integrates through the target when it is checked out in a clean worktree; when the target is not checked out, integration remains checkout-free. A dirty target worktree or an active Git operation blocks close without mutation. Native close reports its integration strategy and result, then performs protected removal. When .hydra.json defines commands.close, Hydra runs that adapter instead; removeOnSuccess controls whether protected removal follows a successful command.",
         after_help = "Examples:\n  hydra head close payment"
     )]
     Close {
@@ -540,10 +540,31 @@ fn close_head(name: &str) -> ExitCode {
     match hydra_core::close_head(Path::new("."), name) {
         Ok(closed) => {
             match closed.outcome {
-                hydra_core::CloseOutcome::Integrated { target_commit } => println!(
-                    "Closed Head {} into {} at {}",
-                    closed.name, closed.target_ref, target_commit
-                ),
+                hydra_core::CloseOutcome::Integrated {
+                    target_commit,
+                    strategy,
+                    result,
+                } => {
+                    println!(
+                        "Closed Head {} into {} at {}",
+                        closed.name, closed.target_ref, target_commit
+                    );
+                    match strategy {
+                        hydra_core::IntegrationStrategy::CheckoutFree => {
+                            println!("Integration strategy: checkout-free");
+                        }
+                        hydra_core::IntegrationStrategy::TargetWorktree { path } => println!(
+                            "Integration strategy: target worktree {}",
+                            output::safe_path_label(&path)
+                        ),
+                    }
+                    let result = match result {
+                        hydra_core::IntegrationResult::AlreadyIntegrated => "already integrated",
+                        hydra_core::IntegrationResult::FastForward => "fast-forward",
+                        hydra_core::IntegrationResult::MergeCommit => "merge commit",
+                    };
+                    println!("Integration result: {result}");
+                }
                 hydra_core::CloseOutcome::CommandCompleted { removed, .. } if removed => {
                     println!(
                         "Close command completed for Head {}; Head removed",

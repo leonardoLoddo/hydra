@@ -756,12 +756,22 @@ Per una Head creata da un branch locale senza `--target`, `targetRef` coincide
 con il branch di partenza. Un `--target` esplicito rimane invece autorevole per
 la chiusura.
 
-Il merge predefinito non deve sporcare o modificare implicitamente un altro
-working tree dell’utente. Prima dell’implementazione va definito un meccanismo
-di integrazione isolato che garantisca:
+Il merge predefinito sceglie dinamicamente dove integrare:
+
+- se `targetRef` è attivo in una worktree registrata, Hydra può avanzare quella
+  worktree soltanto quando branch e commit corrispondono allo snapshot
+  validato, non è in corso un'operazione Git e working tree e index sono
+  puliti;
+- se `targetRef` non è attivo in alcuna worktree, Hydra integra senza checkout
+  e pubblica la ref con compare-and-swap.
+
+Una worktree target sporca o impegnata in un'operazione Git blocca la chiusura
+senza mutare target o Head. Il meccanismo garantisce:
 
 - target ref invariata se il merge fallisce o produce conflitti;
-- nessuna modifica al working tree principale o a un’altra Head;
+- aggiornamento coerente di ref, index e file quando il target pulito è
+  checkoutato;
+- nessuna modifica a working tree diverse dal target selezionato;
 - nessuna eliminazione della Head in caso di conflitto;
 - diagnostica sufficiente per risolvere o ripetere esplicitamente la chiusura.
 

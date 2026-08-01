@@ -154,7 +154,8 @@ initialization, Head creation, and Head inspection, including:
 - tracked and overlay materialization with CoW/copy isolation;
 - transactional Head metadata publication and creation rollback;
 - protected Head removal with recoverable private-branch preservation;
-- checkout-free Head integration with conflict-safe target publication;
+- dynamic Head integration through a clean checked-out target worktree or
+  checkout-free publication when the target is not checked out;
 - validated execution of configured Head-close adapters with optional
   protected removal;
 - validated execution of configured Head-open adapters without a shell;

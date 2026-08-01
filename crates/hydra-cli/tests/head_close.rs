@@ -50,6 +50,10 @@ fn park_primary_worktree(repository: &Path) {
             .status
             .success()
     );
+    configure_git_identity(repository);
+}
+
+fn configure_git_identity(repository: &Path) {
     assert!(
         run_git(repository, &["config", "user.name", "Hydra Tests"])
             .status
@@ -179,6 +183,39 @@ fn custom_close_removes_the_head_after_the_command_integrates_it() {
         .status
         .success()
     );
+}
+
+#[test]
+fn head_can_run_a_removing_custom_close_from_its_own_worktree() {
+    let directory = TestDirectory::new("head-close-custom-from-head");
+    let repository = create_initialized_project(&directory);
+    configure_close(
+        &repository,
+        "git",
+        &["update-ref", "{targetRef}", "{headRef}"],
+        true,
+    );
+    commit_all(&repository, "configure Hydra close");
+    create_head(&repository, "payment");
+    let head = heads_directory(&repository).join("payment");
+    fs::write(head.join("feature.txt"), b"feature\n").expect("feature should be written");
+    commit_all(&head, "feature");
+    let expected = revision(&head, "HEAD");
+    park_primary_worktree(&repository);
+
+    let output = hydra_command()
+        .args(["head", "close", "payment"])
+        .current_dir(&head)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(
+        output.status.success(),
+        "custom close should run from its Head, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(revision(&repository, "main"), expected);
+    assert!(!head.exists());
 }
 
 #[test]
@@ -387,6 +424,15 @@ fn head_close_fast_forwards_the_target_and_removes_the_head() {
         "close should succeed, stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("Integration strategy: checkout-free"),
+        "stdout: {stdout}"
+    );
+    assert!(
+        stdout.contains("Integration result: fast-forward"),
+        "stdout: {stdout}"
+    );
     assert_eq!(revision(&repository, "main"), expected);
     assert!(!head.exists());
     assert!(
@@ -405,14 +451,17 @@ fn head_close_fast_forwards_the_target_and_removes_the_head() {
 }
 
 #[test]
-fn head_close_rejects_a_target_checked_out_in_another_worktree() {
+fn head_close_fast_forwards_a_clean_checked_out_target_worktree() {
     let directory = TestDirectory::new("head-close-open-target");
     let repository = create_initialized_project(&directory);
+    commit_all(&repository, "configure Hydra");
     create_head(&repository, "payment");
     let head = heads_directory(&repository).join("payment");
     fs::write(head.join("feature.txt"), b"feature\n").expect("feature should be written");
     commit_all(&head, "feature");
-    let target_before = revision(&repository, "main");
+    let expected = revision(&head, "HEAD");
+    let canonical_repository =
+        fs::canonicalize(&repository).expect("repository path should be canonicalizable");
 
     let output = hydra_command()
         .args(["head", "close", "payment"])
@@ -420,9 +469,192 @@ fn head_close_rejects_a_target_checked_out_in_another_worktree() {
         .output()
         .expect("Hydra CLI should start");
 
+    assert!(
+        output.status.success(),
+        "close should succeed, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains(&format!(
+            "Integration strategy: target worktree {}",
+            canonical_repository.display()
+        )),
+        "stdout: {stdout}"
+    );
+    assert!(
+        stdout.contains("Integration result: fast-forward"),
+        "stdout: {stdout}"
+    );
+    assert_eq!(revision(&repository, "main"), expected);
+    assert_eq!(
+        fs::read(repository.join("feature.txt")).expect("merged file should be readable"),
+        b"feature\n"
+    );
+    assert!(
+        run_git(&repository, &["status", "--porcelain"])
+            .stdout
+            .is_empty()
+    );
+    assert!(!head.exists());
+}
+
+#[test]
+fn head_can_close_itself_into_a_clean_target_worktree() {
+    let directory = TestDirectory::new("head-close-from-head");
+    let repository = create_initialized_project(&directory);
+    commit_all(&repository, "configure Hydra");
+    create_head(&repository, "payment");
+    let head = heads_directory(&repository).join("payment");
+    fs::write(head.join("feature.txt"), b"feature\n").expect("feature should be written");
+    commit_all(&head, "feature");
+    let expected = revision(&head, "HEAD");
+
+    let output = hydra_command()
+        .args(["head", "close", "payment"])
+        .current_dir(&head)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(
+        output.status.success(),
+        "a Head should close itself, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(revision(&repository, "main"), expected);
+    assert_eq!(
+        fs::read(repository.join("feature.txt")).expect("merged file should be readable"),
+        b"feature\n"
+    );
+    assert!(!head.exists());
+    assert!(
+        run_git(&repository, &["status", "--porcelain"])
+            .stdout
+            .is_empty()
+    );
+}
+
+#[test]
+fn head_close_reports_when_the_head_is_already_integrated() {
+    let directory = TestDirectory::new("head-close-already-integrated");
+    let repository = create_initialized_project(&directory);
+    commit_all(&repository, "configure Hydra");
+    create_head(&repository, "payment");
+    let head = heads_directory(&repository).join("payment");
+
+    let output = hydra_command()
+        .args(["head", "close", "payment"])
+        .current_dir(&head)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("Integration strategy: target worktree"),
+        "stdout: {stdout}"
+    );
+    assert!(
+        stdout.contains("Integration result: already integrated"),
+        "stdout: {stdout}"
+    );
+    assert!(!head.exists());
+}
+
+#[test]
+fn head_close_reports_dirty_checked_out_target_without_mutation() {
+    let directory = TestDirectory::new("head-close-dirty-target");
+    let repository = create_initialized_project(&directory);
+    commit_all(&repository, "configure Hydra");
+    create_head(&repository, "payment");
+    let head = heads_directory(&repository).join("payment");
+    fs::write(head.join("feature.txt"), b"feature\n").expect("feature should be written");
+    commit_all(&head, "feature");
+    let target_before = revision(&repository, "main");
+    let head_before = revision(&head, "HEAD");
+    let state_before = fs::read(head_state_path(&repository)).expect("state should be readable");
+    fs::write(repository.join("src/app.txt"), b"ongoing\n")
+        .expect("tracked target change should be written");
+    fs::write(repository.join("notes.txt"), b"untracked\n")
+        .expect("untracked target change should be written");
+
+    let output = hydra_command()
+        .args(["head", "close", "payment"])
+        .current_dir(&head)
+        .output()
+        .expect("Hydra CLI should start");
+
     assert!(!output.status.success());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("checked out"));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("1 modified, 0 added, 0 deleted, 1 untracked"),
+        "stderr: {stderr}"
+    );
+    assert!(stderr.contains("target and Head were preserved"));
     assert_eq!(revision(&repository, "main"), target_before);
+    assert_eq!(revision(&head, "HEAD"), head_before);
+    assert_eq!(
+        fs::read(repository.join("src/app.txt")).expect("target file should remain readable"),
+        b"ongoing\n"
+    );
+    assert_eq!(
+        fs::read(repository.join("notes.txt")).expect("untracked file should remain readable"),
+        b"untracked\n"
+    );
+    assert_eq!(
+        fs::read(head_state_path(&repository)).expect("state should remain readable"),
+        state_before
+    );
+    assert!(head.is_dir());
+}
+
+#[test]
+fn head_close_rejects_a_clean_target_with_a_git_operation_in_progress() {
+    let directory = TestDirectory::new("head-close-target-operation");
+    let repository = create_initialized_project(&directory);
+    commit_all(&repository, "configure Hydra");
+    create_head(&repository, "payment");
+    let head = heads_directory(&repository).join("payment");
+    fs::write(head.join("feature.txt"), b"feature\n").expect("feature should be written");
+    commit_all(&head, "feature");
+    let target_before = revision(&repository, "main");
+    let head_before = revision(&head, "HEAD");
+    let merge_head_path = String::from_utf8(
+        run_git(
+            &repository,
+            &[
+                "rev-parse",
+                "--path-format=absolute",
+                "--git-path",
+                "MERGE_HEAD",
+            ],
+        )
+        .stdout,
+    )
+    .expect("MERGE_HEAD path should be UTF-8");
+    fs::write(merge_head_path.trim(), format!("{head_before}\n"))
+        .expect("merge operation marker should be written");
+    assert!(
+        run_git(&repository, &["status", "--porcelain"])
+            .stdout
+            .is_empty()
+    );
+
+    let output = hydra_command()
+        .args(["head", "close", "payment"])
+        .current_dir(&head)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("merge operation in progress"),
+        "stderr: {stderr}"
+    );
+    assert!(stderr.contains("target and Head were preserved"));
+    assert_eq!(revision(&repository, "main"), target_before);
+    assert_eq!(revision(&head, "HEAD"), head_before);
     assert!(head.is_dir());
 }
 
@@ -439,7 +671,6 @@ fn head_close_preserves_both_refs_and_the_head_on_merge_conflict() {
     commit_all(&repository, "target change");
     let target_before = revision(&repository, "main");
     let head_before = revision(&head, "HEAD");
-    park_primary_worktree(&repository);
 
     let output = hydra_command()
         .args(["head", "close", "payment"])
@@ -454,12 +685,80 @@ fn head_close_preserves_both_refs_and_the_head_on_merge_conflict() {
         revision(&repository, "refs/heads/hydra/payment"),
         head_before
     );
+    assert_eq!(
+        fs::read(repository.join("src/app.txt")).expect("target file should remain readable"),
+        b"target\n"
+    );
+    assert!(
+        run_git(&repository, &["status", "--porcelain"])
+            .stdout
+            .is_empty()
+    );
     assert!(head.is_dir());
 }
 
 #[test]
-fn head_close_creates_an_isolated_merge_commit_for_diverged_non_conflicting_work() {
+fn head_close_merges_into_a_clean_checked_out_target_worktree() {
     let directory = TestDirectory::new("head-close-merge");
+    let repository = create_initialized_project(&directory);
+    create_head(&repository, "payment");
+    let head = heads_directory(&repository).join("payment");
+    fs::write(head.join("feature.txt"), b"feature\n").expect("feature should be written");
+    commit_all(&head, "Head feature");
+    let head_commit = revision(&head, "HEAD");
+    fs::write(repository.join("target.txt"), b"target\n").expect("target file should be written");
+    commit_all(&repository, "Target progress");
+    configure_git_identity(&repository);
+    let target_commit = revision(&repository, "main");
+    let canonical_repository =
+        fs::canonicalize(&repository).expect("repository path should be canonicalizable");
+
+    let output = hydra_command()
+        .args(["head", "close", "payment"])
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(
+        output.status.success(),
+        "non-conflicting merge should succeed, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains(&format!(
+            "Integration strategy: target worktree {}",
+            canonical_repository.display()
+        )),
+        "stdout: {stdout}"
+    );
+    assert!(
+        stdout.contains("Integration result: merge commit"),
+        "stdout: {stdout}"
+    );
+    let merged = revision(&repository, "main");
+    let parents =
+        String::from_utf8(run_git(&repository, &["show", "-s", "--format=%P", &merged]).stdout)
+            .expect("parents should be UTF-8");
+    assert_eq!(
+        parents.split_ascii_whitespace().collect::<Vec<_>>(),
+        [target_commit.as_str(), head_commit.as_str()]
+    );
+    assert_eq!(
+        fs::read(repository.join("feature.txt")).expect("Head file should be materialized"),
+        b"feature\n"
+    );
+    assert!(
+        run_git(&repository, &["status", "--porcelain"])
+            .stdout
+            .is_empty()
+    );
+    assert!(!head.exists());
+}
+
+#[test]
+fn head_close_creates_a_checkout_free_merge_when_target_is_not_checked_out() {
+    let directory = TestDirectory::new("head-close-checkout-free-merge");
     let repository = create_initialized_project(&directory);
     create_head(&repository, "payment");
     let head = heads_directory(&repository).join("payment");
@@ -477,10 +776,15 @@ fn head_close_creates_an_isolated_merge_commit_for_diverged_non_conflicting_work
         .output()
         .expect("Hydra CLI should start");
 
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        output.status.success(),
-        "non-conflicting merge should succeed, stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
+        stdout.contains("Integration strategy: checkout-free"),
+        "stdout: {stdout}"
+    );
+    assert!(
+        stdout.contains("Integration result: merge commit"),
+        "stdout: {stdout}"
     );
     let merged = revision(&repository, "main");
     let parents =

@@ -66,9 +66,18 @@ pub enum HeadError {
         reason: String,
     },
     HeadCloseHasUncommittedChanges(String),
-    HeadCloseTargetCheckedOut {
+    HeadCloseTargetWorktreeDirty {
         target_ref: String,
         path: PathBuf,
+        modified: usize,
+        added: usize,
+        deleted: usize,
+        untracked: usize,
+    },
+    HeadCloseTargetWorktreeOperation {
+        target_ref: String,
+        path: PathBuf,
+        operation: &'static str,
     },
     HeadCloseConflict {
         name: String,
@@ -186,7 +195,8 @@ impl fmt::Display for HeadError {
             | Self::HeadRemovalIncomplete { .. } => display_removal_failure(formatter, self),
             Self::HeadCloseInconsistent { .. }
             | Self::HeadCloseHasUncommittedChanges(_)
-            | Self::HeadCloseTargetCheckedOut { .. }
+            | Self::HeadCloseTargetWorktreeDirty { .. }
+            | Self::HeadCloseTargetWorktreeOperation { .. }
             | Self::HeadCloseConflict { .. }
             | Self::InvalidCloseCommand(_)
             | Self::CloseCommandUnavailable { .. }
@@ -318,9 +328,25 @@ fn display_close_failure(formatter: &mut fmt::Formatter<'_>, error: &HeadError) 
                 "Head {name:?} cannot be closed with uncommitted changes"
             )
         }
-        HeadError::HeadCloseTargetCheckedOut { target_ref, path } => write!(
+        HeadError::HeadCloseTargetWorktreeDirty {
+            target_ref,
+            path,
+            modified,
+            added,
+            deleted,
+            untracked,
+        } => write!(
             formatter,
-            "target {target_ref} is checked out at {}; switch that worktree before closing",
+            "target {target_ref} is checked out at {} with uncommitted changes ({modified} modified, {added} added, {deleted} deleted, {untracked} untracked); target and Head were preserved",
+            path.display()
+        ),
+        HeadError::HeadCloseTargetWorktreeOperation {
+            target_ref,
+            path,
+            operation,
+        } => write!(
+            formatter,
+            "target {target_ref} is checked out at {} with a {operation} operation in progress; target and Head were preserved",
             path.display()
         ),
         HeadError::HeadCloseConflict { name, target_ref } => write!(

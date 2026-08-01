@@ -193,7 +193,9 @@ fn head_close_help_documents_integration_and_protected_removal() {
     let stdout = String::from_utf8(output.stdout).expect("help output should be UTF-8");
     assert!(stdout.contains("Usage: hydra head close <NAME>"));
     assert!(stdout.contains("must be clean"));
-    assert!(stdout.contains("without checking it out"));
+    assert!(stdout.contains("checked out in a clean worktree"));
+    assert!(stdout.contains("checkout-free"));
+    assert!(stdout.contains("strategy and result"));
     assert!(stdout.contains("protected removal"));
     assert!(stdout.contains("commands.close"));
     assert!(stdout.contains("removeOnSuccess"));

@@ -20,29 +20,42 @@ Hydra requires a fully consistent recorded Head, readable clean worktree,
 existing private and target refs, and matching worktree branch and commit. A
 dirty, staged, or untracked file blocks close; there is no force option.
 
-For native integration, the target ref must not be checked out in any
-registered worktree. Moving a checked-out ref without updating its files and
-index would make that worktree appear dirty, while updating it in place would
-violate isolation. The native strategy therefore refuses and asks the user to
-switch that worktree to another branch first.
+For native integration, Hydra locates the worktree, if any, that has the target
+ref checked out. A checked-out target must still point to the validated target
+commit, have no Git operation in progress, and contain no staged, modified,
+deleted, or untracked files. A dirty or busy target blocks close before any
+integration or removal mutation and reports the observed condition.
 
 ---
 
-## Checkout-Free Integration
+## Dynamic Native Integration
 
-Hydra snapshots target and Head commits, then selects:
+Hydra snapshots target and Head commits, then selects the integration location:
+
+- when the target ref is checked out in a clean registered worktree, Hydra
+  advances that worktree so its ref, index, and files remain synchronized;
+- when the target ref is not checked out, Hydra publishes the integration
+  checkout-free with compare-and-swap ref updates.
+
+In either location Hydra selects:
 
 - no ref update when the Head is already reachable from the target;
 - compare-and-swap fast-forward when the target is an ancestor of the Head;
-- checkout-free three-way merge when both refs diverged.
+- a prepared three-way merge commit when both refs diverged.
 
-Diverged integration uses:
+Checkout-free diverged integration uses:
 
 ```text
 git merge-tree --write-tree <target-commit> <head-commit>
 git commit-tree <tree> -p <target-commit> -p <head-commit> -m <message>
 git update-ref <target-ref> <new-commit> <expected-target-commit>
 ```
+
+For a checked-out target, Hydra still computes a divergent merge with
+`merge-tree` and `commit-tree`, then fast-forwards the validated target
+worktree to that exact prepared commit. It revalidates the branch, commit,
+operation state, and cleanliness immediately before publication and verifies
+the resulting ref, index, files, and cleanliness afterward.
 
 `commit-tree` uses the repository's normal Git identity configuration. A
 missing author identity is an actionable Git failure and leaves both refs
@@ -65,11 +78,23 @@ target ref and integrated commit separately. It does not roll back a valid
 published integration or force removal; the Head remains available for
 inspection and a later retry.
 
-Success prints:
+Native success prints the integration location and result as well as the
+target commit. For example:
 
 ```text
 Closed Head payment into refs/heads/main at <commit>
+Integration strategy: target worktree /workspace/Shop
+Integration result: fast-forward
 ```
+
+The strategy is `checkout-free` when no worktree has the target checked out;
+the result is `already integrated`, `fast-forward`, or `merge commit`.
+
+Removal commands run from the closing Head use another stable registered
+worktree as their control directory. This permits a Head to close itself after
+successful native integration, and permits configured close adapters with
+`removeOnSuccess` to remove their own Head, without nesting projects or using a
+directory that has just been deleted.
 
 ---
 
@@ -129,7 +154,12 @@ Disposable integration tests prove:
 - diverged non-conflicting histories create a merge commit with target and
   Head parents in that order;
 - conflicts preserve both refs and the physical Head;
-- a target checked out in another worktree is rejected without ref mutation;
+- a clean checked-out target is fast-forwarded or merged with its ref, index,
+  and files synchronized;
+- a dirty checked-out target or target with a Git operation in progress is
+  rejected without integration or removal mutation;
+- a close invoked from the closing Head completes removal through a stable
+  sibling worktree;
 - successful native close uses protected removal for worktree, inventory, and
   private branch cleanup;
 - a successful command can preserve the Head or remove an integrated Head;
