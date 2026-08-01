@@ -8,9 +8,9 @@ This document defines the implemented close workflow:
 hydra head close <name>
 ```
 
-Closing integrates a clean private Head branch into its recorded target and
-then delegates to the protected removal contract in
-[`head-removal.md`](head-removal.md).
+Closing either integrates a clean private Head branch into its recorded target
+or executes the configured close-command adapter. Optional removal always
+delegates to the protected contract in [`head-removal.md`](head-removal.md).
 
 ---
 
@@ -20,11 +20,11 @@ Hydra requires a fully consistent recorded Head, readable clean worktree,
 existing private and target refs, and matching worktree branch and commit. A
 dirty, staged, or untracked file blocks close; there is no force option.
 
-The target ref must not be checked out in any registered worktree. Moving a
-checked-out ref without updating its files and index would make that worktree
-appear dirty, while updating it in place would violate isolation. The current
-implementation therefore refuses and asks the user to switch that worktree to
-another branch first.
+For native integration, the target ref must not be checked out in any
+registered worktree. Moving a checked-out ref without updating its files and
+index would make that worktree appear dirty, while updating it in place would
+violate isolation. The native strategy therefore refuses and asks the user to
+switch that worktree to another branch first.
 
 ---
 
@@ -73,6 +73,54 @@ Closed Head payment into refs/heads/main at <commit>
 
 ---
 
+## Configured Command Adapter
+
+The optional schema-v2 configuration replaces native integration for every
+`head close` invocation in that project:
+
+```json
+{
+  "commands": {
+    "close": {
+      "strategy": "command",
+      "program": "./tools/close-head",
+      "args": ["{path}", "{headRef}", "{targetRef}"],
+      "removeOnSuccess": true
+    }
+  }
+}
+```
+
+`program` and each argument are expanded and passed separately without a
+shell. Supported placeholders are `{name}`, `{path}`, `{headRef}`, `{baseRef}`,
+and `{targetRef}`. Invalid braces, unsupported placeholders, empty programs,
+and NUL bytes are rejected before process creation. The validated Head path is
+the adapter's working directory, and standard input, output, and error are
+inherited.
+
+Hydra snapshots the target commit before execution and observes it again after
+the process exits. A non-zero or signal-based exit preserves the Head and skips
+removal. When the target changed, the error reports both the original and
+observed commits; when it no longer resolves, the error reports that fact.
+Hydra does not attempt to roll back effects produced by trusted project code.
+
+When `removeOnSuccess` is `false`, success preserves the worktree, private
+branch, and inventory. When it is `true`, Hydra calls ordinary protected
+removal without force. An adapter that did not integrate the private commits,
+left changes, or made the Head inconsistent cannot bypass those checks. If
+removal fails, Hydra reports separately that the command completed and leaves
+the recoverable Head state untouched wherever the adapter itself did not alter
+it.
+
+Success prints one of:
+
+```text
+Close command completed for Head payment; Head preserved
+Close command completed for Head payment; Head removed
+```
+
+---
+
 ## Verification Contract
 
 Disposable integration tests prove:
@@ -82,5 +130,10 @@ Disposable integration tests prove:
   Head parents in that order;
 - conflicts preserve both refs and the physical Head;
 - a target checked out in another worktree is rejected without ref mutation;
-- successful close uses protected removal for worktree, inventory, and private
-  branch cleanup.
+- successful native close uses protected removal for worktree, inventory, and
+  private branch cleanup;
+- a successful command can preserve the Head or remove an integrated Head;
+- protected removal failure after command success reports the two phases and
+  preserves the Head;
+- command failure after a target update reports the before/after commits and
+  does not remove the Head.

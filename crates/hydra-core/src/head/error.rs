@@ -65,6 +65,7 @@ pub enum HeadError {
         name: String,
         reason: String,
     },
+    HeadCloseHasUncommittedChanges(String),
     HeadCloseTargetCheckedOut {
         target_ref: String,
         path: PathBuf,
@@ -72,6 +73,25 @@ pub enum HeadError {
     HeadCloseConflict {
         name: String,
         target_ref: String,
+    },
+    InvalidCloseCommand(String),
+    CloseCommandUnavailable {
+        program: String,
+        source: std::io::Error,
+    },
+    CloseCommandFailed {
+        program: String,
+        status: Option<i32>,
+        target_ref: String,
+        target_before: String,
+        target_after: Option<String>,
+    },
+    HeadCloseCommandCompletedButRemovalFailed {
+        name: String,
+        target_ref: String,
+        target_before: String,
+        target_after: Option<String>,
+        source: Box<HeadError>,
     },
     HeadIntegratedButRemovalFailed {
         name: String,
@@ -122,6 +142,9 @@ pub enum HeadError {
 }
 
 impl fmt::Display for HeadError {
+    // Exhaustive routing keeps every public error variant tied to one focused
+    // renderer; splitting this match would weaken compiler-checked coverage.
+    #[allow(clippy::too_many_lines)]
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::GitUnavailable(error) => write!(formatter, "could not run Git: {error}"),
@@ -162,8 +185,13 @@ impl fmt::Display for HeadError {
             | Self::HeadRemovalInconsistent { .. }
             | Self::HeadRemovalIncomplete { .. } => display_removal_failure(formatter, self),
             Self::HeadCloseInconsistent { .. }
+            | Self::HeadCloseHasUncommittedChanges(_)
             | Self::HeadCloseTargetCheckedOut { .. }
             | Self::HeadCloseConflict { .. }
+            | Self::InvalidCloseCommand(_)
+            | Self::CloseCommandUnavailable { .. }
+            | Self::CloseCommandFailed { .. }
+            | Self::HeadCloseCommandCompletedButRemovalFailed { .. }
             | Self::HeadIntegratedButRemovalFailed { .. } => display_close_failure(formatter, self),
             Self::DestinationExists(path) => display_destination_exists(formatter, path),
             Self::BranchAlreadyExists(branch) => {
@@ -284,6 +312,12 @@ fn display_close_failure(formatter: &mut fmt::Formatter<'_>, error: &HeadError) 
         HeadError::HeadCloseInconsistent { name, reason } => {
             write!(formatter, "Head {name:?} cannot be closed safely: {reason}")
         }
+        HeadError::HeadCloseHasUncommittedChanges(name) => {
+            write!(
+                formatter,
+                "Head {name:?} cannot be closed with uncommitted changes"
+            )
+        }
         HeadError::HeadCloseTargetCheckedOut { target_ref, path } => write!(
             formatter,
             "target {target_ref} is checked out at {}; switch that worktree before closing",
@@ -293,6 +327,52 @@ fn display_close_failure(formatter: &mut fmt::Formatter<'_>, error: &HeadError) 
             formatter,
             "Head {name:?} conflicts with {target_ref}; target and Head were preserved"
         ),
+        HeadError::InvalidCloseCommand(reason) => {
+            write!(formatter, "close command is invalid: {reason}")
+        }
+        HeadError::CloseCommandUnavailable { program, source } => {
+            write!(
+                formatter,
+                "could not start close command {program:?}: {source}"
+            )
+        }
+        HeadError::CloseCommandFailed {
+            program,
+            status,
+            target_ref,
+            target_before,
+            target_after,
+        } => {
+            let status = status.map_or_else(|| "unknown".to_owned(), |code| code.to_string());
+            write!(
+                formatter,
+                "close command failed: {program:?} exited with status {status}"
+            )?;
+            display_target_change(
+                formatter,
+                target_ref,
+                target_before,
+                target_after.as_deref(),
+            )
+        }
+        HeadError::HeadCloseCommandCompletedButRemovalFailed {
+            name,
+            target_ref,
+            target_before,
+            target_after,
+            source,
+        } => {
+            write!(
+                formatter,
+                "close command completed for Head {name:?}, but protected removal failed; Head was preserved: {source}"
+            )?;
+            display_target_change(
+                formatter,
+                target_ref,
+                target_before,
+                target_after.as_deref(),
+            )
+        }
         HeadError::HeadIntegratedButRemovalFailed {
             name,
             target_ref,
@@ -303,6 +383,25 @@ fn display_close_failure(formatter: &mut fmt::Formatter<'_>, error: &HeadError) 
             "Head {name:?} was integrated into {target_ref} at {target_commit}, but protected removal failed: {source}"
         ),
         _ => unreachable!("caller selects Head-close failures"),
+    }
+}
+
+fn display_target_change(
+    formatter: &mut fmt::Formatter<'_>,
+    target_ref: &str,
+    target_before: &str,
+    target_after: Option<&str>,
+) -> fmt::Result {
+    match target_after {
+        Some(target_after) if target_after != target_before => write!(
+            formatter,
+            "; target {target_ref} changed from {target_before} to {target_after}"
+        ),
+        None => write!(
+            formatter,
+            "; target {target_ref} no longer resolves (was {target_before})"
+        ),
+        Some(_) => Ok(()),
     }
 }
 
@@ -514,9 +613,9 @@ impl Error for HeadError {
             | Self::InvalidLocalMetadata { source, .. } => Some(source),
             Self::SerializeConfiguration(error) | Self::SerializeState(error) => Some(error),
             Self::Timestamp(error) => Some(error),
-            Self::FileSystem { source, .. } | Self::OpenCommandUnavailable { source, .. } => {
-                Some(source)
-            }
+            Self::FileSystem { source, .. }
+            | Self::OpenCommandUnavailable { source, .. }
+            | Self::CloseCommandUnavailable { source, .. } => Some(source),
             Self::ConfigurationCommittedWithCleanupFailure(original)
             | Self::RollbackFailed { original, .. }
             | Self::HeadCommittedWithCleanupFailure(original)
@@ -524,6 +623,9 @@ impl Error for HeadError {
                 source: original, ..
             }
             | Self::HeadIntegratedButRemovalFailed {
+                source: original, ..
+            }
+            | Self::HeadCloseCommandCompletedButRemovalFailed {
                 source: original, ..
             } => Some(original.as_ref()),
             _ => None,

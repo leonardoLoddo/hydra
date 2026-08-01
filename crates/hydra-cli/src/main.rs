@@ -156,7 +156,7 @@ enum HeadCommand {
     },
     /// Integrate and remove a completed Head
     #[command(
-        long_about = "Integrate and remove a completed Head.\n\nThe Head must be clean. Hydra updates the recorded target without checking it out, then performs protected removal.",
+        long_about = "Integrate or run the configured close adapter for a completed Head.\n\nThe Head must be clean. By default, Hydra updates the recorded target without checking it out, then performs protected removal. When .hydra.json defines commands.close, Hydra runs that adapter instead; removeOnSuccess controls whether protected removal follows a successful command.",
         after_help = "Examples:\n  hydra head close payment"
     )]
     Close {
@@ -539,10 +539,24 @@ fn request_moved_worktree_confirmation(
 fn close_head(name: &str) -> ExitCode {
     match hydra_core::close_head(Path::new("."), name) {
         Ok(closed) => {
-            println!(
-                "Closed Head {} into {} at {}",
-                closed.name, closed.target_ref, closed.target_commit
-            );
+            match closed.outcome {
+                hydra_core::CloseOutcome::Integrated { target_commit } => println!(
+                    "Closed Head {} into {} at {}",
+                    closed.name, closed.target_ref, target_commit
+                ),
+                hydra_core::CloseOutcome::CommandCompleted { removed, .. } if removed => {
+                    println!(
+                        "Close command completed for Head {}; Head removed",
+                        closed.name
+                    );
+                }
+                hydra_core::CloseOutcome::CommandCompleted { .. } => {
+                    println!(
+                        "Close command completed for Head {}; Head preserved",
+                        closed.name
+                    );
+                }
+            }
             ExitCode::SUCCESS
         }
         Err(error) => {

@@ -147,13 +147,19 @@ fn head_create_can_exclude_all_unsafe_overlay_symlinks_and_update_configuration(
         "open": {
             "program": "code",
             "args": ["{path}"]
+        },
+        "close": {
+            "strategy": "command",
+            "program": "./tools/close-head",
+            "args": ["{headRef}", "{targetRef}"],
+            "removeOnSuccess": false
         }
     });
     fs::write(
         &configuration_path,
         serde_json::to_vec_pretty(&configured).expect("configuration should serialize"),
     )
-    .expect("configured opener should be written");
+    .expect("configured commands should be written");
     let outside = directory.path().join("outside-secret");
     fs::write(&outside, b"outside\n").expect("outside file should be written");
     fs::create_dir_all(repository.join("public")).expect("public directory should be created");

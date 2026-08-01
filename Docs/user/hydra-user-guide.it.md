@@ -452,6 +452,147 @@ l'integrazione riesce ma la rimozione protetta fallisce, l'errore indica il
 commit già pubblicato: non tentare di annullarlo manualmente e ripeti la
 diagnostica sulla Head rimasta.
 
+Puoi sostituire l'integrazione nativa con un comando configurato:
+
+```json
+{
+  "commands": {
+    "close": {
+      "strategy": "command",
+      "program": "./tools/close-head",
+      "args": ["{path}", "{headRef}", "{targetRef}"],
+      "removeOnSuccess": true
+    }
+  }
+}
+```
+
+Hydra esegue il programma dalla directory validata della Head, passa ogni
+argomento separatamente e attende il risultato. Il programma è codice fidato
+del progetto: non viene eseguito in una sandbox e può modificare Git, file o
+servizi con i permessi dell'utente.
+
+Con `removeOnSuccess: false`, un comando riuscito conserva worktree, branch e
+inventario:
+
+```text
+Close command completed for Head payment; Head preserved
+```
+
+Con `removeOnSuccess: true`, Hydra tenta successivamente la normale rimozione
+protetta, senza `--force`. L'adapter deve quindi avere integrato i commit nel
+target e lasciato la Head pulita e coerente. Se la rimozione fallisce, Hydra
+distingue il comando già completato dalla rimozione non eseguita e conserva la
+Head.
+
+Se l'adapter termina con un codice non-zero, Hydra non rimuove la Head. Se nel
+frattempo il comando ha modificato o eliminato `targetRef`, l'errore confronta
+il commit osservato prima e dopo. Hydra non tenta un rollback degli effetti
+prodotti da un programma arbitrario.
+
+#### Esempio: esegui una verifica e conserva la Head
+
+In un progetto Rust puoi usare la chiusura come gate esplicito senza integrare
+o rimuovere nulla:
+
+```json
+{
+  "commands": {
+    "close": {
+      "strategy": "command",
+      "program": "cargo",
+      "args": ["test", "--workspace"],
+      "removeOnSuccess": false
+    }
+  }
+}
+```
+
+Con una Head pulita:
+
+```bash
+hydra head close payment
+```
+
+Hydra esegue `cargo test --workspace` dentro la Head. Se i test passano, stampa:
+
+```text
+Close command completed for Head payment; Head preserved
+```
+
+Se i test falliscono, `head close` termina con errore e non tenta la rimozione.
+Sostituisci `cargo` e `args` con il comando di verifica previsto dal tuo
+progetto.
+
+#### Esempio: apri una pull request e conserva la Head
+
+Un progetto ospitato su GitHub può affidare la pubblicazione a uno script
+versionato, mantenendo la Head locale per revisioni successive:
+
+```json
+{
+  "commands": {
+    "close": {
+      "strategy": "command",
+      "program": "./tools/open-head-pr",
+      "args": ["{headRef}", "{targetRef}"],
+      "removeOnSuccess": false
+    }
+  }
+}
+```
+
+Un possibile `tools/open-head-pr` è:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+head_branch=${1#refs/heads/}
+target_branch=${2#refs/heads/}
+
+git push --set-upstream origin "$head_branch"
+gh pr create --head "$head_branch" --base "$target_branch"
+```
+
+Rendi eseguibile e versiona lo script:
+
+```bash
+chmod +x tools/open-head-pr
+git add tools/open-head-pr .hydra.json
+git commit -m "chore: configure Hydra pull request workflow"
+```
+
+Questo esempio richiede GitHub CLI installata e autenticata. Il push e la
+creazione della pull request sono effetti esterni dello script: Hydra non può
+annullarli se `gh` fallisce dopo il push.
+
+#### Esempio: integra tramite uno strumento del progetto e rimuovi
+
+Se il repository possiede già un comando affidabile che integra il branch
+privato nel target locale, puoi chiedere la rimozione successiva:
+
+```json
+{
+  "commands": {
+    "close": {
+      "strategy": "command",
+      "program": "./tools/integrate-head",
+      "args": ["{path}", "{headRef}", "{targetRef}"],
+      "removeOnSuccess": true
+    }
+  }
+}
+```
+
+Prima di restituire exit code zero, `tools/integrate-head` deve lasciare la
+Head pulita e fare in modo che il commit di `{headRef}` sia raggiungibile da
+`{targetRef}`. Deve inoltre evitare di spostare una ref aperta in un'altra
+worktree senza aggiornare in modo coerente file e index. Se una di queste
+condizioni non è soddisfatta, la rimozione protetta fallisce e Hydra conserva
+la Head. Per una normale integrazione Git locale continua a preferire la
+strategia nativa, che implementa già queste protezioni.
+
 ### 4.9 Ripara inventario e worktree
 
 Per confrontare lo stato locale di Hydra con le worktree e i branch Git:
@@ -896,8 +1037,9 @@ Regole:
 - `storage.mode` accetta oggi soltanto `auto`;
 - `overlay.copy` contiene regole Gitignore e direttive `...`.
 
-Per `commands.open`, `program` e ogni valore di `args` vengono passati
-separatamente al processo, senza costruire una stringa di shell. Puoi usare:
+Per `commands.open` e per la strategy `command` di `commands.close`, `program`
+e ogni valore di `args` vengono passati separatamente al processo, senza
+costruire una stringa di shell. Puoi usare:
 
 - `{name}`;
 - `{path}`;
@@ -910,6 +1052,10 @@ I placeholder possono essere parte di un argomento, per esempio
 vengono rifiutate. Le graffe che appartengono al valore espanso di un percorso
 rimangono invece letterali. Il programma configurato è codice fidato del
 progetto e non viene eseguito in una sandbox.
+
+`commands.close.removeOnSuccess` è obbligatorio e decide se Hydra deve tentare
+la rimozione protetta dopo un exit code zero. Non viene passato o espanso nel
+programma.
 
 Hydra rifiuta campi sconosciuti e campi appartenenti a una strategy diversa.
 Versiona `.hydra.json`, ma non inserire percorsi assoluti o informazioni
@@ -1030,7 +1176,6 @@ risolva interamente dentro la root.
 
 Il contratto MVP comprende:
 
-- adapter di chiusura configurabile alternativo all'integrazione Git nativa;
 - pubblicazione dello schema ufficiale della configurazione tramite
   SchemaStore, seguita dalla reintroduzione sicura degli aiuti per editor;
 - installazione automatica del completamento tramite futuri pacchetti o

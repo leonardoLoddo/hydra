@@ -155,6 +155,8 @@ initialization, Head creation, and Head inspection, including:
 - transactional Head metadata publication and creation rollback;
 - protected Head removal with recoverable private-branch preservation;
 - checkout-free Head integration with conflict-safe target publication;
+- validated execution of configured Head-close adapters with optional
+  protected removal;
 - validated execution of configured Head-open adapters without a shell;
 - guided reconciliation of inventory, worktree paths, and private branches;
 - validated read-only inventory loading and Head path resolution;
@@ -197,7 +199,7 @@ Head creation follows the same small-orchestrator rule:
 
 | Module | Responsibility |
 |---|---|
-| `head/close.rs` | Integrate a clean Head into its target without checkout and compose protected removal |
+| `head/close.rs` | Select native or configured close behavior, execute command adapters safely, observe target changes, and compose protected removal |
 | `head.rs` | Validate and orchestrate the complete creation transaction |
 | `head/git.rs` | Discover Git state and own ref, branch, index, worktree, and verification commands |
 | `head/materializer.rs` | Materialize Git tree entries without a standard checkout |

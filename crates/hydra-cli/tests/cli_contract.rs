@@ -195,6 +195,8 @@ fn head_close_help_documents_integration_and_protected_removal() {
     assert!(stdout.contains("must be clean"));
     assert!(stdout.contains("without checking it out"));
     assert!(stdout.contains("protected removal"));
+    assert!(stdout.contains("commands.close"));
+    assert!(stdout.contains("removeOnSuccess"));
     assert!(stdout.contains("hydra head close payment"));
 }
 

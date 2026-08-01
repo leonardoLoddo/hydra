@@ -73,7 +73,10 @@ struct OverlayConfiguration {
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct CommandConfiguration {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     open: Option<OpenCommandConfiguration>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    close: Option<CloseCommandConfiguration>,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -90,6 +93,29 @@ impl OpenCommandConfiguration {
 
     pub(in crate::head) fn args(&self) -> &[String] {
         &self.args
+    }
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(tag = "strategy", rename_all = "camelCase", deny_unknown_fields)]
+pub(in crate::head) enum CloseCommandConfiguration {
+    Command {
+        program: String,
+        args: Vec<String>,
+        #[serde(rename = "removeOnSuccess")]
+        remove_on_success: bool,
+    },
+}
+
+impl CloseCommandConfiguration {
+    pub(in crate::head) fn command(&self) -> (&str, &[String], bool) {
+        match self {
+            Self::Command {
+                program,
+                args,
+                remove_on_success,
+            } => (program, args, *remove_on_success),
+        }
     }
 }
 
@@ -133,6 +159,12 @@ impl ProjectConfiguration {
         self.commands
             .as_ref()
             .and_then(|commands| commands.open.as_ref())
+    }
+
+    pub(super) fn close_command(&self) -> Option<&CloseCommandConfiguration> {
+        self.commands
+            .as_ref()
+            .and_then(|commands| commands.close.as_ref())
     }
 
     pub(super) fn exclude_unsafe_overlay_symlinks(

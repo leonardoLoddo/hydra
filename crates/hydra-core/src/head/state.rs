@@ -16,8 +16,8 @@ use crate::StorageBackend;
 use serde::{Deserialize, Serialize};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
-pub(super) use configuration::OpenCommandConfiguration;
 use configuration::ProjectConfiguration;
+pub(super) use configuration::{CloseCommandConfiguration, OpenCommandConfiguration};
 
 const SUPPORTED_LOCAL_METADATA_VERSION: u32 = 1;
 
@@ -141,6 +141,10 @@ impl StateSnapshot {
 
     pub(super) fn open_command(&self) -> Option<&OpenCommandConfiguration> {
         self.configuration.open_command()
+    }
+
+    pub(super) fn close_command(&self) -> Option<&CloseCommandConfiguration> {
+        self.configuration.close_command()
     }
 }
 
