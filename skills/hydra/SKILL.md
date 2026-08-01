@@ -20,6 +20,12 @@ truth and use only documented Hydra commands for Head lifecycle operations.
    authorized Hydra project setup. Treat the generated `.hydra.json` as shared,
    versioned policy and review it before proposing a commit.
 
+Hydra lifecycle commands may run from the main project worktree or any Head
+that contains the versioned `.hydra.json`. All such worktrees resolve the same
+project locator and inventory. Creating a Head from another Head creates a
+sibling in the project's Heads directory; it never creates a nested Head or a
+second Hydra project hierarchy.
+
 If `.hydra.json` is not part of the selected base commit, it will not appear in
 the new Head. In that case, keep running Hydra lifecycle commands from the
 initialized source worktree; do not copy the configuration or local metadata
@@ -56,8 +62,8 @@ reported error, then stop if ownership or state is ambiguous.
 
 1. Obtain the authoritative directory with `hydra head path <name>`.
 2. Set every task, edit, build, and test command's working directory to that
-   exact path. Use the initialized source worktree only as the control directory
-   for Hydra lifecycle commands when the Head lacks `.hydra.json`.
+   exact path. Use another initialized worktree only as the control directory
+   when the Head lacks `.hydra.json`.
 3. Verify the boundary with:
 
 ```bash
@@ -82,10 +88,9 @@ not modify another worktree to make this task pass.
 - Run the focused checks and complete quality gates required by the repository.
 - Commit only when the user and repository instructions authorize it. Create
   commits only on the Head's private branch; never commit this task from the
-  source worktree or target branch.
-- Use `hydra head status <name>` from the initialized source worktree or another
-  worktree that contains the versioned Hydra configuration when lifecycle state
-  must be checked.
+  target branch.
+- Use `hydra head status <name>` from any initialized worktree when lifecycle
+  state must be checked.
 
 ## Hand off or integrate
 
@@ -93,10 +98,16 @@ Default to leaving a completed Head intact for review. Report its name, path,
 branch, status, tests, and whether its commits have been integrated.
 
 Run `hydra head close <name>` only when the user has authorized integration and
-the Head is clean. This command may update the target ref and remove the Head
-after successful integration. Do not switch branches or alter files in another
-worktree merely to make close succeed; if the target is open elsewhere, report
-the blocker and preserve the Head.
+the Head is clean. The command may run from the main project or any initialized
+Head, including the Head being closed. If the target branch is checked out in
+a clean worktree, Hydra integrates there and keeps its ref, index, and files in
+sync. If the target is not checked out, Hydra integrates checkout-free.
+
+A target worktree with staged, modified, deleted, or untracked files, or with a
+Git operation in progress, blocks close without mutating the target or Head.
+Report the blocker; do not switch branches, stash another task's files, or
+alter another worktree to force integration. Report Hydra's integration
+strategy and result after a successful close.
 
 Use `hydra head remove <name>` only for an authorized removal after inspecting
 the Head. Never use `--force` unless the user explicitly authorizes discarding
