@@ -9,7 +9,7 @@ use super::{
     git::{self, Repository},
     inspection::inspect_head,
     removal::{RemoveHeadOptions, remove_head},
-    state::{CloseCommandConfiguration, StateSnapshot},
+    state::{CloseCommandConfiguration, StateSnapshot, discover_project_repository},
     validate_head_name,
 };
 
@@ -56,7 +56,7 @@ pub enum IntegrationResult {
 /// protected removal cannot complete.
 pub fn close_head(source_path: &Path, name: &str) -> Result<ClosedHead, HeadError> {
     validate_head_name(name)?;
-    let repository = Repository::discover(source_path)?;
+    let repository = discover_project_repository(source_path)?;
     let snapshot = StateSnapshot::load(&repository)?;
     if let Some(command) = snapshot.close_command().cloned() {
         return close_with_command(source_path, name, &repository, &command);

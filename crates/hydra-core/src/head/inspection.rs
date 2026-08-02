@@ -6,7 +6,7 @@ use std::{
 use super::{
     HeadError,
     git::{self, Repository},
-    state::{HeadMetadata, StateSnapshot},
+    state::{HeadMetadata, StateSnapshot, discover_project_repository},
     validate_head_name,
 };
 
@@ -65,7 +65,7 @@ pub struct ChangeCounts {
 /// discovered and validated, or when inventory metadata is malformed or
 /// unsafe.
 pub fn list_heads(source_path: &Path) -> Result<Vec<String>, HeadError> {
-    let repository = Repository::discover(source_path)?;
+    let repository = discover_project_repository(source_path)?;
     let snapshot = StateSnapshot::load(&repository)?;
     let heads_directory = snapshot.heads_directory()?;
     for (name, metadata) in snapshot.heads() {
@@ -81,7 +81,7 @@ pub fn list_heads(source_path: &Path) -> Result<Vec<String>, HeadError> {
 /// Returns [`HeadError`] when the repository or installation is invalid, the
 /// Head is unknown, or its recorded path escapes the owned Heads directory.
 pub fn head_path(source_path: &Path, name: &str) -> Result<PathBuf, HeadError> {
-    let repository = Repository::discover(source_path)?;
+    let repository = discover_project_repository(source_path)?;
     let snapshot = StateSnapshot::load(&repository)?;
     let heads_directory = snapshot.heads_directory()?;
     validated_head_path(&heads_directory, name, snapshot.head(name)?)
@@ -94,7 +94,7 @@ pub fn head_path(source_path: &Path, name: &str) -> Result<PathBuf, HeadError> {
 /// Returns [`HeadError`] when repository discovery, installation validation,
 /// inventory parsing, or a required Git read fails.
 pub fn inspect_project(source_path: &Path) -> Result<ProjectInspection, HeadError> {
-    let repository = Repository::discover(source_path)?;
+    let repository = discover_project_repository(source_path)?;
     let snapshot = StateSnapshot::load(&repository)?;
     let heads_directory = snapshot.heads_directory()?;
     let registered_worktrees = git::worktree_paths(&repository)?;
@@ -137,7 +137,7 @@ pub fn inspect_project(source_path: &Path) -> Result<ProjectInspection, HeadErro
 /// Returns [`HeadError`] when the installation is invalid, the Head is
 /// unknown, its path is unsafe, or a required Git read cannot be completed.
 pub fn inspect_head(source_path: &Path, name: &str) -> Result<HeadInspection, HeadError> {
-    let repository = Repository::discover(source_path)?;
+    let repository = discover_project_repository(source_path)?;
     let snapshot = StateSnapshot::load(&repository)?;
     let heads_directory = snapshot.heads_directory()?;
     let registered_worktrees = git::worktree_paths(&repository)?;

@@ -22,9 +22,11 @@ An implementation gap recorded here does not relax the product requirement.
 `head create` is a nested command. `name` is required; `--from` and `--target`
 are optional.
 
-If `--from` is absent, Hydra resolves `HEAD`. The core returns the created Head
-path and effective aggregate storage backend. The CLI prints them only after
-the worktree and local state have been committed:
+If `--from` is absent, Hydra resolves `HEAD` in the canonical parent project.
+This remains true when the command is invoked from a managed Head: that Head's
+private branch and working files do not become implicit creation inputs. The
+core returns the created Head path and effective aggregate storage backend.
+The CLI prints them only after the worktree and local state have been committed:
 
 ```text
 New Head successfully created at <absolute-path>
@@ -149,7 +151,7 @@ The configured `branchPrefix` is prepended to the name. Git then validates the
 complete private branch name. Hydra refuses a duplicate state entry,
 pre-existing destination, or pre-existing private branch before mutation.
 
-The base is resolved to both:
+The base is resolved in the canonical parent repository to both:
 
 - `baseCommit`, using `<from>^{commit}`;
 - `baseRef`, normalized to its full symbolic ref when one exists.
@@ -167,7 +169,8 @@ are rejected before symbolic normalization.
 
 ## Configuration and State Boundary
 
-Head creation reads:
+Head creation reads the parent project's current configuration and shared local
+state, regardless of which managed Head invoked the command:
 
 | Data | Path |
 |---|---|
@@ -224,6 +227,12 @@ overwritten. The configuration update is a separately authorized durable
 result: if a later full-copy prompt is declined or Head creation fails for an
 unrelated reason, the accepted exclusions remain versioned working-tree
 changes.
+
+Tracked materialization and overlay planning also use the canonical parent
+project as their source. A dirty or divergent calling Head therefore cannot
+leak its tracked files, ignored overlays, or configuration changes into a new
+sibling Head unless the user names an explicit committed ref available to the
+parent repository.
 
 ---
 

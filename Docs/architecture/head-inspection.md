@@ -21,9 +21,11 @@ creation and state publication remain owned by
 ## Read-only Boundary
 
 Every inspection begins with Git repository and common-directory discovery,
-then reuses the same schema-v2 configuration, local locator, directory marker,
-ownership, policy, worktree-boundary, and inventory validation used by Head
-creation.
+then normalizes to the locator's canonical parent project and reuses the same
+schema-v2 configuration, directory marker, ownership, policy,
+worktree-boundary, and inventory validation used by Head creation. `hydra
+status` therefore reports the parent `projectRoot` even when invoked from a
+Head, and does not depend on that Head's copy of `.hydra.json`.
 
 Inspection reads `heads.json` without acquiring `heads.json.lock`. It MUST NOT:
 

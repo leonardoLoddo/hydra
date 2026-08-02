@@ -12,24 +12,31 @@ truth and use only documented Hydra commands for Head lifecycle operations.
 
 1. Run `hydra --version` and `hydra --help`. Never assume an installed build
    supports a command or option that its help does not show.
-2. Resolve the repository root with `git rev-parse --show-toplevel` and inspect
-   `git status --short --branch`.
-3. Check whether `.hydra.json` exists at the repository root.
-4. If the project is initialized, run `hydra status` before any mutation.
-5. If it is not initialized, run `hydra init [PATH]` only when the user has
+2. Resolve the current worktree root with `git rev-parse --show-toplevel` and
+   inspect `git status --short --branch`.
+3. Run `hydra status` before mutation. Its `Project:` line is the canonical
+   parent root even when the current worktree is a Head.
+4. If Hydra reports that the project is not initialized, run `hydra init
+   [PATH]` only when the user has
    authorized Hydra project setup. Treat the generated `.hydra.json` as shared,
    versioned policy and review it before proposing a commit.
 
-Hydra lifecycle commands may run from the main project worktree or any Head
-that contains the versioned `.hydra.json`. All such worktrees resolve the same
-project locator and inventory. Creating a Head from another Head creates a
-sibling in the project's Heads directory; it never creates a nested Head or a
-second Hydra project hierarchy.
+Hydra lifecycle commands may run from the main project worktree or any managed
+Head. Hydra uses the shared locator to normalize every invocation to the
+canonical parent project, even when `.hydra.json` is missing or stale in the
+calling Head. Configuration, Git defaults, overlays, project reporting, and
+inventory therefore behave exactly as if the command ran from the parent.
+Creating a Head from another Head creates a sibling in the project's Heads
+directory; it never creates a nested Head or a second Hydra project hierarchy.
+Without explicit `--from` or `--target`, use the parent project's `HEAD` and
+local branch, never the calling Head's private branch or files.
+Running `hydra init` from a managed Head must report the canonical parent as
+already initialized, never initialize the Head as a separate project.
 
 If `.hydra.json` is not part of the selected base commit, it will not appear in
-the new Head. In that case, keep running Hydra lifecycle commands from the
-initialized source worktree; do not copy the configuration or local metadata
-into the Head merely to make discovery work.
+the new Head. Hydra lifecycle discovery still works through the shared locator;
+do not copy configuration or local metadata into the Head merely to make it
+work.
 
 Do not assume uncommitted changes in the current worktree will enter a new
 Head. A Head starts from the commit resolved by `--from`. If another task owns
@@ -62,8 +69,8 @@ reported error, then stop if ownership or state is ambiguous.
 
 1. Obtain the authoritative directory with `hydra head path <name>`.
 2. Set every task, edit, build, and test command's working directory to that
-   exact path. Use another initialized worktree only as the control directory
-   when the Head lacks `.hydra.json`.
+   exact path. Lifecycle commands may still be launched there because Hydra
+   resolves their control context to the parent project.
 3. Verify the boundary with:
 
 ```bash
@@ -108,6 +115,10 @@ Git operation in progress, blocks close without mutating the target or Head.
 Report the blocker; do not switch branches, stash another task's files, or
 alter another worktree to force integration. Report Hydra's integration
 strategy and result after a successful close.
+
+When closing the Head from its own directory, expect that directory to be
+removed on success. Change the caller's working directory to the parent project
+or another surviving Head before issuing subsequent commands.
 
 Use `hydra head remove <name>` only for an authorized removal after inspecting
 the Head. Never use `--force` unless the user explicitly authorizes discarding

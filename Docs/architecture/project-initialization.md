@@ -105,6 +105,23 @@ stores canonical absolute `projectRoot` and `headsDirectory` paths so every
 linked worktree can bootstrap from the same Git common directory without
 resolving the policy against its own root.
 
+### Canonical lifecycle context
+
+After initialization, every lifecycle command first discovers the caller's Git
+common directory and reads its local locator. Hydra then validates that the
+locator's canonical `projectRoot` belongs to that same Git common directory and
+uses the resulting parent repository as the command context.
+
+Consequently, invoking Hydra from a managed Head is equivalent to invoking it
+from the parent project for configuration loading, Git defaults, overlay
+sources, project reporting, and state ownership. The calling Head does not need
+to contain `.hydra.json`, and its private branch, working files, or stale copy
+of the configuration cannot redefine the project context. Adapters that
+explicitly operate on a selected Head still run in that validated Head path.
+Re-running `hydra init` from a managed Head resolves the same parent and reports
+that parent's configuration as already initialized; it never attempts to
+initialize the Head as a separate project.
+
 ---
 
 ## Initial Persisted Data

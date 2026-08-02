@@ -5,7 +5,7 @@ use std::{fs, path::Path, process::Command};
 #[cfg(unix)]
 use std::os::unix::fs::symlink;
 
-use common::{TestDirectory, hydra_command};
+use common::{TestDirectory, create_initialized_project, heads_directory, hydra_command};
 
 fn initialize_repository(path: &Path) {
     let git = Command::new("git")
@@ -37,6 +37,38 @@ fn init_rejects_a_directory_outside_a_git_repository() {
         !directory.path().join(".hydra.json").exists(),
         "failed initialization must not create project configuration"
     );
+}
+
+#[test]
+fn init_from_a_head_reports_the_canonical_parent_as_already_initialized() {
+    let directory = TestDirectory::new("init-from-head");
+    let repository = create_initialized_project(&directory);
+    let output = hydra_command()
+        .args(["head", "create", "payment"])
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+    assert!(output.status.success());
+    let head = heads_directory(&repository).join("payment");
+
+    let output = hydra_command()
+        .arg("init")
+        .current_dir(&head)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(!output.status.success());
+    let parent_configuration = fs::canonicalize(&repository)
+        .expect("parent repository should resolve")
+        .join(".hydra.json");
+    assert_eq!(
+        String::from_utf8_lossy(&output.stderr),
+        format!(
+            "error: Hydra is already initialized at {}\n",
+            parent_configuration.display()
+        )
+    );
+    assert!(!head.join(".hydra.json").exists());
 }
 
 #[test]

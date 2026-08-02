@@ -273,10 +273,11 @@ condividere working tree o index con il repository originale o con altre Head.
 
 ### 4.4 Usa Hydra da una Head esistente
 
-Se `.hydra.json` è stato committato ed è quindi presente nella Head, tutti i
-comandi Hydra possono essere eseguiti anche da lì. Il locator nel Git common
-directory identifica sempre lo stesso progetto e lo stesso inventario locale.
-Per esempio:
+Tutti i comandi Hydra possono essere eseguiti dal progetto principale o da una
+qualsiasi Head gestita. Il locator nel Git common directory riporta sempre il
+comando al `projectRoot` canonico: Hydra usa la configurazione corrente, la
+`HEAD`, gli overlay e l'inventario del progetto padre anche se `.hydra.json`
+manca nella Head chiamante o contiene una versione precedente. Per esempio:
 
 ```bash
 cd /workspace/Shop.heads/payment
@@ -292,7 +293,17 @@ hydra head create auth
 La posizione non viene ricalcolata rispetto a `payment`: le Head sono sorelle
 del progetto principale e non formano una gerarchia annidata. Una Head non può
 quindi possedere proprie sotto-Head indipendenti; può soltanto operare sulle
-Head dello stesso progetto Hydra.
+Head dello stesso progetto Hydra. Senza `--from` e `--target`, `auth` usa la
+`HEAD` e il branch locale del progetto padre, non `hydra/payment`; file tracked,
+overlay e modifiche locali di `payment` non vengono ereditati implicitamente.
+
+Anche `hydra init` lanciato da una Head riconosce l'inizializzazione del padre:
+segnala la configurazione canonica già esistente e non prova a trasformare la
+Head in un progetto Hydra separato.
+
+Se chiudi la Head dalla sua stessa directory, Hydra può rimuoverla in sicurezza
+ma la shell resta posizionata su un percorso ormai eliminato. Dopo il comando
+spostati nel progetto padre o in un'altra Head prima di eseguire altri comandi.
 
 ### 4.5 Elenca e ispeziona le Head
 

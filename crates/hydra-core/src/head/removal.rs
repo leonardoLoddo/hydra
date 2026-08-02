@@ -6,7 +6,7 @@ use std::{
 use super::{
     HeadError,
     git::{self, Repository},
-    state::StateTransaction,
+    state::{StateTransaction, discover_project_repository},
     validate_head_name,
 };
 
@@ -35,7 +35,7 @@ pub fn remove_head(
     options: RemoveHeadOptions,
 ) -> Result<RemovedHead, HeadError> {
     validate_head_name(&options.name)?;
-    let repository = Repository::discover(source_path)?;
+    let repository = discover_project_repository(source_path)?;
     let transaction = StateTransaction::open(&repository)?;
     let prepared = match prepare_removal(&repository, &transaction, &options) {
         Ok(prepared) => prepared,

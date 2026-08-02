@@ -144,6 +144,8 @@ inspection independent of the terminal interface. It currently owns project
 initialization, Head creation, and Head inspection, including:
 
 - Git repository and common-directory discovery;
+- canonical parent-project resolution for lifecycle commands invoked from any
+  managed Head;
 - derivation and validation of initialization paths;
 - configuration and local-state serialization;
 - real storage capability probing on the Heads volume;

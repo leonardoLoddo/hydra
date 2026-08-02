@@ -31,6 +31,53 @@ struct DirectoryMarker {
     installation_id: String,
 }
 
+pub(super) fn discover_project_repository(source_path: &Path) -> Result<Repository, HeadError> {
+    let source_repository = Repository::discover(source_path)?;
+    let locator_path = source_repository
+        .git_common_directory
+        .join("hydra")
+        .join(LOCATOR_FILE_NAME);
+    if let Err(source) = fs::symlink_metadata(&locator_path) {
+        if source.kind() == std::io::ErrorKind::NotFound {
+            return Err(HeadError::ProjectNotInitialized(
+                source_repository.root.join(".hydra.json"),
+            ));
+        }
+        return Err(HeadError::FileSystem {
+            action: "inspect Hydra project file",
+            path: locator_path,
+            source,
+        });
+    }
+    validate_regular_file(&locator_path)?;
+    let locator: ProjectLocator = read_local_metadata(
+        &locator_path,
+        "project locator",
+        "read local project locator",
+    )?;
+    validate_local_metadata_version("project locator", locator.version)?;
+    if !locator.project_root.is_absolute() {
+        return Err(HeadError::UnsafeHeadsDirectory(locator.project_root));
+    }
+    validate_real_directory(&locator.project_root)?;
+
+    let project_repository = Repository::discover(&locator.project_root)?;
+    let source_common = canonicalize_git_directory(&source_repository.git_common_directory)?;
+    let project_common = canonicalize_git_directory(&project_repository.git_common_directory)?;
+    if source_common != project_common {
+        return Err(HeadError::LocalIdentityMismatch(locator_path));
+    }
+    Ok(project_repository)
+}
+
+fn canonicalize_git_directory(path: &Path) -> Result<PathBuf, HeadError> {
+    fs::canonicalize(path).map_err(|source| HeadError::FileSystem {
+        action: "resolve Git common directory",
+        path: path.to_path_buf(),
+        source,
+    })
+}
+
 pub(super) fn inventory_path(
     configuration: &ProjectConfiguration,
     repository: &Repository,

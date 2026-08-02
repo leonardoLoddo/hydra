@@ -21,6 +21,10 @@ pub(super) use configuration::{CloseCommandConfiguration, OpenCommandConfigurati
 
 const SUPPORTED_LOCAL_METADATA_VERSION: u32 = 1;
 
+pub(super) fn discover_project_repository(source_path: &Path) -> Result<Repository, HeadError> {
+    installation::discover_project_repository(source_path)
+}
+
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct LocalState {

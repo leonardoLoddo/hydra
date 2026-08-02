@@ -10,8 +10,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use serde::Deserialize;
+
 use configuration::serialize_initial_metadata;
-use git::{discover_repository, repository_name_as_str};
+use git::{Repository, discover_repository, repository_name_as_str};
 use persistence::{InitialFiles, create_initial_files};
 
 pub use error::{CleanupFailure, InitError};
@@ -23,6 +25,14 @@ const LOCATOR_FILE_NAME: &str = "project.json";
 const HEADS_METADATA_DIRECTORY_NAME: &str = ".hydra";
 const DIRECTORY_MARKER_FILE_NAME: &str = "directory.json";
 const STATE_FILE_NAME: &str = "heads.json";
+const SUPPORTED_LOCATOR_VERSION: u32 = 1;
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ExistingProjectLocator {
+    version: u32,
+    project_root: PathBuf,
+}
 
 #[derive(Debug)]
 pub struct InitializedProject {
@@ -39,7 +49,7 @@ pub struct InitializedProject {
 /// already exists, configuration cannot be serialized, or a filesystem
 /// operation fails. Validation errors occur before Hydra creates any artifact.
 pub fn initialize(path: &Path) -> Result<InitializedProject, InitError> {
-    let repository = discover_repository(path)?;
+    let repository = canonical_parent_repository(discover_repository(path)?);
     let repository_name = repository
         .root
         .file_name()
@@ -88,6 +98,38 @@ pub fn initialize(path: &Path) -> Result<InitializedProject, InitError> {
         heads_directory,
         storage_backend,
     })
+}
+
+fn canonical_parent_repository(repository: Repository) -> Repository {
+    let state_directory = repository.git_common_directory.join(STATE_DIRECTORY_NAME);
+    let locator_path = state_directory.join(LOCATOR_FILE_NAME);
+    let is_real_directory = fs::symlink_metadata(&state_directory)
+        .is_ok_and(|metadata| metadata.is_dir() && !metadata.file_type().is_symlink());
+    let is_real_file = fs::symlink_metadata(&locator_path)
+        .is_ok_and(|metadata| metadata.is_file() && !metadata.file_type().is_symlink());
+    if !is_real_directory || !is_real_file {
+        return repository;
+    }
+    let Some(locator) = fs::read(&locator_path)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<ExistingProjectLocator>(&bytes).ok())
+    else {
+        return repository;
+    };
+    if locator.version != SUPPORTED_LOCATOR_VERSION || !locator.project_root.is_absolute() {
+        return repository;
+    }
+    let Ok(project_repository) = discover_repository(&locator.project_root) else {
+        return repository;
+    };
+    if let (Ok(source_common), Ok(project_common)) = (
+        fs::canonicalize(&repository.git_common_directory),
+        fs::canonicalize(&project_repository.git_common_directory),
+    ) && source_common == project_common
+    {
+        return project_repository;
+    }
+    repository
 }
 
 fn validate_destinations(

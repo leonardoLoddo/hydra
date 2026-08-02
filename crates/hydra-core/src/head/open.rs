@@ -9,7 +9,7 @@ use super::{
     HeadError,
     git::{self, Repository},
     inspection::validated_head_path,
-    state::{HeadMetadata, StateSnapshot},
+    state::{HeadMetadata, StateSnapshot, discover_project_repository},
     validate_head_name,
 };
 
@@ -28,7 +28,7 @@ pub struct OpenedHead {
 /// started, or the adapter exits unsuccessfully.
 pub fn open_head(source_path: &Path, name: &str) -> Result<OpenedHead, HeadError> {
     validate_head_name(name)?;
-    let repository = Repository::discover(source_path)?;
+    let repository = discover_project_repository(source_path)?;
     let snapshot = StateSnapshot::load(&repository)?;
     let path = validated_head_path(&snapshot.heads_directory()?, name, snapshot.head(name)?)?;
     validate_worktree(&repository, name, snapshot.head(name)?, &path)?;

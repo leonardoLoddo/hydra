@@ -90,6 +90,10 @@ fn head_create_help_uses_the_documented_nested_syntax() {
         stdout.contains("starts at <REF>") && stdout.contains("uses <BRANCH>"),
         "help should use the public option placeholders consistently, got: {stdout:?}"
     );
+    assert!(
+        stdout.contains("canonical parent project"),
+        "help should explain that invocation from a Head uses the parent context, got: {stdout:?}"
+    );
     assert!(stdout.contains("--target <BRANCH>"));
     assert!(
         stdout.contains("local branch"),

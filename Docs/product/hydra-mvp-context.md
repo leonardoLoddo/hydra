@@ -347,6 +347,13 @@ nella directory comune delle Head, accanto alle istanze che descrivono.
 collaboratori condividono quindi il primo ma possiedono locator, directory Head
 e `installationId` differenti.
 
+Il `projectRoot` canonico nel locator definisce inoltre il contesto di ogni
+comando Hydra dopo l'inizializzazione. Se il comando viene lanciato da una Head,
+Hydra usa configurazione, default Git, overlay e inventario del progetto padre
+esattamente come se fosse stato lanciato da quel progetto. La Head chiamante
+non crea un sottoprogetto e il suo branch privato non diventa implicitamente
+base o target di nuove Head.
+
 ### Configurazione iniziale
 
 Il contratto condiviso target usa una politica portabile anziché un percorso
@@ -630,7 +637,8 @@ hydra head create payment --from beta
 hydra head create payment --from beta --target beta
 ```
 
-Se `--from` non è specificato, Hydra usa l’`HEAD` corrente come origine.
+Se `--from` non è specificato, Hydra usa l’`HEAD` del progetto padre canonico
+come origine. Questo vale anche quando il comando viene invocato da una Head.
 
 Hydra:
 
@@ -682,7 +690,9 @@ poter essere composto con shell, IDE e automazioni.
 
 `hydra status` mostra il progetto, la directory fisica delle Head e una sintesi
 `clean`, `modified` o `inconsistent` per ogni Head. `hydra head status` espone
-il dettaglio. Branch, commit e modifiche descrivono la `HEAD` realmente aperta
+il dettaglio. Il progetto mostrato è sempre il `projectRoot` canonico del
+locator, anche quando il comando parte da una Head. Branch, commit e modifiche
+descrivono la `HEAD` realmente aperta
 nella worktree. Se differisce dalla `headRef` registrata, Hydra mostra entrambe
 e segnala l'incoerenza.
 

@@ -90,7 +90,7 @@ fn configure_close(repository: &Path, program: &str, args: &[&str], remove_on_su
 }
 
 #[test]
-fn custom_close_can_complete_without_removing_the_head() {
+fn custom_close_from_a_head_uses_current_parent_config_and_preserves_the_head() {
     let directory = TestDirectory::new("head-close-custom-preserve");
     let repository = create_initialized_project(&directory);
     create_head(&repository, "payment");
@@ -112,7 +112,7 @@ fn custom_close_can_complete_without_removing_the_head() {
 
     let output = hydra_command()
         .args(["head", "close", "payment"])
-        .current_dir(&repository)
+        .current_dir(&head)
         .output()
         .expect("Hydra CLI should start");
 

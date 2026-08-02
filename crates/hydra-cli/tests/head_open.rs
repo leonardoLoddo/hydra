@@ -61,7 +61,7 @@ fn head_open_requires_an_explicit_configured_command_without_mutation() {
 }
 
 #[test]
-fn head_open_expands_every_supported_placeholder_as_separate_arguments() {
+fn head_open_from_a_head_uses_parent_config_and_expands_placeholders() {
     let directory = TestDirectory::new("head-open-placeholders");
     let repository = create_initialized_project(&directory);
     create_head(&repository, "payment");
@@ -82,7 +82,7 @@ fn head_open_expands_every_supported_placeholder_as_separate_arguments() {
 
     let output = hydra_command()
         .args(["head", "open", "payment"])
-        .current_dir(&repository)
+        .current_dir(&head)
         .output()
         .expect("Hydra CLI should start");
 

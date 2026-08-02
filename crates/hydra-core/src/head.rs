@@ -27,12 +27,12 @@ pub use open::{OpenedHead, open_head};
 use overlay::{OverlayPlan, materialize_overlays, plan_overlays};
 pub use removal::{RemoveHeadOptions, RemovedHead, remove_head};
 pub use repair::{RepairIssue, RepairPlan, RepairResult, apply_repairs, plan_repairs};
-use state::{HeadMetadata, StateSnapshot, StateTransaction};
+use state::{HeadMetadata, StateSnapshot, StateTransaction, discover_project_repository};
 
 use crate::StorageBackend;
 
 pub(crate) fn validated_heads_directory(source_path: &Path) -> Result<PathBuf, HeadError> {
-    let repository = Repository::discover(source_path)?;
+    let repository = discover_project_repository(source_path)?;
     StateSnapshot::load(&repository)?.heads_directory()
 }
 
@@ -109,7 +109,7 @@ pub fn create_head_with_progress(
 ) -> Result<CreatedHead, HeadError> {
     validate_head_name(&options.name)?;
 
-    let repository = Repository::discover(source_path)?;
+    let repository = discover_project_repository(source_path)?;
     let mut transaction = StateTransaction::open(&repository)?;
     let mut report_progress = ProgressReporter::new(report_progress);
 

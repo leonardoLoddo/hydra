@@ -1,6 +1,6 @@
 mod common;
 
-use std::{fs, process::Stdio};
+use std::{fs, path::Path, process::Stdio};
 
 use common::{
     TestDirectory, create_initialized_project, head_state_path, heads_directory, hydra_command,
@@ -42,6 +42,92 @@ fn relocate_heads_directory(
         serde_json::to_vec_pretty(&locator).expect("locator should serialize"),
     )
     .expect("locator should be updated");
+}
+
+fn commit_all(repository: &Path, message: &str) {
+    let output = run_git(repository, &["add", "--all"]);
+    assert!(output.status.success());
+    let output = run_git(
+        repository,
+        &[
+            "-c",
+            "user.name=Hydra Tests",
+            "-c",
+            "user.email=hydra-tests@example.invalid",
+            "commit",
+            "--quiet",
+            "-m",
+            message,
+        ],
+    );
+    assert!(output.status.success());
+}
+
+fn create_head(repository: &Path, name: &str) {
+    let output = hydra_command()
+        .args(["head", "create", name])
+        .current_dir(repository)
+        .output()
+        .expect("Hydra CLI should start");
+    assert!(
+        output.status.success(),
+        "Head creation should succeed, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+fn close_head_from(head: &Path, name: &str) {
+    let output = hydra_command()
+        .args(["head", "close", name])
+        .current_dir(head)
+        .output()
+        .expect("Hydra CLI should start");
+    assert!(
+        output.status.success(),
+        "Head {name} should close from itself, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+fn assert_status_uses_parent(head: &Path, repository: &Path) {
+    let output = hydra_command()
+        .arg("status")
+        .current_dir(head)
+        .output()
+        .expect("Hydra CLI should start");
+    assert!(
+        output.status.success(),
+        "status from a Head should use the parent configuration, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let parent = fs::canonicalize(repository).expect("repository should resolve");
+    assert!(
+        String::from_utf8_lossy(&output.stdout)
+            .starts_with(&format!("Project: {}\n", parent.display())),
+        "status should identify the canonical parent project"
+    );
+}
+
+fn assert_auth_uses_parent_context(repository: &Path, auth: &Path, parent_commit: &str) {
+    let state: serde_json::Value = serde_json::from_slice(
+        &fs::read(head_state_path(repository)).expect("state should be readable"),
+    )
+    .expect("state should be valid JSON");
+    assert!(state["heads"]["payment"].is_object());
+    assert!(state["heads"]["auth"].is_object());
+    assert_eq!(state["heads"]["auth"]["baseRef"], "refs/heads/main");
+    assert_eq!(state["heads"]["auth"]["baseCommit"], parent_commit);
+    assert_eq!(state["heads"]["auth"]["targetRef"], "refs/heads/main");
+    assert_eq!(
+        fs::read(auth.join("src/app.txt")).expect("auth source should be readable"),
+        b"base\n",
+        "tracked files should come from the parent project's HEAD"
+    );
+    assert_eq!(
+        fs::read(auth.join(".env")).expect("auth overlay should be readable"),
+        b"parent overlay\n",
+        "overlays should come from the parent project rather than the calling Head"
+    );
 }
 
 #[test]
@@ -188,49 +274,32 @@ fn head_create_rejects_the_unpublished_json_schema_annotation() {
 }
 
 #[test]
-fn head_create_uses_the_same_heads_directory_when_invoked_from_a_head() {
+fn commands_from_a_head_use_the_parent_project_context() {
     let directory = TestDirectory::new("head-create-from-head");
     let repository = create_initialized_project(&directory);
-    let output = run_git(&repository, &["add", ".hydra.json"]);
+    fs::write(repository.join(".gitignore"), b".env\n").expect("overlay rules should be written");
+    fs::write(repository.join(".env"), b"parent overlay\n")
+        .expect("parent overlay should be written");
+    commit_all(&repository, "track Hydra configuration");
+    let output = run_git(&repository, &["rev-parse", "main"]);
     assert!(output.status.success());
-    let output = run_git(
-        &repository,
-        &[
-            "-c",
-            "user.name=Hydra Tests",
-            "-c",
-            "user.email=hydra-tests@example.invalid",
-            "commit",
-            "--quiet",
-            "-m",
-            "track Hydra configuration",
-        ],
-    );
-    assert!(output.status.success());
+    let parent_commit = String::from_utf8(output.stdout)
+        .expect("parent commit should be UTF-8")
+        .trim()
+        .to_owned();
 
-    let first = hydra_command()
-        .args(["head", "create", "payment"])
-        .current_dir(&repository)
-        .output()
-        .expect("Hydra CLI should start");
-    assert!(
-        first.status.success(),
-        "first Head creation should succeed, stderr: {}",
-        String::from_utf8_lossy(&first.stderr)
-    );
-
+    create_head(&repository, "payment");
     let payment = directory.path().join("SampleProject.heads/payment");
-    let second = hydra_command()
-        .args(["head", "create", "auth"])
-        .current_dir(&payment)
-        .output()
-        .expect("Hydra CLI should start");
+    fs::write(payment.join("src/app.txt"), b"payment progress\n")
+        .expect("payment progress should be written");
+    commit_all(&payment, "payment progress");
+    fs::write(payment.join(".env"), b"payment overlay\n")
+        .expect("payment overlay should be changed");
+    fs::remove_file(payment.join(".hydra.json"))
+        .expect("Head configuration should be removable for discovery coverage");
 
-    assert!(
-        second.status.success(),
-        "creation from a Head should use the installation locator, stderr: {}",
-        String::from_utf8_lossy(&second.stderr)
-    );
+    assert_status_uses_parent(&payment, &repository);
+    create_head(&payment, "auth");
     assert!(directory.path().join("SampleProject.heads/auth").is_dir());
     assert!(
         !directory
@@ -239,12 +308,25 @@ fn head_create_uses_the_same_heads_directory_when_invoked_from_a_head() {
             .exists(),
         "the versioned sibling policy must not be resolved relative to the current Head"
     );
-    let state: serde_json::Value = serde_json::from_slice(
-        &fs::read(head_state_path(&repository)).expect("state should be readable"),
-    )
-    .expect("state should be valid JSON");
-    assert!(state["heads"]["payment"].is_object());
-    assert!(state["heads"]["auth"].is_object());
+    let auth = directory.path().join("SampleProject.heads/auth");
+    assert_auth_uses_parent_context(&repository, &auth, &parent_commit);
+
+    let output = run_git(&payment, &["restore", ".hydra.json"]);
+    assert!(output.status.success());
+    close_head_from(&payment, "payment");
+
+    let auth_status = hydra_command()
+        .args(["head", "status", "auth"])
+        .current_dir(&auth)
+        .output()
+        .expect("Hydra CLI should start");
+    assert!(
+        auth_status.status.success(),
+        "the sibling should remain consistent after closing the calling Head: {}",
+        String::from_utf8_lossy(&auth_status.stderr)
+    );
+    assert!(String::from_utf8_lossy(&auth_status.stdout).contains("Consistency: ok"));
+    close_head_from(&auth, "auth");
 }
 
 #[test]

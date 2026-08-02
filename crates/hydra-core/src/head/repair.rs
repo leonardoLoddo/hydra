@@ -8,7 +8,7 @@ use super::{
     HeadError,
     git::{self, RegisteredWorktree, Repository},
     inspection::validated_head_path,
-    state::{HeadMetadata, StateSnapshot, StateTransaction},
+    state::{HeadMetadata, StateSnapshot, StateTransaction, discover_project_repository},
 };
 
 #[derive(Debug)]
@@ -84,7 +84,7 @@ pub struct RepairResult {
 /// Returns [`HeadError`] when repository discovery, installation validation,
 /// inventory parsing, or Git worktree discovery fails.
 pub fn plan_repairs(source_path: &Path) -> Result<RepairPlan, HeadError> {
-    let repository = Repository::discover(source_path)?;
+    let repository = discover_project_repository(source_path)?;
     let snapshot = StateSnapshot::load(&repository)?;
     build_plan(
         &repository,
@@ -108,7 +108,7 @@ pub fn apply_repairs(
     approved_stale_inventory: &[String],
     approved_moved_worktrees: &[String],
 ) -> Result<RepairResult, HeadError> {
-    let repository = Repository::discover(source_path)?;
+    let repository = discover_project_repository(source_path)?;
     let transaction = StateTransaction::open(&repository)?;
     let plan = match build_plan(
         &repository,

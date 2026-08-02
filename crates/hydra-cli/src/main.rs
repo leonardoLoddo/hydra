@@ -104,13 +104,13 @@ enum DoctorCommand {
 enum HeadCommand {
     /// Create a new isolated Head
     #[command(
-        long_about = "Create a new isolated Head.\n\nThe new Head starts at <REF> and uses <BRANCH> as its local integration branch.",
+        long_about = "Create a new isolated Head.\n\nThe new Head starts at <REF> and uses <BRANCH> as its local integration branch. When invoked from an existing Hydra Head, configuration, HEAD defaults, and overlays come from the canonical parent project exactly as if the command ran there.",
         after_help = "Examples:\n  hydra head create payment\n  hydra head create payment --from beta\n  hydra head create payment --from beta --target main"
     )]
     Create {
         /// Name for the new Head
         name: String,
-        /// Start the Head at this Git ref or commit (default: HEAD)
+        /// Start at this ref or commit (default: canonical parent project HEAD)
         #[arg(long, value_name = "REF")]
         from: Option<String>,
         /// Set the local branch used for integration
