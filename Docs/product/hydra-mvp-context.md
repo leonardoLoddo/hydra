@@ -1289,6 +1289,7 @@ Per l’MVP, file JSON e scritture atomiche sono sufficienti. SQLite e dipendenz
 | Repair e riconciliazione | MVP |
 | Guida utente italiana mantenuta | MVP |
 | Skill operativa installabile per agenti AI | MVP |
+| Distribuzione pubblicabile e multiprovider della skill | Successivo |
 | Schema della configurazione pubblicato tramite SchemaStore | Successivo |
 | Head Recipe condivisibili e materializzabili | Successivo |
 | Hook o comando di setup | v0.2 |
@@ -1340,6 +1341,15 @@ produrre varianti per altri agenti senza ridefinire il comportamento di Hydra.
 La skill non integra o rimuove automaticamente una Head: lascia per default il
 workspace disponibile alla revisione e richiede un'autorizzazione esplicita
 prima delle operazioni che aggiornano il target o possono scartare file.
+
+In una fase successiva, la stessa sorgente canonica deve diventare facilmente
+scaricabile, installabile, aggiornabile e pubblicabile per tutti gli host che
+supportano lo standard aperto Agent Skills. Hydra non mantiene copie divergenti
+delle istruzioni per singolo vendor: plugin, marketplace, estensioni, archivi o
+installer specifici del provider sono adapter di distribuzione e devono
+proiettare lo stesso artefatto portabile. Ogni canale deve documentare percorso,
+versione, verifica dell'origine, aggiornamento e rimozione senza trasformare un
+formato proprietario nella fonte del comportamento operativo.
 
 ### Head Recipe condivisibili
 

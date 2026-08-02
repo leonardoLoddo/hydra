@@ -20,6 +20,10 @@ truth and use only documented Hydra commands for Head lifecycle operations.
    [PATH]` only when the user has
    authorized Hydra project setup. Treat the generated `.hydra.json` as shared,
    versioned policy and review it before proposing a commit.
+5. Run `hydra head list` and decide whether this task should resume an existing
+   Head or create a new one. Never reuse a Head merely because its name looks
+   related: inspect it with `hydra head status <name>` and stop if its ownership,
+   task, branch, path, or existing work is unclear.
 
 Hydra lifecycle commands may run from the main project worktree or any managed
 Head. Hydra uses the shared locator to normalize every invocation to the
@@ -42,7 +46,13 @@ Do not assume uncommitted changes in the current worktree will enter a new
 Head. A Head starts from the commit resolved by `--from`. If another task owns
 the current changes, leave them untouched and choose a committed base.
 
-## Select a Head identity
+## Select or create a Head
+
+When the user identifies an existing Head, or inspection proves that it belongs
+to this task, do not recreate it. Resolve it with `hydra head path <name>`,
+inspect its status, and continue with the boundary checks below.
+
+For a new Head:
 
 - Choose a short task-specific name, preferably lowercase words separated by
   hyphens.
@@ -60,6 +70,20 @@ Create the Head with the syntax supported by the installed CLI:
 ```bash
 hydra head create <name> --from <source> --target <target>
 ```
+
+Before creation, review the canonical project's `.hydra.json`, when present.
+Pay particular attention to overlay policy and configured `open` or `close`
+commands. Do not copy configuration or local metadata into a Head.
+
+Creation may pause for confirmation:
+
+- If Hydra lists unsafe overlay symlinks, decline unless the user explicitly
+  authorizes excluding the listed paths from shared policy. After approval,
+  inspect and report the `.hydra.json` diff; commit it only when authorized.
+- If Hydra reports that full copy is required, report the file count and byte
+  size and answer yes only after the user authorizes that storage cost.
+- A negative answer or EOF is a safe cancellation. Do not bypass either prompt
+  with manual copying, Git worktree commands, or metadata edits.
 
 If creation fails, do not substitute `git worktree add`, manual directory
 copying, or metadata edits. Inspect `hydra status`, `git worktree list`, and the
@@ -92,6 +116,11 @@ git status --short --branch
 Keep temporary files, generated files, tests, and edits inside the Head. Do
 not modify another worktree to make this task pass.
 
+Open a Head with `hydra head open <name>` only when the user wants the
+configured tool launched. Inspect `commands.open` in the canonical project
+configuration first and report the program being started. Do not invent or
+silently add an opener when none is configured.
+
 ## Develop and verify
 
 - Follow the repository's own implementation, testing, safety, documentation,
@@ -109,11 +138,20 @@ not modify another worktree to make this task pass.
 Default to leaving a completed Head intact for review. Report its name, path,
 branch, status, tests, and whether its commits have been integrated.
 
-Run `hydra head close <name>` only when the user has authorized integration and
-the Head is clean. The command may run from the main project or any initialized
-Head, including the Head being closed. If the target branch is checked out in
-a clean worktree, Hydra integrates there and keeps its ref, index, and files in
-sync. If the target is not checked out, Hydra integrates checkout-free.
+Before closing, inspect `commands.close` in the canonical project
+configuration. If it is absent or uses the native merge strategy, run `hydra
+head close <name>` only when the user has authorized integration and the Head
+is clean. The command may run from the main project or any initialized Head,
+including the Head being closed. If the target branch is checked out in a clean
+worktree, Hydra integrates there and keeps its ref, index, and files in sync. If
+the target is not checked out, Hydra integrates checkout-free.
+
+If `commands.close` uses a custom command, report its program, arguments, and
+`removeOnSuccess` policy before execution. Treat the command as trusted project
+code that is not sandboxed and may push branches, create pull requests, modify
+files, or contact services. Execute it only when the user's authorization
+covers those concrete effects. Do not describe a successful custom command as
+an integration unless its observed result proves that claim.
 
 A target worktree with staged, modified, deleted, or untracked files, or with a
 Git operation in progress, blocks close without mutating the target or Head.
@@ -141,9 +179,14 @@ that are not integrated, and its output must be reported.
 - Do not delete a lock merely because it appears stale. First report the
   operation, processes, worktrees, branches, and Hydra status that can be
   observed safely.
-- Run `hydra repair` only after inspection and when the user authorizes the
-  proposed state change. If ownership, paths, policy, or Git state remain
-  ambiguous, stop and report the exact evidence.
+- Use `hydra doctor storage` when the active backend or fallback behavior needs
+  diagnosis. Report its result and any temporary path that Hydra could not
+  clean up; do not remove such a path blindly.
+- Run `hydra repair` first to collect its plan and decline each proposed
+  mutation. Report the exact deterministic repairs and unresolved
+  inconsistencies, then rerun and confirm only the changes the user explicitly
+  authorizes. Repair does not justify deleting stale locks, rewriting ownership
+  or locator data, or reconstructing ambiguous metadata by hand.
 
 Preserve recoverability over convenience: leave the Head and its private branch
 in place whenever safe integration or removal cannot be proven.

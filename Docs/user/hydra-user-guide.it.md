@@ -1236,8 +1236,11 @@ risolva interamente dentro la root.
 
 ## 13. Pianificato — non ancora disponibile
 
-Il contratto MVP comprende:
+Le evoluzioni pianificate comprendono:
 
+- distribuzione della skill come artefatto Agent Skills portabile, facilmente
+  scaricabile, installabile, aggiornabile e pubblicabile sui provider
+  compatibili, con adapter specifici senza copie divergenti delle istruzioni;
 - pubblicazione dello schema ufficiale della configurazione tramite
   SchemaStore, seguita dalla reintroduzione sicura degli aiuti per editor;
 - installazione automatica del completamento tramite futuri pacchetti o

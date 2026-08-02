@@ -33,6 +33,31 @@ skills/hydra/
 Keep the skill concise. It must tell an agent how to operate Hydra safely, not
 teach general Git usage or preserve implementation history.
 
+The canonical `SKILL.md` is vendor-neutral and follows the portable
+[Agent Skills specification](https://agentskills.io/specification).
+Provider-specific metadata such as
+`agents/openai.yaml` may improve discovery or presentation for one host, but it
+must not own workflow or safety behavior that other compatible agents need.
+
+---
+
+## Distribution Direction
+
+The repository artifact is the single source used by every future distribution
+channel. Hydra must eventually make the skill easy to download, install,
+update, publish, and remove across compatible AI-agent hosts without requiring
+users to reconstruct the directory manually.
+
+Provider plugins, marketplaces, extensions, archives, package-manager entries,
+and installers are distribution adapters. They must not fork `SKILL.md` or
+become independent behavior specifications. Each adapter must identify the
+canonical skill version, preserve provenance, validate the installed artifact,
+and document host-specific discovery and refresh behavior.
+
+Do not claim a provider or installation channel as supported until its package,
+installation procedure, update path, and representative activation workflow
+have been verified on that host. Keep unavailable channels explicitly planned.
+
 ---
 
 ## Authoritative Inputs
