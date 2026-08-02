@@ -185,8 +185,14 @@ that are not integrated, and its output must be reported.
 - Run `hydra repair` first to collect its plan and decline each proposed
   mutation. Report the exact deterministic repairs and unresolved
   inconsistencies, then rerun and confirm only the changes the user explicitly
-  authorizes. Repair does not justify deleting stale locks, rewriting ownership
-  or locator data, or reconstructing ambiguous metadata by hand.
+  authorizes. When the inventory is missing, approve reconstruction only if
+  every expected Head appears in the recoverable set; Hydra will revalidate
+  the complete set and use exact private recovery manifests rather than infer
+  metadata from Git. A legacy or inconsistent Head disables partial automatic
+  reconstruction, while a malformed or unsupported manifest is a validation
+  error to preserve for diagnosis. Repair does not justify editing recovery
+  manifests, deleting stale locks, rewriting ownership or locator data,
+  replacing malformed inventory, or reconstructing ambiguous metadata by hand.
 
 Preserve recoverability over convenience: leave the Head and its private branch
 in place whenever safe integration or removal cannot be proven.

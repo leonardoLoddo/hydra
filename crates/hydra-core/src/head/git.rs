@@ -1,5 +1,6 @@
 use std::{
     ffi::OsString,
+    fs,
     path::{Path, PathBuf},
     process::{Command, Output},
 };
@@ -59,6 +60,47 @@ pub(super) fn worktree_paths(repository: &Repository) -> Result<Vec<PathBuf>, He
             .map(|worktree| worktree.path)
             .collect()
     })
+}
+
+pub(super) fn worktree_private_file(
+    repository: &Repository,
+    worktree: &Path,
+    file_name: &str,
+) -> Result<PathBuf, HeadError> {
+    let output = run_git(
+        worktree,
+        &[
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-path",
+            file_name,
+        ],
+        "locating private Head metadata",
+    )?;
+    let candidate = bytes_to_path(&stdout_record(&output, "private Head metadata path")?)?;
+    if candidate.file_name().and_then(|name| name.to_str()) != Some(file_name) {
+        return Err(HeadError::UnsafeProjectFile(candidate));
+    }
+    let parent = candidate
+        .parent()
+        .ok_or_else(|| HeadError::UnsafeProjectFile(candidate.clone()))?;
+    let parent = fs::canonicalize(parent).map_err(|source| HeadError::FileSystem {
+        action: "resolve private Head metadata directory",
+        path: parent.to_path_buf(),
+        source,
+    })?;
+    let common = fs::canonicalize(&repository.git_common_directory).map_err(|source| {
+        HeadError::FileSystem {
+            action: "resolve Git common directory",
+            path: repository.git_common_directory.clone(),
+            source,
+        }
+    })?;
+    let worktrees = common.join("worktrees");
+    if !parent.starts_with(&worktrees) || parent == worktrees {
+        return Err(HeadError::UnsafeProjectFile(candidate));
+    }
+    Ok(parent.join(file_name))
 }
 
 pub(super) fn registered_worktrees(

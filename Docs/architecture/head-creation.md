@@ -179,6 +179,7 @@ state, regardless of which managed Head invoked the command:
 | Local project locator | `<git-common-dir>/hydra/project.json` |
 | Directory ownership marker | `<heads-directory>/.hydra/directory.json` |
 | Local Head inventory | `<heads-directory>/.hydra/heads.json` |
+| Per-Head recovery manifest | linked-worktree private Git directory, `hydra-head.json` |
 
 Every path must be a regular file rather than a symlink. The reader accepts
 only project configuration schema version 2 and local metadata schema version
@@ -258,6 +259,8 @@ materialize tracked entries
 materialize confirmed overlays
         ↓
 verify a clean Git worktree
+        ↓
+create the private recovery manifest
         ↓
 atomically replace heads.json
         ↓
@@ -417,6 +420,13 @@ Successful creation adds version-1 metadata containing:
 - aggregate `materializationBackend` (`cow` or `copy`);
 - UTC RFC 3339 `createdAt`.
 
+Before publishing the shared inventory, Hydra writes the same exact Head
+identity and intent to a versioned `hydra-head.json` manifest inside the
+linked worktree's private Git administrative directory. The file is created
+with no-clobber atomic publication and is not placed in the project working
+tree. It exists only to let `hydra repair` reconstruct a completely missing
+inventory without inferring fields that Git does not preserve.
+
 State publication:
 
 1. re-reads `heads.json` and compares it byte-for-byte with the state loaded
@@ -426,10 +436,11 @@ State publication:
 4. synchronizes the parent directory on Unix;
 5. removes the state lock.
 
-A failure before state publication rolls back the registered worktree and the
-private branch, then releases the lock. Rollback operates on exact paths and
-refs created by the invocation. Cleanup failures retain the original error and
-the cleanup diagnostics.
+A failure before state publication, including recovery-manifest creation,
+rolls back the registered worktree and the private branch, then releases the
+lock. Removing the registered worktree also removes its private administrative
+manifest. Rollback operates on exact paths and refs created by the invocation.
+Cleanup failures retain the original error and the cleanup diagnostics.
 
 After the state rename, the Head is committed. A subsequent directory-sync or
 lock-removal failure is reported as a post-commit cleanup failure, but Hydra
@@ -453,6 +464,8 @@ repositories. Current coverage proves:
   tracked executables, and Unix symlinks;
 - independent worktree, index, private branch, and writable files;
 - metadata fields and clean Git status;
+- exact recovery-manifest publication before inventory commit and
+  missing-inventory reconstruction through `hydra repair`;
 - Gitignore overlay expansion, negation, conditional fallback confirmation,
   copy, and isolation;
 - rejection of unsafe names, unknown refs, missing targets, duplicates,

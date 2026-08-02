@@ -6,6 +6,7 @@ mod materializer;
 mod open;
 mod overlay;
 mod persistence;
+mod recovery;
 mod removal;
 mod repair;
 mod state;
@@ -26,7 +27,10 @@ use materializer::materialize_tracked_files;
 pub use open::{OpenedHead, open_head};
 use overlay::{OverlayPlan, materialize_overlays, plan_overlays};
 pub use removal::{RemoveHeadOptions, RemovedHead, remove_head};
-pub use repair::{RepairIssue, RepairPlan, RepairResult, apply_repairs, plan_repairs};
+pub use repair::{
+    InventoryRecoveryResult, RepairIssue, RepairPlan, RepairResult, apply_inventory_recovery,
+    apply_repairs, plan_repairs,
+};
 use state::{HeadMetadata, StateSnapshot, StateTransaction, discover_project_repository};
 
 use crate::StorageBackend;
@@ -156,6 +160,12 @@ pub fn create_head_with_progress(
             return Err(transaction.abort(error));
         }
     };
+    if let Err(error) =
+        recovery::create_manifest(&repository, &prepared.head_path, &options.name, &metadata)
+    {
+        let error = rollback_worktree(&repository, &prepared.head_path, &prepared.branch, error);
+        return Err(transaction.abort(error));
+    }
     if let Err(error) = transaction.commit(options.name.clone(), metadata) {
         if error.head_was_committed() {
             return Err(error);

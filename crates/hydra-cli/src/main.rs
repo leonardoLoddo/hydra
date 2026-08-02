@@ -335,6 +335,9 @@ fn repair() -> ExitCode {
     for issue in &plan.issues {
         show_repair_issue(issue);
     }
+    if plan.missing_inventory.is_some() {
+        return repair_missing_inventory(&plan);
+    }
     if plan.stale_inventory.is_empty() && plan.moved_worktrees.is_empty() {
         println!("No automatic repairs available; manual recovery required.");
         return ExitCode::SUCCESS;
@@ -412,8 +415,63 @@ fn repair() -> ExitCode {
     }
 }
 
+fn repair_missing_inventory(plan: &hydra_core::RepairPlan) -> ExitCode {
+    if plan.recoverable_inventory.is_empty() {
+        println!("No automatic repairs available; manual recovery required.");
+        return ExitCode::SUCCESS;
+    }
+    let stdin = io::stdin();
+    let mut input = stdin.lock();
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    let confirmed = match request_inventory_recovery_confirmation(
+        &mut input,
+        &mut output,
+        plan.recoverable_inventory.len(),
+    ) {
+        Ok(confirmed) => confirmed,
+        Err(error) => {
+            eprintln!("error: failed to read repair confirmation: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    if !confirmed {
+        println!("No repairs applied.");
+        return ExitCode::SUCCESS;
+    }
+    match hydra_core::apply_inventory_recovery(Path::new("."), &plan.recoverable_inventory) {
+        Ok(result) if result.recovered_heads.len() == 1 => {
+            println!("Rebuilt the missing inventory with 1 recovered Head.");
+            ExitCode::SUCCESS
+        }
+        Ok(result) if !result.recovered_heads.is_empty() => {
+            println!(
+                "Rebuilt the missing inventory with {} recovered Heads.",
+                result.recovered_heads.len()
+            );
+            ExitCode::SUCCESS
+        }
+        Ok(_) => {
+            println!("No repairs applied; recovery state changed during confirmation.");
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("error: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
 fn show_repair_issue(issue: &hydra_core::RepairIssue) {
     match issue {
+        hydra_core::RepairIssue::MissingInventory { path } => {
+            println!("Missing Hydra inventory: {}", safe_path_label(path));
+        }
+        hydra_core::RepairIssue::RecoverableHead {
+            name,
+            path: _,
+            head_ref: _,
+        } => println!("Recoverable Head: {name}"),
         hydra_core::RepairIssue::StaleInventory {
             name,
             path,
@@ -484,6 +542,31 @@ fn show_repair_issue(issue: &hydra_core::RepairIssue) {
         ),
         _ => println!("Unknown repair issue; manual recovery required"),
     }
+}
+
+fn request_inventory_recovery_confirmation(
+    input: &mut impl BufRead,
+    output: &mut impl Write,
+    count: usize,
+) -> io::Result<bool> {
+    if count == 1 {
+        write!(
+            output,
+            "Rebuild the missing inventory with 1 recovered Head? [y/N] "
+        )?;
+    } else {
+        write!(
+            output,
+            "Rebuild the missing inventory with {count} recovered Heads? [y/N] "
+        )?;
+    }
+    output.flush()?;
+    let mut response = String::new();
+    input.read_line(&mut response)?;
+    Ok(matches!(
+        response.trim().to_ascii_lowercase().as_str(),
+        "y" | "yes"
+    ))
 }
 
 fn request_stale_inventory_confirmation(

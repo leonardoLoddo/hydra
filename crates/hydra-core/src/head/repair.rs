@@ -8,7 +8,11 @@ use super::{
     HeadError,
     git::{self, RegisteredWorktree, Repository},
     inspection::validated_head_path,
-    state::{HeadMetadata, StateSnapshot, StateTransaction, discover_project_repository},
+    recovery,
+    state::{
+        HeadMetadata, MissingStateSnapshot, MissingStateTransaction, RepairStateSnapshot,
+        StateSnapshot, StateTransaction, discover_project_repository,
+    },
 };
 
 #[derive(Debug)]
@@ -16,11 +20,21 @@ pub struct RepairPlan {
     pub issues: Vec<RepairIssue>,
     pub stale_inventory: Vec<String>,
     pub moved_worktrees: Vec<String>,
+    pub missing_inventory: Option<PathBuf>,
+    pub recoverable_inventory: Vec<String>,
 }
 
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum RepairIssue {
+    MissingInventory {
+        path: PathBuf,
+    },
+    RecoverableHead {
+        name: String,
+        path: PathBuf,
+        head_ref: String,
+    },
     StaleInventory {
         name: String,
         path: PathBuf,
@@ -77,6 +91,11 @@ pub struct RepairResult {
     pub restored_worktrees: Vec<String>,
 }
 
+#[derive(Debug)]
+pub struct InventoryRecoveryResult {
+    pub recovered_heads: Vec<String>,
+}
+
 /// Compares Hydra inventory with Git worktree and branch state without mutation.
 ///
 /// # Errors
@@ -85,13 +104,64 @@ pub struct RepairResult {
 /// inventory parsing, or Git worktree discovery fails.
 pub fn plan_repairs(source_path: &Path) -> Result<RepairPlan, HeadError> {
     let repository = discover_project_repository(source_path)?;
-    let snapshot = StateSnapshot::load(&repository)?;
-    build_plan(
+    match StateSnapshot::load_for_repair(&repository)? {
+        RepairStateSnapshot::Present(snapshot) => build_plan(
+            &repository,
+            &snapshot.heads_directory()?,
+            snapshot.branch_prefix(),
+            snapshot.heads(),
+        ),
+        RepairStateSnapshot::Missing(snapshot) => {
+            build_missing_inventory_plan(&repository, &snapshot)
+        }
+    }
+}
+
+/// Rebuilds a missing inventory from explicitly approved, verified recovery manifests.
+///
+/// The inventory remains absent when the approved set no longer matches the
+/// complete deterministic recovery plan after acquiring the state lock.
+///
+/// # Errors
+///
+/// Returns [`HeadError`] when installation validation, locking, recovery
+/// manifest validation, Git inspection, or atomic publication fails.
+pub fn apply_inventory_recovery(
+    source_path: &Path,
+    approved_heads: &[String],
+) -> Result<InventoryRecoveryResult, HeadError> {
+    let repository = discover_project_repository(source_path)?;
+    let transaction = MissingStateTransaction::open(&repository)?;
+    let heads_directory = match transaction.heads_directory() {
+        Ok(path) => path,
+        Err(error) => return Err(transaction.abort(error)),
+    };
+    let recovery = build_missing_inventory_state(
         &repository,
-        &snapshot.heads_directory()?,
-        snapshot.branch_prefix(),
-        snapshot.heads(),
-    )
+        transaction.state_path(),
+        &heads_directory,
+        transaction.branch_prefix(),
+    );
+    let (plan, recovered) = match recovery {
+        Ok(recovery) => recovery,
+        Err(error) => return Err(transaction.abort(error)),
+    };
+    let approved: BTreeSet<&str> = approved_heads.iter().map(String::as_str).collect();
+    let current: BTreeSet<&str> = plan
+        .recoverable_inventory
+        .iter()
+        .map(String::as_str)
+        .collect();
+    if current.is_empty() || approved != current {
+        transaction.release()?;
+        return Ok(InventoryRecoveryResult {
+            recovered_heads: Vec::new(),
+        });
+    }
+
+    let recovered_heads = plan.recoverable_inventory;
+    transaction.commit(recovered)?;
+    Ok(InventoryRecoveryResult { recovered_heads })
 }
 
 /// Removes explicitly approved inventory entries that are still provably stale.
@@ -228,7 +298,95 @@ fn build_plan(
         issues,
         stale_inventory,
         moved_worktrees,
+        missing_inventory: None,
+        recoverable_inventory: Vec::new(),
     })
+}
+
+fn build_missing_inventory_plan(
+    repository: &Repository,
+    snapshot: &MissingStateSnapshot,
+) -> Result<RepairPlan, HeadError> {
+    build_missing_inventory_state(
+        repository,
+        snapshot.state_path(),
+        &snapshot.heads_directory()?,
+        snapshot.branch_prefix(),
+    )
+    .map(|(plan, _)| plan)
+}
+
+fn build_missing_inventory_state(
+    repository: &Repository,
+    state_path: &Path,
+    heads_directory: &Path,
+    branch_prefix: &str,
+) -> Result<(RepairPlan, BTreeMap<String, HeadMetadata>), HeadError> {
+    let state_path = state_path.to_path_buf();
+    let full_branch_prefix = format!("refs/heads/{branch_prefix}");
+    let mut issues = vec![RepairIssue::MissingInventory {
+        path: state_path.clone(),
+    }];
+    let mut recoverable_inventory = Vec::new();
+    let mut recovered_inventory = BTreeMap::new();
+    let mut all_recoverable = true;
+
+    for worktree in git::registered_worktrees(repository)? {
+        let Some(head_ref) = worktree.branch.as_deref() else {
+            continue;
+        };
+        let Some(name) = head_ref.strip_prefix(&full_branch_prefix) else {
+            continue;
+        };
+        if name.is_empty() {
+            continue;
+        }
+        let Some(recovered) = recovery::read_manifest(repository, &worktree.path)? else {
+            all_recoverable = false;
+            issues.push(RepairIssue::UntrackedHydraWorktree {
+                name: name.to_owned(),
+                path: worktree.path,
+                head_ref: head_ref.to_owned(),
+            });
+            continue;
+        };
+        let recovered_path = validated_head_path(heads_directory, name, &recovered.metadata)?;
+        if recovered.name != name
+            || recovered.metadata.head_ref() != head_ref
+            || recovered_path != worktree.path
+        {
+            all_recoverable = false;
+            issues.push(RepairIssue::UntrackedHydraWorktree {
+                name: name.to_owned(),
+                path: worktree.path,
+                head_ref: head_ref.to_owned(),
+            });
+            continue;
+        }
+        issues.push(RepairIssue::RecoverableHead {
+            name: name.to_owned(),
+            path: recovered_path,
+            head_ref: head_ref.to_owned(),
+        });
+        recoverable_inventory.push(name.to_owned());
+        recovered_inventory.insert(name.to_owned(), recovered.metadata);
+    }
+
+    if !all_recoverable || recoverable_inventory.is_empty() {
+        recoverable_inventory.clear();
+        recovered_inventory.clear();
+    }
+
+    Ok((
+        RepairPlan {
+            issues,
+            stale_inventory: Vec::new(),
+            moved_worktrees: Vec::new(),
+            missing_inventory: Some(state_path),
+            recoverable_inventory,
+        },
+        recovered_inventory,
+    ))
 }
 
 struct RecordedHeadPlan {

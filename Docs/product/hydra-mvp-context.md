@@ -335,6 +335,7 @@ Hydra separa configurazione condivisa, locator locale e stato fisico.
 | `<git-common-dir>/hydra/project.json` | Locator canonico e identità dell'installazione locale | No |
 | `<heads-directory>/.hydra/directory.json` | Marker di ownership della directory | No |
 | `<heads-directory>/.hydra/heads.json` | Inventario delle Head fisiche locali | No |
+| directory amministrativa Git privata della worktree, `hydra-head.json` | Manifest di recupero esatto della singola Head | No |
 
 La configurazione nel progetto descrive come quel progetto deve essere
 materializzato. Il locator nel Git common directory permette al workspace
@@ -1071,7 +1072,8 @@ Questa separazione evita due dipendenze circolari:
 
 - qualsiasi Head trova il locator attraverso il Git common directory;
 - se l'inventario viene perso, Git e le directory fisiche rimangono
-  ispezionabili;
+  ispezionabili e i manifest delle Head create dalle versioni correnti
+  permettono una ricostruzione deterministica;
 - se il locator viene perso, il marker permette a un futuro `repair` di
   riconnettere una directory indicata esplicitamente dall'utente;
 - spostare repository o directory Head richiede una relocation esplicita e
@@ -1084,6 +1086,15 @@ I file locali:
 - non sono l’unica fonte della verità;
 - non memorizzano informazioni ricavabili in modo affidabile da Git se non utili alla riconciliazione;
 - non contengono PID, porte, agenti o runtime nell’MVP.
+
+Ogni nuova Head conserva inoltre una copia versionata dei propri metadati
+esatti nel file privato `hydra-head.json` della linked worktree Git. Il
+manifest non sostituisce l'inventario e non viene dedotto dal branch: serve
+soltanto a ricostruire atomicamente un `heads.json` assente. Il repair può
+procedere solo se tutte le worktree con il prefisso Hydra configurato hanno un
+manifest coerente con nome, percorso gestito e ref simbolica. Non ricostruisce
+parzialmente l'inventario, non sostituisce un inventario malformato e non
+inventa metadati per Head legacy prive di manifest.
 
 Git rimane autorevole per:
 

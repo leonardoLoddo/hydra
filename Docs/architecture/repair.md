@@ -17,8 +17,8 @@ refs. Product intent remains authoritative in
 
 ## Planning Boundary
 
-The first phase is read-only. It loads and validates the installation and
-inventory, then parses one:
+The first phase is read-only. It loads and validates the installation and,
+when present, the inventory, then parses one:
 
 ```text
 git worktree list --porcelain -z
@@ -37,8 +37,33 @@ repair candidate.
 
 ## Guided Repairs
 
-Hydra offers only two deterministic repairs, and applies neither without an
+Hydra offers only three deterministic repairs, and applies none without an
 explicit affirmative answer.
+
+### Missing inventory
+
+Every newly created Head stores a versioned recovery manifest in its private
+Git linked-worktree administrative directory. The manifest preserves the exact
+inventory metadata that Git alone cannot reconstruct: base and target intent,
+the resolved base commit, materialization backend, creation time, managed path,
+and private ref.
+
+When `heads.json` is absent, Hydra offers to rebuild it only when every
+registered worktree using the configured Hydra branch prefix has a manifest
+whose Head name, managed path, and symbolic branch agree with current Git and
+the owned Heads directory. One missing or inconsistent manifest makes the
+complete reconstruction report-only; Hydra does not publish a partial
+inventory or infer the missing fields.
+
+A malformed, non-regular, or unsupported recovery manifest is a validation
+error rather than a repair candidate. Hydra leaves the missing inventory,
+worktree, branch, and manifest untouched for diagnosis.
+
+After confirmation, Hydra acquires the normal state lock, verifies that the
+inventory is still absent, rebuilds the complete recovery plan, requires its
+Head set to match the approved set exactly, and creates `heads.json`
+atomically without replacing an existing file. A malformed or unsupported
+inventory is an error and remains byte-for-byte unchanged.
 
 ### Stale inventory
 
@@ -79,14 +104,15 @@ Hydra reports but does not guess a mutation for:
 - metadata refs that differ from the configured branch prefix;
 - ambiguous duplicate branch-to-worktree associations.
 
-An untracked worktree does not contain enough authoritative information to
-reconstruct `baseRef`, `baseCommit`, `targetRef`, creation time, and the
-materialization backend. Repair therefore preserves the worktree and branch
-and requests manual diagnosis instead of fabricating intent.
+An untracked worktree without a matching recovery manifest does not contain
+enough authoritative information to reconstruct `baseRef`, `baseCommit`,
+`targetRef`, creation time, and the materialization backend. Repair therefore
+preserves the worktree and branch and requests manual diagnosis instead of
+fabricating intent.
 
 The current command does not remove stale lock files, repair locator or
-ownership identity, relocate the whole Heads directory, or reconstruct a lost
-inventory. Those cases fail validation or remain explicitly report-only.
+ownership identity, or relocate the whole Heads directory. Missing inventories
+from legacy Heads without recovery manifests remain explicitly report-only.
 
 ---
 
@@ -94,7 +120,9 @@ inventory. Those cases fail validation or remain explicitly report-only.
 
 After confirmation, the core acquires the normal exclusive state lock and
 rebuilds the repair plan from current Git and inventory state. An approved
-entry that is no longer a repair candidate is skipped.
+entry that is no longer a repair candidate is skipped. Missing-inventory
+recovery is stricter: any change to the complete approved Head set cancels the
+publication.
 
 Relocated worktrees are restored before inventory publication. Stale entries
 are removed together through one atomic state replacement. No repair path
@@ -110,6 +138,11 @@ Declining every prompt leaves Git, filesystem, inventory, and refs unchanged.
 Disposable-repository tests prove:
 
 - a consistent project remains byte-for-byte unchanged;
+- missing inventory requires confirmation and remains absent after refusal;
+- confirmed recovery reproduces the original inventory bytes from exact
+  recovery manifests while preserving worktrees and branches;
+- one missing recovery manifest disables complete automatic reconstruction;
+- malformed inventory is rejected and preserved rather than replaced;
 - stale inventory requires confirmation;
 - confirmed stale cleanup removes only metadata and preserves the branch;
 - relocated worktrees require confirmation and return to the managed path only

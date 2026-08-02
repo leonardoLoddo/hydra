@@ -82,6 +82,15 @@ pub(super) fn inventory_path(
     configuration: &ProjectConfiguration,
     repository: &Repository,
 ) -> Result<PathBuf, HeadError> {
+    let inventory_path = inventory_location(configuration, repository)?;
+    validate_regular_file(&inventory_path)?;
+    Ok(inventory_path)
+}
+
+pub(super) fn inventory_location(
+    configuration: &ProjectConfiguration,
+    repository: &Repository,
+) -> Result<PathBuf, HeadError> {
     let locator_path = repository
         .git_common_directory
         .join("hydra")
@@ -113,9 +122,7 @@ pub(super) fn inventory_path(
         return Err(HeadError::LocalIdentityMismatch(marker_path));
     }
 
-    let inventory_path = metadata_directory.join(STATE_FILE_NAME);
-    validate_regular_file(&inventory_path)?;
-    Ok(inventory_path)
+    Ok(metadata_directory.join(STATE_FILE_NAME))
 }
 
 fn validate_heads_directory(

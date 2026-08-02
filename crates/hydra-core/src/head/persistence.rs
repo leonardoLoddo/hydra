@@ -100,6 +100,60 @@ pub(super) fn replace_state_atomically(
         .map_err(|error| HeadError::HeadCommittedWithCleanupFailure(Box::new(error)))
 }
 
+pub(super) fn create_file_atomically(path: &Path, contents: &[u8]) -> Result<(), HeadError> {
+    let file_name = path
+        .file_name()
+        .ok_or_else(|| HeadError::UnsafeProjectFile(path.to_path_buf()))?;
+    let temporary = path.with_file_name(format!(
+        ".{}.tmp-{}",
+        file_name.to_string_lossy(),
+        Uuid::new_v4().simple()
+    ));
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temporary)
+        .map_err(|source| HeadError::FileSystem {
+            action: "create temporary state file",
+            path: temporary.clone(),
+            source,
+        })?;
+    if let Err(source) = file.write_all(contents).and_then(|()| file.sync_all()) {
+        drop(file);
+        return Err(remove_temporary_after_error(
+            &temporary,
+            HeadError::FileSystem {
+                action: "write temporary state file",
+                path: temporary.clone(),
+                source,
+            },
+        ));
+    }
+    drop(file);
+
+    if let Err(source) = fs::hard_link(&temporary, path) {
+        return Err(remove_temporary_after_error(
+            &temporary,
+            HeadError::FileSystem {
+                action: "publish new state file atomically",
+                path: path.to_path_buf(),
+                source,
+            },
+        ));
+    }
+    if let Err(source) = fs::remove_file(&temporary) {
+        return Err(HeadError::HeadCommittedWithCleanupFailure(Box::new(
+            HeadError::FileSystem {
+                action: "remove temporary state link",
+                path: temporary,
+                source,
+            },
+        )));
+    }
+    sync_parent_directory(path)
+        .map_err(|error| HeadError::HeadCommittedWithCleanupFailure(Box::new(error)))
+}
+
 fn remove_temporary_after_error(path: &Path, original: HeadError) -> HeadError {
     match fs::remove_file(path) {
         Ok(()) => original,

@@ -3,7 +3,7 @@ mod common;
 use std::{
     fs,
     io::Write,
-    path::Path,
+    path::{Path, PathBuf},
     process::{Output, Stdio},
 };
 
@@ -63,6 +63,135 @@ fn branch_exists(repository: &Path, name: &str) -> bool {
     )
     .status
     .success()
+}
+
+fn recovery_manifest_path(repository: &Path, name: &str) -> PathBuf {
+    let head = heads_directory(repository).join(name);
+    let output = run_git(
+        &head,
+        &[
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-path",
+            "hydra-head.json",
+        ],
+    );
+    assert!(output.status.success());
+    PathBuf::from(
+        String::from_utf8(output.stdout)
+            .expect("recovery manifest fixture path should be UTF-8")
+            .trim_end(),
+    )
+}
+
+#[test]
+fn repair_requires_confirmation_before_rebuilding_a_missing_inventory() {
+    let directory = TestDirectory::new("repair-missing-inventory-declined");
+    let repository = create_initialized_project(&directory);
+    create_head(&repository, "payment");
+    let head = heads_directory(&repository).join("payment");
+    let state_path = head_state_path(&repository);
+    fs::remove_file(&state_path).expect("disposable inventory should be removed");
+
+    let output = run_repair(&repository, b"\n");
+
+    assert!(
+        output.status.success(),
+        "repair planning should succeed, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    assert!(stdout.contains(&format!(
+        "Missing Hydra inventory: {}",
+        state_path.display()
+    )));
+    assert!(stdout.contains("Recoverable Head: payment"));
+    assert!(stdout.contains("Rebuild the missing inventory with 1 recovered Head? [y/N] "));
+    assert!(stdout.ends_with("No repairs applied.\n"));
+    assert!(
+        !state_path.exists(),
+        "declining must preserve the missing state"
+    );
+    assert!(head.is_dir());
+    assert!(branch_exists(&repository, "payment"));
+    assert!(!head_state_lock_path(&repository).exists());
+}
+
+#[test]
+fn confirmed_repair_rebuilds_a_missing_inventory_from_recovery_manifests() {
+    let directory = TestDirectory::new("repair-missing-inventory-confirmed");
+    let repository = create_initialized_project(&directory);
+    create_head(&repository, "payment");
+    let head = heads_directory(&repository).join("payment");
+    let state_path = head_state_path(&repository);
+    let state_before = fs::read(&state_path).expect("inventory should be readable");
+    fs::remove_file(&state_path).expect("disposable inventory should be removed");
+
+    let output = run_repair(&repository, b"yes\n");
+
+    assert!(
+        output.status.success(),
+        "confirmed inventory recovery should succeed, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8(output.stdout)
+            .expect("stdout should be UTF-8")
+            .ends_with("Rebuilt the missing inventory with 1 recovered Head.\n")
+    );
+    assert_eq!(
+        fs::read(&state_path).expect("inventory should be rebuilt"),
+        state_before,
+        "recovery must preserve the original Head intent"
+    );
+    assert!(head_is_recorded(&repository, "payment"));
+    assert!(head.is_dir());
+    assert!(branch_exists(&repository, "payment"));
+    assert!(!head_state_lock_path(&repository).exists());
+}
+
+#[test]
+fn repair_does_not_rebuild_when_a_head_has_no_recovery_manifest() {
+    let directory = TestDirectory::new("repair-missing-recovery-manifest");
+    let repository = create_initialized_project(&directory);
+    create_head(&repository, "payment");
+    let head = heads_directory(&repository).join("payment");
+    let state_path = head_state_path(&repository);
+    fs::remove_file(recovery_manifest_path(&repository, "payment"))
+        .expect("disposable recovery manifest should be removed");
+    fs::remove_file(&state_path).expect("disposable inventory should be removed");
+
+    let output = run_repair(&repository, b"yes\n");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    assert!(stdout.contains("Untracked Hydra worktree: payment"));
+    assert!(stdout.ends_with("No automatic repairs available; manual recovery required.\n"));
+    assert!(!state_path.exists());
+    assert!(head.is_dir());
+    assert!(branch_exists(&repository, "payment"));
+    assert!(!head_state_lock_path(&repository).exists());
+}
+
+#[test]
+fn repair_does_not_replace_a_malformed_inventory_from_recovery_manifests() {
+    let directory = TestDirectory::new("repair-malformed-inventory");
+    let repository = create_initialized_project(&directory);
+    create_head(&repository, "payment");
+    let state_path = head_state_path(&repository);
+    let malformed = b"not valid inventory\n";
+    fs::write(&state_path, malformed).expect("malformed fixture should be written");
+
+    let output = run_repair(&repository, b"yes\n");
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("is invalid"));
+    assert_eq!(
+        fs::read(&state_path).expect("malformed inventory should remain"),
+        malformed
+    );
+    assert!(branch_exists(&repository, "payment"));
+    assert!(!head_state_lock_path(&repository).exists());
 }
 
 #[test]

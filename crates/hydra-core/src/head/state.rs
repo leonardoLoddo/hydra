@@ -10,7 +10,7 @@ use std::{
 use super::{
     HeadError,
     git::Repository,
-    persistence::{StateLock, replace_state_atomically},
+    persistence::{StateLock, create_file_atomically, replace_state_atomically},
 };
 use crate::StorageBackend;
 use serde::{Deserialize, Serialize};
@@ -112,6 +112,22 @@ pub(super) struct StateSnapshot {
     state_path: PathBuf,
 }
 
+pub(super) enum RepairStateSnapshot {
+    Present(StateSnapshot),
+    Missing(MissingStateSnapshot),
+}
+
+pub(super) struct MissingStateSnapshot {
+    configuration: ProjectConfiguration,
+    state_path: PathBuf,
+}
+
+pub(super) struct MissingStateTransaction {
+    configuration: ProjectConfiguration,
+    state_path: PathBuf,
+    lock: StateLock,
+}
+
 impl StateSnapshot {
     pub(super) fn load(repository: &Repository) -> Result<Self, HeadError> {
         let configuration = ProjectConfiguration::load(&repository.root)?;
@@ -149,6 +165,110 @@ impl StateSnapshot {
 
     pub(super) fn close_command(&self) -> Option<&CloseCommandConfiguration> {
         self.configuration.close_command()
+    }
+
+    pub(super) fn load_for_repair(
+        repository: &Repository,
+    ) -> Result<RepairStateSnapshot, HeadError> {
+        let configuration = ProjectConfiguration::load(&repository.root)?;
+        let state_path = installation::inventory_location(&configuration, repository)?;
+        match fs::symlink_metadata(&state_path) {
+            Ok(metadata) if metadata.is_file() => {
+                let state = read_local_state(&state_path)?;
+                Ok(RepairStateSnapshot::Present(Self {
+                    configuration,
+                    state,
+                    state_path,
+                }))
+            }
+            Ok(_) => Err(HeadError::UnsafeProjectFile(state_path)),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                Ok(RepairStateSnapshot::Missing(MissingStateSnapshot {
+                    configuration,
+                    state_path,
+                }))
+            }
+            Err(source) => Err(HeadError::FileSystem {
+                action: "inspect local Hydra state",
+                path: state_path,
+                source,
+            }),
+        }
+    }
+}
+
+impl MissingStateSnapshot {
+    pub(super) fn state_path(&self) -> &Path {
+        &self.state_path
+    }
+
+    pub(super) fn heads_directory(&self) -> Result<PathBuf, HeadError> {
+        heads_directory_from_state_path(&self.state_path)
+    }
+
+    pub(super) fn branch_prefix(&self) -> &str {
+        self.configuration.branch_prefix()
+    }
+}
+
+impl MissingStateTransaction {
+    pub(super) fn open(repository: &Repository) -> Result<Self, HeadError> {
+        let configuration = ProjectConfiguration::load(&repository.root)?;
+        let state_path = installation::inventory_location(&configuration, repository)?;
+        let lock = StateLock::acquire(&state_path)?;
+        match fs::symlink_metadata(&state_path) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Self {
+                configuration,
+                state_path,
+                lock,
+            }),
+            Ok(_) => Err(release_lock_after_error(
+                lock,
+                HeadError::ConcurrentStateChange(state_path),
+            )),
+            Err(source) => Err(release_lock_after_error(
+                lock,
+                HeadError::FileSystem {
+                    action: "inspect local Hydra state",
+                    path: state_path,
+                    source,
+                },
+            )),
+        }
+    }
+
+    pub(super) fn state_path(&self) -> &Path {
+        &self.state_path
+    }
+
+    pub(super) fn heads_directory(&self) -> Result<PathBuf, HeadError> {
+        heads_directory_from_state_path(&self.state_path)
+    }
+
+    pub(super) fn branch_prefix(&self) -> &str {
+        self.configuration.branch_prefix()
+    }
+
+    pub(super) fn commit(self, heads: BTreeMap<String, HeadMetadata>) -> Result<(), HeadError> {
+        let state = LocalState {
+            version: SUPPORTED_LOCAL_METADATA_VERSION,
+            heads,
+        };
+        let result = serde_json::to_vec_pretty(&state)
+            .map_err(HeadError::SerializeState)
+            .and_then(|mut bytes| {
+                bytes.push(b'\n');
+                create_file_atomically(&self.state_path, &bytes)
+            });
+        finish_locked_state_write(self.lock, result)
+    }
+
+    pub(super) fn release(self) -> Result<(), HeadError> {
+        self.lock.release()
+    }
+
+    pub(super) fn abort(self, original: HeadError) -> HeadError {
+        release_lock_after_error(self.lock, original)
     }
 }
 
@@ -278,24 +398,7 @@ impl StateTransaction {
     }
 
     fn finish_commit(self, result: Result<(), HeadError>) -> Result<(), HeadError> {
-        let release = self.lock.release();
-        match (result, release) {
-            (Ok(()), Ok(())) => Ok(()),
-            (Ok(()), Err(cleanup)) => Err(HeadError::HeadCommittedWithCleanupFailure(Box::new(
-                cleanup,
-            ))),
-            (Err(error), Ok(())) => Err(error),
-            (Err(HeadError::HeadCommittedWithCleanupFailure(original)), Err(cleanup)) => Err(
-                HeadError::HeadCommittedWithCleanupFailure(Box::new(HeadError::RollbackFailed {
-                    original,
-                    failures: vec![cleanup.to_string()],
-                })),
-            ),
-            (Err(original), Err(cleanup)) => Err(HeadError::RollbackFailed {
-                original: Box::new(original),
-                failures: vec![cleanup.to_string()],
-            }),
-        }
+        finish_locked_state_write(self.lock, result)
     }
 }
 
@@ -326,4 +429,38 @@ fn heads_directory_from_state_path(state_path: &Path) -> Result<PathBuf, HeadErr
         .and_then(Path::parent)
         .map(Path::to_path_buf)
         .ok_or_else(|| HeadError::UnsafeHeadsDirectory(state_path.to_path_buf()))
+}
+
+fn release_lock_after_error(lock: StateLock, original: HeadError) -> HeadError {
+    match lock.release() {
+        Ok(()) => original,
+        Err(cleanup) => HeadError::RollbackFailed {
+            original: Box::new(original),
+            failures: vec![cleanup.to_string()],
+        },
+    }
+}
+
+fn finish_locked_state_write(
+    lock: StateLock,
+    result: Result<(), HeadError>,
+) -> Result<(), HeadError> {
+    let release = lock.release();
+    match (result, release) {
+        (Ok(()), Ok(())) => Ok(()),
+        (Ok(()), Err(cleanup)) => Err(HeadError::HeadCommittedWithCleanupFailure(Box::new(
+            cleanup,
+        ))),
+        (Err(error), Ok(())) => Err(error),
+        (Err(HeadError::HeadCommittedWithCleanupFailure(original)), Err(cleanup)) => Err(
+            HeadError::HeadCommittedWithCleanupFailure(Box::new(HeadError::RollbackFailed {
+                original,
+                failures: vec![cleanup.to_string()],
+            })),
+        ),
+        (Err(original), Err(cleanup)) => Err(HeadError::RollbackFailed {
+            original: Box::new(original),
+            failures: vec![cleanup.to_string()],
+        }),
+    }
 }

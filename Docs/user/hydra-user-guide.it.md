@@ -662,8 +662,11 @@ Se tutto è coerente, il comando termina senza modifiche:
 Hydra state is consistent.
 ```
 
-Hydra può proporti due correzioni deterministiche:
+Hydra può proporti tre correzioni deterministiche:
 
+- ricostruire un `heads.json` assente dai manifest privati delle Head, ma solo
+  se tutte le worktree con prefisso Hydra hanno manifest coerenti con nome,
+  percorso gestito e branch Git;
 - rimuovere dall’inventario una Head la cui directory e registrazione Git non
   esistono più, conservando sempre il branch privato;
 - riportare nel percorso gestito una worktree spostata, quando Git associa in
@@ -673,14 +676,31 @@ Entrambe richiedono una conferma esplicita. Una risposta vuota o negativa non
 applica modifiche. Dopo la conferma, Hydra acquisisce il lock, ricontrolla lo
 stato corrente e salta una correzione che nel frattempo non è più valida.
 
-Altre incoerenze vengono soltanto segnalate: worktree Hydra non presenti
-nell’inventario, directory registrate ma mancanti, directory non registrate,
+Per l'inventario mancante, Hydra elenca le Head recuperabili e chiede, per
+esempio:
+
+```text
+Rebuild the missing inventory with 1 recovered Head? [y/N]
+```
+
+Se confermi, Hydra ricontrolla l'intero insieme sotto lock e crea
+atomicamente l'inventario senza modificare worktree o branch. Se una Head è
+legacy, non ha il manifest, o non coincide con Git, non viene creato un
+inventario parziale.
+
+Un manifest malformato, di versione non supportata o non rappresentato da un
+file regolare interrompe la validazione senza modificare manifest, worktree,
+branch o inventario.
+
+Altre incoerenze vengono soltanto segnalate: worktree Hydra senza manifest
+verificabile, directory registrate ma mancanti, directory non registrate,
 branch assenti o differenti e associazioni ambigue. Hydra conserva file e ref
-perché Git non contiene informazioni sufficienti per ricostruire con certezza
-base, target, backend e intenzione originaria.
+perché Git da solo non contiene informazioni sufficienti per ricostruire con
+certezza base, target, backend e intenzione originaria.
 
 `repair` non elimina lock stale, non corregge ownership o locator e non
-ricostruisce un inventario completamente perso.
+reloca l'intera directory delle Head. Un inventario malformato viene rifiutato
+e conservato, non sostituito con i manifest.
 
 ### 4.10 Stato attuale del ciclo di vita
 
@@ -1136,11 +1156,14 @@ Hydra separa:
 <git-common-dir>/hydra/project.json
 <heads-directory>/.hydra/directory.json
 <heads-directory>/.hydra/heads.json
+<git-private-worktree-directory>/hydra-head.json
 ```
 
 - `project.json` individua l’installazione locale da qualunque worktree;
 - `directory.json` prova l’ownership tramite `projectId` e `installationId`;
 - `heads.json` contiene l’inventario fisico delle Head locali.
+- ogni `hydra-head.json` conserva i metadati esatti della singola Head per il
+  solo recupero di un inventario completamente assente.
 
 Questi file:
 
@@ -1161,6 +1184,17 @@ metadata symlinkate e destinazioni annidate dentro altre worktree.
 Esiste già `.hydra.json`. Non eseguire nuovamente `hydra init` e non cancellare
 metadati. Usa `hydra status` o `hydra repair` per ispezionare lo stato locale;
 il repair corrente non reinizializza il progetto.
+
+### Manca `heads.json`
+
+Non ricrearlo a mano. Esegui `hydra repair`: per le Head create con un
+manifest di recupero verificabile, Hydra può proporre la ricostruzione esatta
+dell'inventario. Controlla l'elenco e conferma soltanto se tutte le Head attese
+sono presenti. Se anche una worktree Hydra non ha un manifest coerente, Hydra
+non scrive uno stato parziale e richiede diagnosi manuale.
+
+Se `heads.json` esiste ma è malformato, Hydra lo conserva e restituisce un
+errore. Non cancellarlo per forzare il recupero: preservalo per la diagnosi.
 
 ### “configuration version 1 is not supported”
 
