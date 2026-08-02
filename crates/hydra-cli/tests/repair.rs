@@ -84,6 +84,142 @@ fn recovery_manifest_path(repository: &Path, name: &str) -> PathBuf {
     )
 }
 
+fn remove_head_from_inventory(repository: &Path, name: &str) -> (Vec<u8>, Vec<u8>) {
+    let state_path = head_state_path(repository);
+    let original = fs::read(&state_path).expect("inventory should be readable");
+    let mut state: serde_json::Value =
+        serde_json::from_slice(&original).expect("inventory should be valid JSON");
+    state["heads"]
+        .as_object_mut()
+        .expect("heads should be an object")
+        .remove(name)
+        .expect("Head should be recorded before the crash fixture");
+    let mut interrupted = serde_json::to_vec_pretty(&state).expect("inventory should serialize");
+    interrupted.push(b'\n');
+    fs::write(&state_path, &interrupted).expect("interrupted inventory should be written");
+    (original, interrupted)
+}
+
+#[test]
+fn repair_requires_confirmation_before_adopting_a_manifest_backed_head() {
+    let directory = TestDirectory::new("repair-manifest-head-declined");
+    let repository = create_initialized_project(&directory);
+    create_head(&repository, "existing");
+    create_head(&repository, "payment");
+    let (_, interrupted_inventory) = remove_head_from_inventory(&repository, "payment");
+
+    let output = run_repair(&repository, b"\n");
+
+    assert!(
+        output.status.success(),
+        "repair planning should succeed, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    assert!(stdout.contains("Recoverable untracked Head: payment"));
+    assert!(stdout.contains("Add 1 recovered Head to the inventory? [y/N] "));
+    assert!(stdout.ends_with("No repairs applied.\n"));
+    assert_eq!(
+        fs::read(head_state_path(&repository)).expect("inventory should remain readable"),
+        interrupted_inventory
+    );
+    assert!(head_is_recorded(&repository, "existing"));
+    assert!(!head_is_recorded(&repository, "payment"));
+    assert!(heads_directory(&repository).join("payment").is_dir());
+    assert!(branch_exists(&repository, "payment"));
+    assert!(!head_state_lock_path(&repository).exists());
+}
+
+#[test]
+fn confirmed_repair_adopts_a_manifest_backed_head_without_changing_existing_entries() {
+    let directory = TestDirectory::new("repair-manifest-head-confirmed");
+    let repository = create_initialized_project(&directory);
+    create_head(&repository, "existing");
+    create_head(&repository, "payment");
+    let (complete_inventory, _) = remove_head_from_inventory(&repository, "payment");
+
+    let output = run_repair(&repository, b"yes\n");
+
+    assert!(
+        output.status.success(),
+        "confirmed Head adoption should succeed, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8(output.stdout)
+            .expect("stdout should be UTF-8")
+            .ends_with("Added 1 recovered Head to the inventory.\n")
+    );
+    assert_eq!(
+        fs::read(head_state_path(&repository)).expect("inventory should remain readable"),
+        complete_inventory,
+        "adoption should restore exact metadata and preserve existing entries"
+    );
+    assert!(head_is_recorded(&repository, "existing"));
+    assert!(head_is_recorded(&repository, "payment"));
+    assert!(heads_directory(&repository).join("payment").is_dir());
+    assert!(branch_exists(&repository, "payment"));
+    assert!(!head_state_lock_path(&repository).exists());
+}
+
+#[test]
+fn untracked_head_recovery_rechecks_the_manifest_after_planning() {
+    let directory = TestDirectory::new("repair-manifest-head-race");
+    let repository = create_initialized_project(&directory);
+    create_head(&repository, "payment");
+    let (_, interrupted_inventory) = remove_head_from_inventory(&repository, "payment");
+    let plan = hydra_core::plan_repairs(&repository).expect("repair planning should succeed");
+    assert_eq!(plan.recoverable_untracked_heads, ["payment"]);
+    fs::remove_file(recovery_manifest_path(&repository, "payment"))
+        .expect("fixture should remove the recovery manifest after planning");
+
+    let result =
+        hydra_core::apply_untracked_head_recovery(&repository, &plan.recoverable_untracked_heads)
+            .expect("changed recovery state should be skipped safely");
+
+    assert!(result.recovered_heads.is_empty());
+    assert_eq!(
+        fs::read(head_state_path(&repository)).expect("inventory should remain readable"),
+        interrupted_inventory
+    );
+    assert!(!head_is_recorded(&repository, "payment"));
+    assert!(heads_directory(&repository).join("payment").is_dir());
+    assert!(branch_exists(&repository, "payment"));
+    assert!(!head_state_lock_path(&repository).exists());
+}
+
+#[test]
+fn repair_does_not_adopt_a_head_with_an_inconsistent_recovery_manifest() {
+    let directory = TestDirectory::new("repair-inconsistent-head-manifest");
+    let repository = create_initialized_project(&directory);
+    create_head(&repository, "payment");
+    let (_, interrupted_inventory) = remove_head_from_inventory(&repository, "payment");
+    let manifest_path = recovery_manifest_path(&repository, "payment");
+    let mut manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(&manifest_path).expect("manifest should be readable"))
+            .expect("manifest should be valid JSON");
+    manifest["name"] = serde_json::json!("other");
+    let mut manifest_bytes =
+        serde_json::to_vec_pretty(&manifest).expect("manifest should serialize");
+    manifest_bytes.push(b'\n');
+    fs::write(&manifest_path, manifest_bytes).expect("fixture manifest should be replaced");
+
+    let output = run_repair(&repository, b"yes\n");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    assert!(stdout.contains("Untracked Hydra worktree: payment"));
+    assert!(stdout.ends_with("No automatic repairs available; manual recovery required.\n"));
+    assert_eq!(
+        fs::read(head_state_path(&repository)).expect("inventory should remain readable"),
+        interrupted_inventory
+    );
+    assert!(!head_is_recorded(&repository, "payment"));
+    assert!(heads_directory(&repository).join("payment").is_dir());
+    assert!(branch_exists(&repository, "payment"));
+    assert!(!head_state_lock_path(&repository).exists());
+}
+
 #[test]
 fn repair_requires_confirmation_before_removing_an_abandoned_current_state_lock() {
     let directory = TestDirectory::new("repair-abandoned-state-lock-declined");
@@ -453,6 +589,8 @@ fn repair_reports_an_untracked_hydra_worktree_without_guessing_metadata() {
     let repository = create_initialized_project(&directory);
     create_head(&repository, "payment");
     let head = heads_directory(&repository).join("payment");
+    fs::remove_file(recovery_manifest_path(&repository, "payment"))
+        .expect("fixture should remove the exact recovery metadata");
     let state_path = head_state_path(&repository);
     let mut state: serde_json::Value =
         serde_json::from_slice(&fs::read(&state_path).expect("state should be readable"))

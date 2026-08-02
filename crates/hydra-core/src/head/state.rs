@@ -348,6 +348,24 @@ impl StateTransaction {
 
     pub(super) fn commit(mut self, name: String, metadata: HeadMetadata) -> Result<(), HeadError> {
         self.state.heads.insert(name, metadata);
+        self.publish_state()
+    }
+
+    pub(super) fn commit_many(
+        mut self,
+        heads: BTreeMap<String, HeadMetadata>,
+    ) -> Result<(), HeadError> {
+        if let Some(name) = heads
+            .keys()
+            .find(|name| self.state.heads.contains_key(name.as_str()))
+        {
+            return Err(self.abort(HeadError::HeadAlreadyExists(name.clone())));
+        }
+        self.state.heads.extend(heads);
+        self.publish_state()
+    }
+
+    fn publish_state(self) -> Result<(), HeadError> {
         let result = serde_json::to_vec_pretty(&self.state)
             .map_err(HeadError::SerializeState)
             .and_then(|mut bytes| {

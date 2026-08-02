@@ -435,7 +435,8 @@ identity and intent to a versioned `hydra-head.json` manifest inside the
 linked worktree's private Git administrative directory. The file is created
 with no-clobber atomic publication and is not placed in the project working
 tree. It exists only to let `hydra repair` reconstruct a completely missing
-inventory without inferring fields that Git does not preserve.
+inventory or adopt this exact Head after a crash immediately before inventory
+publication, without inferring fields that Git does not preserve.
 
 State publication:
 
@@ -532,12 +533,13 @@ cargo test --release -p hydra-cli \
 2. **Forced fallback coverage in Head creation.** Initialization directly
    verifies both CoW and full-copy behavior. Head-creation tests accept either
    detected backend but do not yet force the per-file fallback path.
-3. **Partial creation crash reconciliation.** Atomic state publication and
-   rollback protect ordinary errors, and repair can now remove a confirmed
-   abandoned current-version lock after the OS guard is released. Process
-   termination before inventory publication can still leave branch, worktree,
-   filesystem, or manifest combinations that are not yet adopted or rolled
-   back automatically.
+3. **Earlier partial creation crash reconciliation.** Atomic state publication
+   and rollback protect ordinary errors. Repair can remove a confirmed
+   abandoned current-version lock and adopt a complete manifest-backed Head
+   after a crash immediately before inventory publication. Termination before
+   the recovery manifest is durably published can still leave branch,
+   worktree, or filesystem combinations that are not adopted or rolled back
+   automatically.
 4. **Cross-platform symlinks and durability.** Tracked and overlay symlink
    materialization is implemented only on Unix. Direct runtime evidence for
    this workflow currently comes from the development platform and does not

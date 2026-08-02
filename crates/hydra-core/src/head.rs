@@ -29,7 +29,8 @@ use overlay::{OverlayPlan, materialize_overlays, plan_overlays};
 pub use removal::{RemoveHeadOptions, RemovedHead, remove_head};
 pub use repair::{
     InventoryRecoveryResult, RepairIssue, RepairPlan, RepairResult,
-    apply_abandoned_state_lock_recovery, apply_inventory_recovery, apply_repairs, plan_repairs,
+    apply_abandoned_state_lock_recovery, apply_inventory_recovery, apply_repairs,
+    apply_untracked_head_recovery, plan_repairs,
 };
 use state::{HeadMetadata, StateSnapshot, StateTransaction, discover_project_repository};
 

@@ -929,7 +929,10 @@ e deve poter:
 - distinguere tramite un guard del sistema operativo un lock corrente attivo
   da uno abbandonato dopo l'interruzione del processo;
 - rimuovere un lock abbandonato soltanto se appartiene allo schema corrente e
-  dopo conferma esplicita, senza dedurre l'attività da PID persistiti.
+  dopo conferma esplicita, senza dedurre l'attività da PID persistiti;
+- adottare atomicamente in un inventario esistente una worktree Hydra omessa
+  soltanto quando il suo manifest privato conserva metadati esatti e coerenti
+  con nome, percorso gestito e branch osservati da Git.
 
 Le correzioni distruttive o ambigue richiedono sempre una conferma esplicita.
 

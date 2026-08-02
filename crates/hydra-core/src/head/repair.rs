@@ -24,6 +24,7 @@ pub struct RepairPlan {
     pub missing_inventory: Option<PathBuf>,
     pub recoverable_inventory: Vec<String>,
     pub abandoned_state_lock: Option<PathBuf>,
+    pub recoverable_untracked_heads: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -42,6 +43,11 @@ pub enum RepairIssue {
     },
     ActiveStateLock {
         path: PathBuf,
+    },
+    RecoverableUntrackedHead {
+        name: String,
+        path: PathBuf,
+        head_ref: String,
     },
     StaleInventory {
         name: String,
@@ -196,6 +202,53 @@ pub fn apply_abandoned_state_lock_recovery(source_path: &Path) -> Result<bool, H
     persistence::remove_abandoned_state_lock(&state_path)
 }
 
+/// Adds explicitly approved manifest-backed worktrees to an existing inventory.
+///
+/// The inventory remains unchanged when the complete approved set no longer
+/// matches the deterministic recovery candidates after locking.
+///
+/// # Errors
+///
+/// Returns [`HeadError`] when installation validation, locking, manifest or
+/// Git validation, or atomic inventory publication fails.
+pub fn apply_untracked_head_recovery(
+    source_path: &Path,
+    approved_heads: &[String],
+) -> Result<InventoryRecoveryResult, HeadError> {
+    let repository = discover_project_repository(source_path)?;
+    let transaction = StateTransaction::open(&repository)?;
+    let heads_directory = match transaction.heads_directory() {
+        Ok(path) => path,
+        Err(error) => return Err(transaction.abort(error)),
+    };
+    let recovery = build_present_repair_state(
+        &repository,
+        &heads_directory,
+        transaction.branch_prefix(),
+        transaction.heads(),
+    );
+    let (plan, recovered) = match recovery {
+        Ok(recovery) => recovery,
+        Err(error) => return Err(transaction.abort(error)),
+    };
+    let approved: BTreeSet<&str> = approved_heads.iter().map(String::as_str).collect();
+    let current: BTreeSet<&str> = plan
+        .recoverable_untracked_heads
+        .iter()
+        .map(String::as_str)
+        .collect();
+    if current.is_empty() || approved != current {
+        transaction.release()?;
+        return Ok(InventoryRecoveryResult {
+            recovered_heads: Vec::new(),
+        });
+    }
+
+    let recovered_heads = plan.recoverable_untracked_heads;
+    transaction.commit_many(recovered)?;
+    Ok(InventoryRecoveryResult { recovered_heads })
+}
+
 /// Removes explicitly approved inventory entries that are still provably stale.
 ///
 /// The private branch is never deleted. Entries that changed after planning are
@@ -281,10 +334,22 @@ fn build_plan(
     branch_prefix: &str,
     heads: &BTreeMap<String, HeadMetadata>,
 ) -> Result<RepairPlan, HeadError> {
+    build_present_repair_state(repository, heads_directory, branch_prefix, heads)
+        .map(|(plan, _)| plan)
+}
+
+fn build_present_repair_state(
+    repository: &Repository,
+    heads_directory: &Path,
+    branch_prefix: &str,
+    heads: &BTreeMap<String, HeadMetadata>,
+) -> Result<(RepairPlan, BTreeMap<String, HeadMetadata>), HeadError> {
     let worktrees = git::registered_worktrees(repository)?;
     let mut issues = Vec::new();
     let mut stale_inventory = Vec::new();
     let mut moved_worktrees = Vec::new();
+    let mut recoverable_untracked_heads = Vec::new();
+    let mut recovered_untracked_heads = BTreeMap::new();
     let expected_head_refs: BTreeSet<&str> = heads.values().map(HeadMetadata::head_ref).collect();
 
     for (name, metadata) in heads {
@@ -319,21 +384,86 @@ fn build_plan(
         if name.is_empty() {
             continue;
         }
-        issues.push(RepairIssue::UntrackedHydraWorktree {
-            name: name.to_owned(),
-            path: worktree.path.clone(),
-            head_ref: head_ref.to_owned(),
-        });
+        let (issue, recovered) = plan_untracked_hydra_worktree(
+            repository,
+            heads_directory,
+            heads,
+            name,
+            head_ref,
+            worktree,
+        )?;
+        issues.push(issue);
+        if let Some(metadata) = recovered {
+            recoverable_untracked_heads.push(name.to_owned());
+            recovered_untracked_heads.insert(name.to_owned(), metadata);
+        }
     }
 
-    Ok(RepairPlan {
-        issues,
-        stale_inventory,
-        moved_worktrees,
-        missing_inventory: None,
-        recoverable_inventory: Vec::new(),
-        abandoned_state_lock: None,
-    })
+    Ok((
+        RepairPlan {
+            issues,
+            stale_inventory,
+            moved_worktrees,
+            missing_inventory: None,
+            recoverable_inventory: Vec::new(),
+            abandoned_state_lock: None,
+            recoverable_untracked_heads,
+        },
+        recovered_untracked_heads,
+    ))
+}
+
+fn plan_untracked_hydra_worktree(
+    repository: &Repository,
+    heads_directory: &Path,
+    heads: &BTreeMap<String, HeadMetadata>,
+    name: &str,
+    head_ref: &str,
+    worktree: &RegisteredWorktree,
+) -> Result<(RepairIssue, Option<HeadMetadata>), HeadError> {
+    let report_only = || {
+        (
+            RepairIssue::UntrackedHydraWorktree {
+                name: name.to_owned(),
+                path: worktree.path.clone(),
+                head_ref: head_ref.to_owned(),
+            },
+            None,
+        )
+    };
+    if heads.contains_key(name) || !git::ref_exists(repository, head_ref)? {
+        return Ok(report_only());
+    }
+    match fs::symlink_metadata(&worktree.path) {
+        Ok(metadata) if metadata.is_dir() => {}
+        Ok(_) => return Ok(report_only()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(report_only()),
+        Err(source) => {
+            return Err(HeadError::FileSystem {
+                action: "inspect untracked Hydra worktree",
+                path: worktree.path.clone(),
+                source,
+            });
+        }
+    }
+    let Some(recovered) = recovery::read_manifest(repository, &worktree.path)? else {
+        return Ok(report_only());
+    };
+    let recovered_path = validated_head_path(heads_directory, name, &recovered.metadata)?;
+    if recovered.name != name
+        || recovered.metadata.head_ref() != head_ref
+        || recovered_path != worktree.path
+    {
+        return Ok(report_only());
+    }
+    Ok((
+        RepairIssue::RecoverableUntrackedHead {
+            name: name.to_owned(),
+            path: recovered_path,
+            head_ref: head_ref.to_owned(),
+        },
+        Some(recovered.metadata),
+    ))
 }
 
 fn build_missing_inventory_plan(
@@ -418,6 +548,7 @@ fn build_missing_inventory_state(
             missing_inventory: Some(state_path),
             recoverable_inventory,
             abandoned_state_lock: None,
+            recoverable_untracked_heads: Vec::new(),
         },
         recovered_inventory,
     ))

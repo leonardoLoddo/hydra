@@ -192,11 +192,14 @@ that are not integrated, and its output must be reported.
   the complete set and use exact private recovery manifests rather than infer
   metadata from Git. A Head without a manifest, or an inconsistent Head,
   disables partial automatic reconstruction, while a malformed or unsupported
-  manifest is a validation error to preserve for diagnosis. If repair removes
-  an abandoned lock, rerun it before authorizing any other proposal. Repair
-  does not justify editing recovery manifests or lock markers, rewriting
-  ownership or locator data, replacing malformed inventory, or reconstructing
-  ambiguous metadata by hand.
+  manifest is a validation error to preserve for diagnosis. When an existing
+  inventory omits a manifest-backed worktree, authorize adoption only if the
+  proposed Head name, managed path, and private branch all match the expected
+  task; Hydra must revalidate the complete approved set under lock and preserve
+  existing entries. If repair removes an abandoned lock or adopts a Head, rerun
+  it before authorizing any other proposal. Repair does not justify editing
+  recovery manifests or lock markers, rewriting ownership or locator data,
+  replacing malformed inventory, or reconstructing ambiguous metadata by hand.
 
 Preserve recoverability over convenience: leave the Head and its private branch
 in place whenever safe integration or removal cannot be proven.

@@ -662,7 +662,7 @@ Se tutto è coerente, il comando termina senza modifiche:
 Hydra state is consistent.
 ```
 
-Hydra può proporti quattro correzioni deterministiche:
+Hydra può proporti cinque correzioni deterministiche:
 
 - rimuovere un `heads.json.lock` abbandonato, ma solo se appartiene al formato
   corrente e il guard del sistema operativo dimostra che nessun processo Hydra
@@ -670,6 +670,9 @@ Hydra può proporti quattro correzioni deterministiche:
 - ricostruire un `heads.json` assente dai manifest privati delle Head, ma solo
   se tutte le worktree con prefisso Hydra hanno manifest coerenti con nome,
   percorso gestito e branch Git;
+- aggiungere a un inventario esistente una Head omessa dopo un crash, ma solo
+  quando la worktree registrata e il suo manifest coincidono esattamente per
+  nome, percorso gestito e branch;
 - rimuovere dall’inventario una Head la cui directory e registrazione Git non
   esistono più, conservando sempre il branch privato;
 - riportare nel percorso gestito una worktree spostata, quando Git associa in
@@ -706,6 +709,19 @@ ha il manifest o non coincide con Git, non viene creato un inventario parziale.
 Un manifest malformato, di versione non supportata o non rappresentato da un
 file regolare interrompe la validazione senza modificare manifest, worktree,
 branch o inventario.
+
+Se l'inventario esiste ma omette una Head completa dotata di manifest, Hydra la
+mostra come recuperabile e chiede, per esempio:
+
+```text
+Add 1 recovered Head to the inventory? [y/N]
+```
+
+Se confermi, Hydra ricontrolla sotto lock l'intero insieme approvato e aggiunge
+atomicamente i metadati esatti senza cambiare le voci già registrate. Se il
+manifest, Git o l'inventario cambiano durante la conferma, non adotta nessuna
+Head. Un manifest assente o semanticamente incoerente lascia la worktree in
+sola segnalazione e non autorizza metadati dedotti.
 
 Altre incoerenze vengono soltanto segnalate: worktree Hydra senza manifest
 verificabile, directory registrate ma mancanti, directory non registrate,

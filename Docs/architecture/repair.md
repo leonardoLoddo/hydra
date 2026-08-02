@@ -39,7 +39,7 @@ repair candidate.
 
 ## Guided Repairs
 
-Hydra offers only four deterministic repairs, and applies none without an
+Hydra offers only five deterministic repairs, and applies none without an
 explicit affirmative answer.
 
 ### Abandoned current-version state lock
@@ -85,6 +85,31 @@ Head set to match the approved set exactly, and creates `heads.json`
 atomically without replacing an existing file. A malformed or unsupported
 inventory is an error and remains byte-for-byte unchanged.
 
+### Manifest-backed untracked Head
+
+When `heads.json` exists but omits a registered Hydra-prefixed worktree, Hydra
+can adopt that Head only when:
+
+1. the inventory does not already contain the derived Head name;
+2. the registered path is a present directory and its private branch ref still
+   exists;
+3. the worktree has a current, valid private recovery manifest;
+4. manifest name and private ref equal the name and symbolic branch observed
+   from Git;
+5. the manifest path equals `<owned-heads-directory>/<name>` and the registered
+   worktree path exactly.
+
+Hydra reports each qualifying worktree as a recoverable untracked Head. After
+confirmation, it acquires the normal state lock, rebuilds the complete
+candidate set, and requires that set to equal the approved names exactly. It
+then atomically adds the recovered metadata while preserving all existing
+inventory entries, worktrees, and branches. The command returns after adoption
+so any other inconsistency can be planned again from the new state.
+
+A missing or semantically inconsistent manifest leaves the worktree
+report-only. A malformed, non-regular, or unsupported manifest is a validation
+error and remains untouched.
+
 ### Stale inventory
 
 An entry is stale only when all of these facts hold:
@@ -115,7 +140,8 @@ inventory toward an arbitrary external destination.
 
 Hydra reports but does not guess a mutation for:
 
-- a Hydra-prefixed Git worktree missing from inventory;
+- a Hydra-prefixed Git worktree missing from inventory and lacking a matching
+  recovery manifest;
 - a registered worktree whose physical directory is missing;
 - a present managed directory not registered with Git;
 - non-directory entries at managed Head paths;
@@ -143,6 +169,11 @@ rebuilds the repair plan from current Git and inventory state. An approved
 entry that is no longer a repair candidate is skipped. Missing-inventory
 recovery is stricter: any change to the complete approved Head set cancels the
 publication.
+
+Manifest-backed adoption uses the same exact-set rule after acquiring the
+normal state lock. A removed or changed manifest, a changed Git association,
+or a newly colliding inventory name cancels the complete adoption rather than
+publishing a partial approved set.
 
 Abandoned-lock recovery similarly reacquires the stable OS guard after
 confirmation. If another process owns it, or if the marker disappeared or
@@ -174,6 +205,10 @@ Disposable-repository tests prove:
   recovery manifests while preserving worktrees and branches;
 - one missing recovery manifest disables complete automatic reconstruction;
 - malformed inventory is rejected and preserved rather than replaced;
+- a manifest-backed untracked Head requires confirmation and restores its
+  exact original metadata without changing existing inventory entries;
+- missing or inconsistent manifests do not authorize adoption, and a manifest
+  change after planning cancels publication without leaving a lock;
 - stale inventory requires confirmation;
 - confirmed stale cleanup removes only metadata and preserves the branch;
 - relocated worktrees require confirmation and return to the managed path only

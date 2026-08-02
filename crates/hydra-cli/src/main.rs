@@ -341,6 +341,9 @@ fn repair() -> ExitCode {
     if plan.missing_inventory.is_some() {
         return repair_missing_inventory(&plan);
     }
+    if !plan.recoverable_untracked_heads.is_empty() {
+        return repair_untracked_heads(&plan);
+    }
     if plan.stale_inventory.is_empty() && plan.moved_worktrees.is_empty() {
         println!("No automatic repairs available; manual recovery required.");
         return ExitCode::SUCCESS;
@@ -413,6 +416,51 @@ fn repair() -> ExitCode {
         }
         Err(error) => {
             eprintln!("error: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn repair_untracked_heads(plan: &hydra_core::RepairPlan) -> ExitCode {
+    let stdin = io::stdin();
+    let mut input = stdin.lock();
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    match request_untracked_head_recovery_confirmation(
+        &mut input,
+        &mut output,
+        plan.recoverable_untracked_heads.len(),
+    ) {
+        Ok(true) => match hydra_core::apply_untracked_head_recovery(
+            Path::new("."),
+            &plan.recoverable_untracked_heads,
+        ) {
+            Ok(result) if result.recovered_heads.len() == 1 => {
+                println!("Added 1 recovered Head to the inventory.");
+                ExitCode::SUCCESS
+            }
+            Ok(result) if !result.recovered_heads.is_empty() => {
+                println!(
+                    "Added {} recovered Heads to the inventory.",
+                    result.recovered_heads.len()
+                );
+                ExitCode::SUCCESS
+            }
+            Ok(_) => {
+                println!("No repairs applied; Head recovery changed during confirmation.");
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("error: {error}");
+                ExitCode::FAILURE
+            }
+        },
+        Ok(false) => {
+            println!("No repairs applied.");
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("error: failed to read repair confirmation: {error}");
             ExitCode::FAILURE
         }
     }
@@ -512,6 +560,11 @@ fn show_repair_issue(issue: &hydra_core::RepairIssue) {
         hydra_core::RepairIssue::ActiveStateLock { path } => {
             println!("Active Hydra state lock: {}", safe_path_label(path));
         }
+        hydra_core::RepairIssue::RecoverableUntrackedHead {
+            name,
+            path: _,
+            head_ref: _,
+        } => println!("Recoverable untracked Head: {name}"),
         hydra_core::RepairIssue::StaleInventory {
             name,
             path,
@@ -589,6 +642,28 @@ fn request_abandoned_lock_confirmation(
     output: &mut impl Write,
 ) -> io::Result<bool> {
     write!(output, "Remove the abandoned Hydra state lock? [y/N] ")?;
+    output.flush()?;
+    let mut response = String::new();
+    input.read_line(&mut response)?;
+    Ok(matches!(
+        response.trim().to_ascii_lowercase().as_str(),
+        "y" | "yes"
+    ))
+}
+
+fn request_untracked_head_recovery_confirmation(
+    input: &mut impl BufRead,
+    output: &mut impl Write,
+    count: usize,
+) -> io::Result<bool> {
+    if count == 1 {
+        write!(output, "Add 1 recovered Head to the inventory? [y/N] ")?;
+    } else {
+        write!(
+            output,
+            "Add {count} recovered Heads to the inventory? [y/N] "
+        )?;
+    }
     output.flush()?;
     let mut response = String::new();
     input.read_line(&mut response)?;
