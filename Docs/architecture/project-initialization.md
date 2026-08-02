@@ -177,6 +177,11 @@ The Heads directory receives a matching ownership marker:
 }
 ```
 
+After initialization, lifecycle state transactions also use this stable marker
+as the operating-system advisory-lock target. The JSON content remains solely
+the ownership identity; lock ownership is attached to the open file handle and
+does not add a PID, process record, or mutable runtime field to the marker.
+
 Its physical inventory is initialized as:
 
 ```json

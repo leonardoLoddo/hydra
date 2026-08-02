@@ -176,9 +176,11 @@ that are not integrated, and its output must be reported.
   ownership marker, inventory, or lock by hand.
 - Never replace Hydra lifecycle commands with `rm`, recursive deletion, or
   destructive `git worktree` commands.
-- Do not delete a lock merely because it appears stale. First report the
-  operation, processes, worktrees, branches, and Hydra status that can be
-  observed safely.
+- Do not delete a lock by hand merely because it appears stale. Run `hydra
+  repair` read-only first. Authorize its dedicated lock removal only when Hydra
+  classifies a current-version lock as abandoned through the OS guard. Stop and
+  preserve active locks; treat malformed or unsupported locks as validation
+  errors, not formats to migrate.
 - Use `hydra doctor storage` when the active backend or fallback behavior needs
   diagnosis. Report its result and any temporary path that Hydra could not
   clean up; do not remove such a path blindly.
@@ -188,11 +190,13 @@ that are not integrated, and its output must be reported.
   authorizes. When the inventory is missing, approve reconstruction only if
   every expected Head appears in the recoverable set; Hydra will revalidate
   the complete set and use exact private recovery manifests rather than infer
-  metadata from Git. A legacy or inconsistent Head disables partial automatic
-  reconstruction, while a malformed or unsupported manifest is a validation
-  error to preserve for diagnosis. Repair does not justify editing recovery
-  manifests, deleting stale locks, rewriting ownership or locator data,
-  replacing malformed inventory, or reconstructing ambiguous metadata by hand.
+  metadata from Git. A Head without a manifest, or an inconsistent Head,
+  disables partial automatic reconstruction, while a malformed or unsupported
+  manifest is a validation error to preserve for diagnosis. If repair removes
+  an abandoned lock, rerun it before authorizing any other proposal. Repair
+  does not justify editing recovery manifests or lock markers, rewriting
+  ownership or locator data, replacing malformed inventory, or reconstructing
+  ambiguous metadata by hand.
 
 Preserve recoverability over convenience: leave the Head and its private branch
 in place whenever safe integration or removal cannot be proven.

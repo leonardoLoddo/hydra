@@ -26,7 +26,9 @@ git worktree list --porcelain -z
 
 snapshot containing both paths and symbolic branch refs. Planning does not
 acquire `heads.json.lock`, write inventory, move worktrees, delete refs, or
-hide inconsistencies.
+hide inconsistencies. When a recognized lock marker exists, it performs a
+non-blocking advisory-lock probe against the stable ownership marker and
+immediately releases a successful probe. This changes no persisted state.
 
 Inventory paths retain the same trust boundary as inspection and removal:
 every name is validated and every recorded path must equal
@@ -37,8 +39,26 @@ repair candidate.
 
 ## Guided Repairs
 
-Hydra offers only three deterministic repairs, and applies none without an
+Hydra offers only four deterministic repairs, and applies none without an
 explicit affirmative answer.
+
+### Abandoned current-version state lock
+
+Every new state transaction writes a versioned `heads.json.lock` marker while
+holding an exclusive operating-system advisory lock on the validated
+`directory.json` ownership marker. If the process terminates, the OS releases
+the advisory lock even though the marker can remain.
+
+Hydra proposes removal only when the marker is a regular file with the exact
+current schema and the advisory guard can be acquired without blocking. After
+confirmation, the core acquires the guard again, re-reads the marker, and
+removes it only if it is still the same supported lock class. The command then
+returns so the user can rerun repair against state that is no longer blocked.
+
+An active current lock is report-only. Empty or malformed JSON, unknown fields,
+and unsupported versions are invalid local metadata: planning fails and leaves
+the file untouched. Repair never uses PID inference, migrates another lock
+format, or edits the ownership marker.
 
 ### Missing inventory
 
@@ -110,9 +130,9 @@ enough authoritative information to reconstruct `baseRef`, `baseCommit`,
 preserves the worktree and branch and requests manual diagnosis instead of
 fabricating intent.
 
-The current command does not remove stale lock files, repair locator or
+The current command does not remove active lock files, repair locator or
 ownership identity, or relocate the whole Heads directory. Missing inventories
-from legacy Heads without recovery manifests remain explicitly report-only.
+containing Heads without recovery manifests remain explicitly report-only.
 
 ---
 
@@ -123,6 +143,11 @@ rebuilds the repair plan from current Git and inventory state. An approved
 entry that is no longer a repair candidate is skipped. Missing-inventory
 recovery is stricter: any change to the complete approved Head set cancels the
 publication.
+
+Abandoned-lock recovery similarly reacquires the stable OS guard after
+confirmation. If another process owns it, or if the marker disappeared or
+changed class, Hydra preserves the current path and reports that no repair was
+applied or that another state operation owns it.
 
 Relocated worktrees are restored before inventory publication. Stale entries
 are removed together through one atomic state replacement. No repair path
@@ -138,6 +163,12 @@ Declining every prompt leaves Git, filesystem, inventory, and refs unchanged.
 Disposable-repository tests prove:
 
 - a consistent project remains byte-for-byte unchanged;
+- current-version abandoned lock removal requires confirmation and changes no
+  inventory, worktree, or branch state;
+- an active current-version lock is detected through the OS guard and
+  preserved, including when ownership changes after planning;
+- malformed and unsupported lock markers fail validation and remain
+  byte-for-byte unchanged;
 - missing inventory requires confirmation and remains absent after refusal;
 - confirmed recovery reproduces the original inventory bytes from exact
   recovery manifests while preserving worktrees and branches;
@@ -149,6 +180,7 @@ Disposable-repository tests prove:
   after approval;
 - an untracked Hydra worktree is reported without inferred metadata;
 - a registered worktree with a deleted directory is detected without mutation;
-- the state lock is absent after success, refusal, and report-only outcomes;
+- repair paths that start without a lock leave none behind, while refusal and
+  report-only classification preserve the pre-existing lock byte-for-byte;
 - NUL-delimited Git worktree records keep paths and branches associated,
   including detached worktrees.

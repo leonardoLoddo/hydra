@@ -333,7 +333,7 @@ Hydra separa configurazione condivisa, locator locale e stato fisico.
 |---|---|---:|
 | `<project-root>/.hydra.json` | Politica condivisa per creare le Head | Sì |
 | `<git-common-dir>/hydra/project.json` | Locator canonico e identità dell'installazione locale | No |
-| `<heads-directory>/.hydra/directory.json` | Marker di ownership della directory | No |
+| `<heads-directory>/.hydra/directory.json` | Marker di ownership e target stabile del guard OS per le mutazioni di stato | No |
 | `<heads-directory>/.hydra/heads.json` | Inventario delle Head fisiche locali | No |
 | directory amministrativa Git privata della worktree, `hydra-head.json` | Manifest di recupero esatto della singola Head | No |
 
@@ -925,7 +925,11 @@ e deve poter:
 - individuare worktree Hydra non registrati;
 - aggiornare percorsi modificati;
 - segnalare branch o directory incoerenti;
-- ricostruire lo stato minimo senza modificare il codice.
+- ricostruire lo stato minimo senza modificare il codice;
+- distinguere tramite un guard del sistema operativo un lock corrente attivo
+  da uno abbandonato dopo l'interruzione del processo;
+- rimuovere un lock abbandonato soltanto se appartiene allo schema corrente e
+  dopo conferma esplicita, senza dedurre l'attività da PID persistiti.
 
 Le correzioni distruttive o ambigue richiedono sempre una conferma esplicita.
 
@@ -1049,6 +1053,15 @@ uguale con `installationId` differente rappresenta un'altra installazione
 locale dello stesso progetto e non autorizza il riuso implicito della
 directory.
 
+Durante una mutazione il marker di ownership resta immutato, ma il relativo
+file aperto è anche il target stabile di un advisory lock esclusivo del sistema
+operativo. Il marker effimero `heads.json.lock` contiene soltanto una versione
+di schema, senza PID o identità di agenti. Dopo un crash, `repair` può rimuovere
+quel marker soltanto se ne riconosce la versione e riesce a riacquisire il
+guard; i lock attivi vengono preservati, mentre formati malformati o versioni
+diverse da quella corrente falliscono la validazione senza mutazioni. Non
+vengono migrati formati precedenti perché Hydra non è ancora stata rilasciata.
+
 L'inventario fisico vive in `<heads-directory>/.hydra/heads.json`:
 
 ```json
@@ -1094,7 +1107,7 @@ soltanto a ricostruire atomicamente un `heads.json` assente. Il repair può
 procedere solo se tutte le worktree con il prefisso Hydra configurato hanno un
 manifest coerente con nome, percorso gestito e ref simbolica. Non ricostruisce
 parzialmente l'inventario, non sostituisce un inventario malformato e non
-inventa metadati per Head legacy prive di manifest.
+inventa metadati per Head prive di manifest.
 
 Git rimane autorevole per:
 

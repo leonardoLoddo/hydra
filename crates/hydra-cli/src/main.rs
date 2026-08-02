@@ -335,6 +335,9 @@ fn repair() -> ExitCode {
     for issue in &plan.issues {
         show_repair_issue(issue);
     }
+    if plan.abandoned_state_lock.is_some() {
+        return repair_abandoned_state_lock();
+    }
     if plan.missing_inventory.is_some() {
         return repair_missing_inventory(&plan);
     }
@@ -415,6 +418,37 @@ fn repair() -> ExitCode {
     }
 }
 
+fn repair_abandoned_state_lock() -> ExitCode {
+    let stdin = io::stdin();
+    let mut input = stdin.lock();
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    match request_abandoned_lock_confirmation(&mut input, &mut output) {
+        Ok(true) => match hydra_core::apply_abandoned_state_lock_recovery(Path::new(".")) {
+            Ok(true) => {
+                println!("Removed the abandoned Hydra state lock.");
+                ExitCode::SUCCESS
+            }
+            Ok(false) => {
+                println!("No repairs applied; state-lock recovery changed during confirmation.");
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("error: {error}");
+                ExitCode::FAILURE
+            }
+        },
+        Ok(false) => {
+            println!("No repairs applied.");
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("error: failed to read repair confirmation: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
 fn repair_missing_inventory(plan: &hydra_core::RepairPlan) -> ExitCode {
     if plan.recoverable_inventory.is_empty() {
         println!("No automatic repairs available; manual recovery required.");
@@ -472,6 +506,12 @@ fn show_repair_issue(issue: &hydra_core::RepairIssue) {
             path: _,
             head_ref: _,
         } => println!("Recoverable Head: {name}"),
+        hydra_core::RepairIssue::AbandonedStateLock { path } => {
+            println!("Abandoned Hydra state lock: {}", safe_path_label(path));
+        }
+        hydra_core::RepairIssue::ActiveStateLock { path } => {
+            println!("Active Hydra state lock: {}", safe_path_label(path));
+        }
         hydra_core::RepairIssue::StaleInventory {
             name,
             path,
@@ -542,6 +582,20 @@ fn show_repair_issue(issue: &hydra_core::RepairIssue) {
         ),
         _ => println!("Unknown repair issue; manual recovery required"),
     }
+}
+
+fn request_abandoned_lock_confirmation(
+    input: &mut impl BufRead,
+    output: &mut impl Write,
+) -> io::Result<bool> {
+    write!(output, "Remove the abandoned Hydra state lock? [y/N] ")?;
+    output.flush()?;
+    let mut response = String::new();
+    input.read_line(&mut response)?;
+    Ok(matches!(
+        response.trim().to_ascii_lowercase().as_str(),
+        "y" | "yes"
+    ))
 }
 
 fn request_inventory_recovery_confirmation(

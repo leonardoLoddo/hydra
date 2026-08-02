@@ -144,6 +144,10 @@ impl StateSnapshot {
         &self.state.heads
     }
 
+    pub(super) fn state_path(&self) -> &Path {
+        &self.state_path
+    }
+
     pub(super) fn head(&self, name: &str) -> Result<&HeadMetadata, HeadError> {
         self.state
             .heads

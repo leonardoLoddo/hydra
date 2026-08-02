@@ -216,9 +216,19 @@ creates:
 <heads-directory>/.hydra/heads.json.lock
 ```
 
-The state is read and parsed while that lock is held. Every normal success,
-validation failure, cancellation, and pre-commit operational failure releases
-the lock. A pre-existing lock is not stolen or removed.
+The lock is a versioned JSON marker. While it exists, the operation also holds
+an exclusive operating-system advisory lock on the stable, validated
+`directory.json` ownership marker. The state is read and parsed while both are
+held. Every normal success, validation failure, cancellation, and pre-commit
+operational failure removes the ephemeral marker before releasing the advisory
+guard. A pre-existing lock is not stolen or removed by ordinary lifecycle
+commands.
+
+If a process terminates after creating a current-version lock, the operating
+system releases the advisory guard while the marker remains. This distinction
+lets an explicitly confirmed `hydra repair` remove that exact abandoned lock.
+An active lock remains untouched. A malformed marker or unsupported version is
+invalid local metadata and fails validation without mutation.
 
 A confirmed unsafe-symlink exclusion is persisted while this same lock is
 held. Hydra compares `.hydra.json` byte-for-byte with the version loaded for
@@ -522,10 +532,12 @@ cargo test --release -p hydra-cli \
 2. **Forced fallback coverage in Head creation.** Initialization directly
    verifies both CoW and full-copy behavior. Head-creation tests accept either
    detected backend but do not yet force the per-file fallback path.
-3. **Crash reconciliation.** Atomic state publication and rollback protect
-   ordinary errors, but process termination between Git/filesystem steps is not
-   yet reconciled automatically. A stale state lock is reported and preserved
-   for later repair rather than removed heuristically.
+3. **Partial creation crash reconciliation.** Atomic state publication and
+   rollback protect ordinary errors, and repair can now remove a confirmed
+   abandoned current-version lock after the OS guard is released. Process
+   termination before inventory publication can still leave branch, worktree,
+   filesystem, or manifest combinations that are not yet adopted or rolled
+   back automatically.
 4. **Cross-platform symlinks and durability.** Tracked and overlay symlink
    materialization is implemented only on Unix. Direct runtime evidence for
    this workflow currently comes from the development platform and does not

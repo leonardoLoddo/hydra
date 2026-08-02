@@ -662,8 +662,11 @@ Se tutto è coerente, il comando termina senza modifiche:
 Hydra state is consistent.
 ```
 
-Hydra può proporti tre correzioni deterministiche:
+Hydra può proporti quattro correzioni deterministiche:
 
+- rimuovere un `heads.json.lock` abbandonato, ma solo se appartiene al formato
+  corrente e il guard del sistema operativo dimostra che nessun processo Hydra
+  lo possiede;
 - ricostruire un `heads.json` assente dai manifest privati delle Head, ma solo
   se tutte le worktree con prefisso Hydra hanno manifest coerenti con nome,
   percorso gestito e branch Git;
@@ -672,9 +675,22 @@ Hydra può proporti tre correzioni deterministiche:
 - riportare nel percorso gestito una worktree spostata, quando Git associa in
   modo univoco quel percorso al branch privato registrato.
 
-Entrambe richiedono una conferma esplicita. Una risposta vuota o negativa non
-applica modifiche. Dopo la conferma, Hydra acquisisce il lock, ricontrolla lo
-stato corrente e salta una correzione che nel frattempo non è più valida.
+Tutte richiedono una conferma esplicita. Una risposta vuota o negativa non
+applica modifiche. Dopo la conferma, Hydra riacquisisce la protezione necessaria,
+ricontrolla lo stato corrente e salta una correzione che nel frattempo non è
+più valida.
+
+Per un lock corrente riconosciuto ma non più posseduto da un processo, Hydra
+mostra il percorso e chiede:
+
+```text
+Remove the abandoned Hydra state lock? [y/N]
+```
+
+Se confermi, Hydra riacquisisce il guard, ricontrolla il file e rimuove soltanto
+il marker effimero. Inventario, worktree, branch e marker di ownership restano
+invariati. Il comando termina dopo questa correzione: esegui di nuovo
+`hydra repair` per pianificare eventuali altre riparazioni.
 
 Per l'inventario mancante, Hydra elenca le Head recuperabili e chiede, per
 esempio:
@@ -684,9 +700,8 @@ Rebuild the missing inventory with 1 recovered Head? [y/N]
 ```
 
 Se confermi, Hydra ricontrolla l'intero insieme sotto lock e crea
-atomicamente l'inventario senza modificare worktree o branch. Se una Head è
-legacy, non ha il manifest, o non coincide con Git, non viene creato un
-inventario parziale.
+atomicamente l'inventario senza modificare worktree o branch. Se una Head non
+ha il manifest o non coincide con Git, non viene creato un inventario parziale.
 
 Un manifest malformato, di versione non supportata o non rappresentato da un
 file regolare interrompe la validazione senza modificare manifest, worktree,
@@ -698,9 +713,12 @@ branch assenti o differenti e associazioni ambigue. Hydra conserva file e ref
 perché Git da solo non contiene informazioni sufficienti per ricostruire con
 certezza base, target, backend e intenzione originaria.
 
-`repair` non elimina lock stale, non corregge ownership o locator e non
-reloca l'intera directory delle Head. Un inventario malformato viene rifiutato
-e conservato, non sostituito con i manifest.
+`repair` non elimina lock attivi; un lock vuoto o malformato e una versione
+diversa da quella corrente falliscono invece la validazione senza essere
+modificati. Hydra non migra formati lock precedenti perché non è ancora stata
+rilasciata. Il comando non corregge ownership o locator e non reloca l'intera
+directory delle Head. Un inventario malformato viene rifiutato e conservato,
+non sostituito con i manifest.
 
 ### 4.10 Stato attuale del ciclo di vita
 
@@ -1160,7 +1178,8 @@ Hydra separa:
 ```
 
 - `project.json` individua l’installazione locale da qualunque worktree;
-- `directory.json` prova l’ownership tramite `projectId` e `installationId`;
+- `directory.json` prova l’ownership tramite `projectId` e `installationId` e,
+  senza cambiarne il contenuto, fornisce il target stabile del guard OS;
 - `heads.json` contiene l’inventario fisico delle Head locali.
 - ogni `hydra-head.json` conserva i metadati esatti della singola Head per il
   solo recupero di un inventario completamente assente.
@@ -1241,8 +1260,14 @@ le Head. La relocation assistita non è ancora disponibile.
 ### Esiste `heads.json.lock`
 
 Un’operazione Hydra potrebbe essere attiva oppure essersi interrotta. Non
-eliminare automaticamente il lock: prima verifica processi, worktree, branch e
-inventario. Il comando `repair` corrente non rimuove lock stale.
+eliminare il lock a mano. Esegui `hydra repair`: un lock del formato corrente
+viene classificato come attivo quando il guard OS è occupato, oppure come
+abbandonato quando il guard può essere riacquisito. Soltanto il secondo viene
+proposto per la rimozione e richiede conferma esplicita.
+
+Un lock vuoto, malformato o con una versione diversa da quella corrente causa
+un errore di validazione e viene conservato per la diagnosi. Non modificarlo
+per farlo apparire recuperabile: non è prevista una migrazione.
 
 ### “Head removal is incomplete”
 

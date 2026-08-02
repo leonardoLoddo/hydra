@@ -9,8 +9,8 @@ pub use head::{
     ChangeCounts, CloseOutcome, ClosedHead, CreateHeadOptions, CreatedHead, HeadCreationProgress,
     HeadError, HeadInspection, HeadSummary, IntegrationResult, IntegrationStrategy,
     InventoryRecoveryResult, OpenedHead, ProjectInspection, RemoveHeadOptions, RemovedHead,
-    RepairIssue, RepairPlan, RepairResult, WorktreeHead, apply_inventory_recovery, apply_repairs,
-    close_head, create_head, create_head_with_progress, head_path, inspect_head, inspect_project,
-    list_heads, open_head, plan_repairs, remove_head,
+    RepairIssue, RepairPlan, RepairResult, WorktreeHead, apply_abandoned_state_lock_recovery,
+    apply_inventory_recovery, apply_repairs, close_head, create_head, create_head_with_progress,
+    head_path, inspect_head, inspect_project, list_heads, open_head, plan_repairs, remove_head,
 };
 pub use init::{InitError, InitializedProject, StorageBackend, initialize};

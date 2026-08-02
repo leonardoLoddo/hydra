@@ -1,7 +1,7 @@
 mod common;
 
 use std::{
-    fs,
+    fs::{self, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
     process::{Output, Stdio},
@@ -82,6 +82,183 @@ fn recovery_manifest_path(repository: &Path, name: &str) -> PathBuf {
             .expect("recovery manifest fixture path should be UTF-8")
             .trim_end(),
     )
+}
+
+#[test]
+fn repair_requires_confirmation_before_removing_an_abandoned_current_state_lock() {
+    let directory = TestDirectory::new("repair-abandoned-state-lock-declined");
+    let repository = create_initialized_project(&directory);
+    create_head(&repository, "payment");
+    let lock_path = head_state_lock_path(&repository);
+    let inventory_before = fs::read(head_state_path(&repository)).expect("inventory should exist");
+    fs::write(&lock_path, b"{\n  \"version\": 1\n}\n")
+        .expect("current abandoned lock fixture should be written");
+
+    let output = run_repair(&repository, b"\n");
+
+    assert!(
+        output.status.success(),
+        "repair planning should succeed, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    assert!(stdout.contains(&format!(
+        "Abandoned Hydra state lock: {}",
+        lock_path.display()
+    )));
+    assert!(stdout.contains("Remove the abandoned Hydra state lock? [y/N] "));
+    assert!(stdout.ends_with("No repairs applied.\n"));
+    assert!(lock_path.is_file(), "declining must preserve the lock");
+    assert_eq!(
+        fs::read(head_state_path(&repository)).expect("inventory should remain readable"),
+        inventory_before
+    );
+    assert!(heads_directory(&repository).join("payment").is_dir());
+    assert!(branch_exists(&repository, "payment"));
+}
+
+#[test]
+fn confirmed_repair_removes_an_abandoned_current_state_lock_only() {
+    let directory = TestDirectory::new("repair-abandoned-state-lock-confirmed");
+    let repository = create_initialized_project(&directory);
+    create_head(&repository, "payment");
+    let lock_path = head_state_lock_path(&repository);
+    let inventory_before = fs::read(head_state_path(&repository)).expect("inventory should exist");
+    fs::write(&lock_path, b"{\n  \"version\": 1\n}\n")
+        .expect("current abandoned lock fixture should be written");
+
+    let output = run_repair(&repository, b"yes\n");
+
+    assert!(
+        output.status.success(),
+        "confirmed lock recovery should succeed, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8(output.stdout)
+            .expect("stdout should be UTF-8")
+            .ends_with("Removed the abandoned Hydra state lock.\n")
+    );
+    assert!(
+        !lock_path.exists(),
+        "confirmed repair should remove the lock"
+    );
+    assert_eq!(
+        fs::read(head_state_path(&repository)).expect("inventory should remain readable"),
+        inventory_before
+    );
+    assert!(heads_directory(&repository).join("payment").is_dir());
+    assert!(branch_exists(&repository, "payment"));
+}
+
+#[test]
+fn repair_preserves_an_active_current_state_lock() {
+    let directory = TestDirectory::new("repair-active-state-lock");
+    let repository = create_initialized_project(&directory);
+    create_head(&repository, "payment");
+    let lock_path = head_state_lock_path(&repository);
+    fs::write(&lock_path, b"{\n  \"version\": 1\n}\n")
+        .expect("current active lock fixture should be written");
+    let guard_path = heads_directory(&repository).join(".hydra/directory.json");
+    let guard = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(&guard_path)
+        .expect("state guard should open");
+    guard.lock().expect("fixture should own the state guard");
+
+    let output = run_repair(&repository, b"yes\n");
+
+    guard
+        .unlock()
+        .expect("fixture should release the state guard");
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    assert!(stdout.contains(&format!("Active Hydra state lock: {}", lock_path.display())));
+    assert!(stdout.ends_with("No automatic repairs available; manual recovery required.\n"));
+    assert!(lock_path.is_file(), "active lock must remain untouched");
+    assert!(heads_directory(&repository).join("payment").is_dir());
+    assert!(branch_exists(&repository, "payment"));
+}
+
+#[test]
+fn state_lock_recovery_rechecks_process_ownership_after_planning() {
+    let directory = TestDirectory::new("repair-state-lock-race");
+    let repository = create_initialized_project(&directory);
+    create_head(&repository, "payment");
+    let lock_path = head_state_lock_path(&repository);
+    fs::write(&lock_path, b"{\n  \"version\": 1\n}\n")
+        .expect("current abandoned lock fixture should be written");
+    let plan = hydra_core::plan_repairs(&repository).expect("repair planning should succeed");
+    assert_eq!(
+        plan.abandoned_state_lock.as_deref(),
+        Some(lock_path.as_path())
+    );
+
+    let guard_path = heads_directory(&repository).join(".hydra/directory.json");
+    let guard = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(&guard_path)
+        .expect("state guard should open");
+    guard.lock().expect("fixture should own the state guard");
+    let recovery = hydra_core::apply_abandoned_state_lock_recovery(&repository);
+    guard
+        .unlock()
+        .expect("fixture should release the state guard");
+
+    assert!(matches!(
+        recovery,
+        Err(hydra_core::HeadError::StateLockExists(path)) if path == lock_path
+    ));
+    assert!(
+        lock_path.is_file(),
+        "a newly active lock must remain untouched"
+    );
+    assert!(heads_directory(&repository).join("payment").is_dir());
+    assert!(branch_exists(&repository, "payment"));
+}
+
+#[test]
+fn repair_rejects_a_malformed_state_lock_without_mutation() {
+    let directory = TestDirectory::new("repair-malformed-state-lock");
+    let repository = create_initialized_project(&directory);
+    create_head(&repository, "payment");
+    let lock_path = head_state_lock_path(&repository);
+    fs::write(&lock_path, b"").expect("malformed lock fixture should be written");
+
+    let output = run_repair(&repository, b"yes\n");
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("state lock"));
+    assert!(lock_path.is_file(), "malformed lock must remain untouched");
+    assert_eq!(
+        fs::read(&lock_path).expect("malformed lock should remain readable"),
+        b""
+    );
+    assert!(heads_directory(&repository).join("payment").is_dir());
+    assert!(branch_exists(&repository, "payment"));
+}
+
+#[test]
+fn repair_rejects_an_unsupported_state_lock_version_without_mutation() {
+    let directory = TestDirectory::new("repair-unsupported-state-lock");
+    let repository = create_initialized_project(&directory);
+    create_head(&repository, "payment");
+    let lock_path = head_state_lock_path(&repository);
+    let unsupported = b"{\n  \"version\": 2\n}\n";
+    fs::write(&lock_path, unsupported).expect("unsupported lock fixture should be written");
+
+    let output = run_repair(&repository, b"yes\n");
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("lock version 2"));
+    assert_eq!(
+        fs::read(&lock_path).expect("unsupported lock should remain readable"),
+        unsupported
+    );
+    assert!(heads_directory(&repository).join("payment").is_dir());
+    assert!(branch_exists(&repository, "payment"));
 }
 
 #[test]

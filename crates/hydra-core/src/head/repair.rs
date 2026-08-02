@@ -8,6 +8,7 @@ use super::{
     HeadError,
     git::{self, RegisteredWorktree, Repository},
     inspection::validated_head_path,
+    persistence::{self, StateLockInspection},
     recovery,
     state::{
         HeadMetadata, MissingStateSnapshot, MissingStateTransaction, RepairStateSnapshot,
@@ -22,6 +23,7 @@ pub struct RepairPlan {
     pub moved_worktrees: Vec<String>,
     pub missing_inventory: Option<PathBuf>,
     pub recoverable_inventory: Vec<String>,
+    pub abandoned_state_lock: Option<PathBuf>,
 }
 
 #[derive(Debug)]
@@ -34,6 +36,12 @@ pub enum RepairIssue {
         name: String,
         path: PathBuf,
         head_ref: String,
+    },
+    AbandonedStateLock {
+        path: PathBuf,
+    },
+    ActiveStateLock {
+        path: PathBuf,
     },
     StaleInventory {
         name: String,
@@ -105,14 +113,20 @@ pub struct InventoryRecoveryResult {
 pub fn plan_repairs(source_path: &Path) -> Result<RepairPlan, HeadError> {
     let repository = discover_project_repository(source_path)?;
     match StateSnapshot::load_for_repair(&repository)? {
-        RepairStateSnapshot::Present(snapshot) => build_plan(
-            &repository,
-            &snapshot.heads_directory()?,
-            snapshot.branch_prefix(),
-            snapshot.heads(),
-        ),
+        RepairStateSnapshot::Present(snapshot) => {
+            let mut plan = build_plan(
+                &repository,
+                &snapshot.heads_directory()?,
+                snapshot.branch_prefix(),
+                snapshot.heads(),
+            )?;
+            attach_state_lock_issue(&mut plan, snapshot.state_path())?;
+            Ok(plan)
+        }
         RepairStateSnapshot::Missing(snapshot) => {
-            build_missing_inventory_plan(&repository, &snapshot)
+            let mut plan = build_missing_inventory_plan(&repository, &snapshot)?;
+            attach_state_lock_issue(&mut plan, snapshot.state_path())?;
+            Ok(plan)
         }
     }
 }
@@ -162,6 +176,24 @@ pub fn apply_inventory_recovery(
     let recovered_heads = plan.recoverable_inventory;
     transaction.commit(recovered)?;
     Ok(InventoryRecoveryResult { recovered_heads })
+}
+
+/// Removes a recognized abandoned state lock after rechecking OS ownership.
+///
+/// An active, malformed, unsupported, or concurrently changed lock is never
+/// removed.
+///
+/// # Errors
+///
+/// Returns [`HeadError`] when installation validation, state inspection,
+/// guard acquisition, lock removal, or guard cleanup fails.
+pub fn apply_abandoned_state_lock_recovery(source_path: &Path) -> Result<bool, HeadError> {
+    let repository = discover_project_repository(source_path)?;
+    let state_path = match StateSnapshot::load_for_repair(&repository)? {
+        RepairStateSnapshot::Present(snapshot) => snapshot.state_path().to_path_buf(),
+        RepairStateSnapshot::Missing(snapshot) => snapshot.state_path().to_path_buf(),
+    };
+    persistence::remove_abandoned_state_lock(&state_path)
 }
 
 /// Removes explicitly approved inventory entries that are still provably stale.
@@ -300,6 +332,7 @@ fn build_plan(
         moved_worktrees,
         missing_inventory: None,
         recoverable_inventory: Vec::new(),
+        abandoned_state_lock: None,
     })
 }
 
@@ -384,9 +417,25 @@ fn build_missing_inventory_state(
             moved_worktrees: Vec::new(),
             missing_inventory: Some(state_path),
             recoverable_inventory,
+            abandoned_state_lock: None,
         },
         recovered_inventory,
     ))
+}
+
+fn attach_state_lock_issue(plan: &mut RepairPlan, state_path: &Path) -> Result<(), HeadError> {
+    match persistence::inspect_state_lock(state_path)? {
+        StateLockInspection::Absent => {}
+        StateLockInspection::Active(path) => {
+            plan.issues.push(RepairIssue::ActiveStateLock { path });
+        }
+        StateLockInspection::Abandoned(path) => {
+            plan.issues
+                .push(RepairIssue::AbandonedStateLock { path: path.clone() });
+            plan.abandoned_state_lock = Some(path);
+        }
+    }
+    Ok(())
 }
 
 struct RecordedHeadPlan {
