@@ -532,7 +532,8 @@ In questo esempio:
 
 Il codice versionato deriva dal commit indicato da `--from`.
 
-I file locali selezionati dagli overlay derivano invece dalla Head o dal workspace da cui viene eseguito il comando:
+I file locali selezionati dagli overlay derivano invece dal progetto padre
+canonico, anche quando il comando viene eseguito da una Head:
 
 ```bash
 hydra head create payment --from beta
@@ -541,7 +542,7 @@ hydra head create payment --from beta
 significa:
 
 - codice versionato dal commit risolto da `beta`;
-- overlay dal workspace corrente;
+- overlay dal progetto padre canonico;
 - nuovo branch privato `hydra/payment`.
 
 ### Algoritmo di risoluzione

@@ -788,8 +788,8 @@ nome di branch valido per Git e non deve esistere già.
 ## 7. Overlay: file ignorati da copiare
 
 I file tracciati provengono sempre dal commit di base. Gli overlay permettono
-di aggiungere alla nuova Head file non tracciati o ignorati presenti nella
-worktree da cui esegui il comando.
+di aggiungere alla nuova Head file non tracciati o ignorati presenti nel
+progetto padre canonico, anche quando esegui il comando da una Head.
 
 La configurazione predefinita contiene:
 
