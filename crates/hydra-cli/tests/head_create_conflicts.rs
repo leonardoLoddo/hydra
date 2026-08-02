@@ -41,6 +41,27 @@ fn head_create_rejects_an_unknown_base_without_leaving_artifacts() {
 }
 
 #[test]
+fn head_create_identifies_an_unknown_target_without_leaving_artifacts() {
+    let directory = TestDirectory::new("head-invalid-target");
+    let repository = create_initialized_project(&directory);
+
+    let output = hydra_command()
+        .args(["head", "create", "payment", "--target", "missing-target"])
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("normalizing the target ref"),
+        "error should identify target normalization, got: {stderr}"
+    );
+    assert!(!stderr.contains("normalizing the base ref"));
+    assert_no_head_creation_artifacts(&repository, "payment");
+}
+
+#[test]
 fn head_create_preserves_a_preexisting_destination() {
     let directory = TestDirectory::new("head-destination");
     let repository = create_initialized_project(&directory);

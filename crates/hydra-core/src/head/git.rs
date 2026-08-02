@@ -247,21 +247,26 @@ pub(super) fn resolve_commit(
     stdout_line(&output, "base commit")
 }
 
-pub(super) fn normalize_ref(repository: &Repository, reference: &str) -> Result<String, HeadError> {
+pub(super) fn normalize_ref(
+    repository: &Repository,
+    reference: &str,
+    operation: &'static str,
+    output_name: &'static str,
+) -> Result<String, HeadError> {
     if reference.starts_with('-') {
         return Err(HeadError::InvalidRef(reference.to_owned()));
     }
     let output = run_git(
         &repository.root,
         &["rev-parse", "--symbolic-full-name", reference],
-        "normalizing the base ref",
+        operation,
     )?;
     let value = output.stdout.strip_suffix(b"\n").unwrap_or(&output.stdout);
     let value = value.strip_suffix(b"\r").unwrap_or(value);
     if value.is_empty() {
         Ok(reference.to_owned())
     } else {
-        String::from_utf8(value.to_vec()).map_err(|_| HeadError::InvalidGitOutput("base ref"))
+        String::from_utf8(value.to_vec()).map_err(|_| HeadError::InvalidGitOutput(output_name))
     }
 }
 
@@ -269,7 +274,12 @@ pub(super) fn resolve_local_branch(
     repository: &Repository,
     reference: &str,
 ) -> Result<String, HeadError> {
-    let normalized = normalize_ref(repository, reference)?;
+    let normalized = normalize_ref(
+        repository,
+        reference,
+        "normalizing the target ref",
+        "target ref",
+    )?;
     if normalized.starts_with("refs/heads/") {
         resolve_commit(repository, &normalized)?;
         Ok(normalized)

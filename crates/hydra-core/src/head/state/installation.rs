@@ -150,11 +150,19 @@ fn validate_heads_directory(
             source,
         })?;
     let expected = configuration.resolve_heads_directory(&project_root, &heads)?;
-    let expected = fs::canonicalize(&expected).map_err(|source| HeadError::FileSystem {
-        action: "resolve configured Heads directory",
-        path: expected,
-        source,
-    })?;
+    let expected = match fs::canonicalize(&expected) {
+        Ok(expected) => expected,
+        Err(source) if source.kind() == std::io::ErrorKind::NotFound => {
+            return Err(HeadError::DirectoryPolicyMismatch(heads));
+        }
+        Err(source) => {
+            return Err(HeadError::FileSystem {
+                action: "resolve configured Heads directory",
+                path: expected,
+                source,
+            });
+        }
+    };
     if expected != heads {
         return Err(HeadError::DirectoryPolicyMismatch(heads));
     }

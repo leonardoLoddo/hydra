@@ -1184,6 +1184,12 @@ locale previsto per l’integrazione:
 hydra head create experiment --from <COMMIT> --target main
 ```
 
+### “normalizing the target ref”
+
+Il valore passato a `--target` non identifica un branch locale esistente.
+Controlla il nome con `git branch --list` e ripeti il comando con il target
+corretto. Hydra non crea una Head parziale quando questa validazione fallisce.
+
 ### “directory ownership does not match”
 
 Locator e marker non descrivono la stessa installazione. Non correggere gli ID
@@ -1193,9 +1199,10 @@ corrente richiede un’installazione già validabile e non corregge l’identit�
 ### “does not match the versioned directory policy”
 
 La configurazione condivisa e il locator locale risolvono directory diverse.
-Questo può accadere dopo modifiche o spostamenti manuali. Ripristina la
-configurazione conosciuta senza cancellare le Head; la relocation assistita non
-è ancora disponibile.
+Questo può accadere dopo modifiche o spostamenti manuali, anche quando il nuovo
+percorso configurato non esiste. Non creare la directory mancante e non
+modificare il locator: ripristina la configurazione conosciuta senza cancellare
+le Head. La relocation assistita non è ancora disponibile.
 
 ### Esiste `heads.json.lock`
 

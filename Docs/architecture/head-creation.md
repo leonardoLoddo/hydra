@@ -159,7 +159,8 @@ The base is resolved in the canonical parent repository to both:
 If `--target` is present, it must resolve to a local branch and is stored as a
 full `refs/heads/...` ref. Without `--target`, a base that resolves to a local
 branch becomes the target. A detached commit or other non-local base requires
-an explicit target.
+an explicit target. Git failures identify whether base or target normalization
+failed rather than reporting both paths as base resolution.
 
 User-controlled Git values are passed as individual process arguments. Commit
 resolution uses Git's end-of-options handling, and raw refs beginning with `-`
@@ -456,6 +457,7 @@ repositories. Current coverage proves:
   copy, and isolation;
 - rejection of unsafe names, unknown refs, missing targets, duplicates,
   existing branches, and existing destinations;
+- target-specific diagnostics for an explicit target that cannot be resolved;
 - preservation and isolation of safe relative overlay symlinks;
 - explicit, atomic exclusion of multiple absolute or escaping overlay symlinks
   after confirmation, plus cancellation that preserves configuration and Git
@@ -470,6 +472,8 @@ repositories. Current coverage proves:
 - rejection of locator/marker ownership mismatches, path separators in a
   suffix, symlinked metadata directories, and directories nested inside another
   registered worktree;
+- policy-mismatch diagnostics when a changed policy resolves to a directory
+  that does not exist, without creating that directory;
 - lock release on pre-commit failures;
 - preservation of committed artifacts when only post-commit lock cleanup
   fails;

@@ -209,7 +209,12 @@ fn prepare_head(
 
     let requested_base = options.from.as_deref().unwrap_or("HEAD");
     let base_commit = git::resolve_commit(repository, requested_base)?;
-    let base_ref = git::normalize_ref(repository, requested_base)?;
+    let base_ref = git::normalize_ref(
+        repository,
+        requested_base,
+        "normalizing the base ref",
+        "base ref",
+    )?;
     let target_ref = resolve_target_ref(repository, options.target.as_deref(), &base_ref)?;
     let tracked_entries = git::tracked_entries(repository, &base_commit)?;
     report_progress.report(HeadCreationProgress::PlanningOverlays);

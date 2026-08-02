@@ -65,6 +65,11 @@ If creation fails, do not substitute `git worktree add`, manual directory
 copying, or metadata edits. Inspect `hydra status`, `git worktree list`, and the
 reported error, then stop if ownership or state is ambiguous.
 
+If Hydra reports failure while normalizing the target ref, verify that the
+explicit `--target` names an existing local branch. If it reports a versioned
+directory-policy mismatch, do not create the configured directory or edit the
+locator; restore the reviewed project configuration or stop for user guidance.
+
 ## Move all task work into the Head
 
 1. Obtain the authoritative directory with `hydra head path <name>`.

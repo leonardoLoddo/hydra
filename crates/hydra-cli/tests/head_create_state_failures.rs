@@ -126,6 +126,41 @@ fn head_create_rejects_a_suffix_that_contains_a_path_separator() {
 }
 
 #[test]
+fn head_create_reports_policy_mismatch_when_configured_directory_is_missing() {
+    let directory = TestDirectory::new("head-missing-policy-directory");
+    let repository = create_initialized_project(&directory);
+    let configuration_path = repository.join(".hydra.json");
+    let mut configuration: serde_json::Value = serde_json::from_slice(
+        &fs::read(&configuration_path).expect("configuration should be readable"),
+    )
+    .expect("configuration should be valid JSON");
+    configuration["headsDirectory"]["suffix"] = "-different".into();
+    fs::write(
+        &configuration_path,
+        serde_json::to_vec_pretty(&configuration).expect("configuration should serialize"),
+    )
+    .expect("mismatched configuration should be written");
+
+    let output = hydra_command()
+        .args(["head", "create", "payment"])
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("does not match the versioned directory policy"),
+        "error should identify the policy mismatch, got: {stderr}"
+    );
+    assert!(
+        !directory.path().join("SampleProject-different").exists(),
+        "validation must not create the configured directory"
+    );
+    assert_no_head_creation_artifacts(&repository, "payment");
+}
+
+#[test]
 fn head_create_rejects_a_heads_directory_nested_inside_another_worktree() {
     let directory = TestDirectory::new("head-nested-directory");
     let repository = create_initialized_project(&directory);
