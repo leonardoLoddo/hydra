@@ -54,6 +54,10 @@ become independent behavior specifications. Each adapter must identify the
 canonical skill version, preserve provenance, validate the installed artifact,
 and document host-specific discovery and refresh behavior.
 
+A future interactive Hydra installer must ask whether the user wants to install
+the skill. It must not silently place the skill alongside the CLI, and the
+prompt must make the applicable destination clear before copying the artifact.
+
 Do not claim a provider or installation channel as supported until its package,
 installation procedure, update path, and representative activation workflow
 have been verified on that host. Keep unavailable channels explicitly planned.

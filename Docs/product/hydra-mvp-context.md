@@ -1378,6 +1378,11 @@ proiettare lo stesso artefatto portabile. Ogni canale deve documentare percorso,
 versione, verifica dell'origine, aggiornamento e rimozione senza trasformare un
 formato proprietario nella fonte del comportamento operativo.
 
+Quando un futuro installer interattivo installa Hydra, deve chiedere
+esplicitamente all'utente se desidera installare anche la skill. La skill non
+deve essere aggiunta silenziosamente insieme al binario: la scelta e la
+destinazione applicabile devono essere comprensibili prima della copia.
+
 ### Head Recipe condivisibili
 
 Una Head fisica rimane un'istanza locale e non viene versionata. In futuro
