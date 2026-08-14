@@ -459,7 +459,11 @@ ufficiale tramite SchemaStore è pianificata per una fase successiva; soltanto
 dopo che l'URL pubblico sarà disponibile Hydra potrà reintrodurre
 l'annotazione e gli aiuti dell'editor.
 
-Con `storage.mode: "auto"`, Hydra prova il clone CoW sul volume di destinazione e usa la copia completa se non è supportato. Modalità più rigide potranno essere esposte per test e automazioni, ma il default deve privilegiare compatibilità e sicurezza.
+Con `storage.mode: "auto"`, Hydra prova il clone CoW sul volume di destinazione
+e usa la copia completa se non è supportato. `storage.mode: "copy"` forza invece
+la copia completa per ogni file regolare tracciato o overlay, così test e
+automazioni possono esercitare deterministicamente il fallback sicuro. Il
+default rimane `auto` e privilegia efficienza, compatibilità e sicurezza.
 
 La direttiva:
 

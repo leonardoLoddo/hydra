@@ -30,6 +30,7 @@ pub(super) fn materialize_tracked_files(
     head_path: &Path,
     tracked_entries: &[TrackedEntry],
     reuse_tracked_sources: bool,
+    force_full_copy: bool,
 ) -> Result<StorageBackend, HeadError> {
     if tracked_entries.is_empty() {
         return Ok(StorageBackend::CopyOnWrite);
@@ -60,6 +61,7 @@ pub(super) fn materialize_tracked_files(
                     entry,
                     &destination,
                     reusable_source_root.as_deref(),
+                    force_full_copy,
                 )? == StorageBackend::FullCopy
                 {
                     backend = StorageBackend::FullCopy;
@@ -89,8 +91,10 @@ fn materialize_regular_file(
     entry: &TrackedEntry,
     destination: &Path,
     reusable_source_root: Option<&Path>,
+    force_full_copy: bool,
 ) -> Result<StorageBackend, HeadError> {
-    if let Some(canonical_source_root) = reusable_source_root
+    if !force_full_copy
+        && let Some(canonical_source_root) = reusable_source_root
         && try_reuse_tracked_source(repository, canonical_source_root, entry, destination)?
     {
         return Ok(StorageBackend::CopyOnWrite);
@@ -103,15 +107,25 @@ fn materialize_regular_file(
     let blobs = blob_batch(repository, blobs)?;
     write_blob_to_file(blobs, &entry.object, &temporary_path)?;
 
-    let backend = match reflink_copy::reflink(&temporary_path, destination) {
-        Ok(()) => Ok(StorageBackend::CopyOnWrite),
-        Err(_) => copy_exclusive(&temporary_path, destination)
+    let backend = if force_full_copy {
+        copy_exclusive(&temporary_path, destination)
             .map(|()| StorageBackend::FullCopy)
             .map_err(|source| HeadError::FileSystem {
                 action: "copy tracked file",
                 path: destination.to_path_buf(),
                 source,
-            }),
+            })
+    } else {
+        match reflink_copy::reflink(&temporary_path, destination) {
+            Ok(()) => Ok(StorageBackend::CopyOnWrite),
+            Err(_) => copy_exclusive(&temporary_path, destination)
+                .map(|()| StorageBackend::FullCopy)
+                .map_err(|source| HeadError::FileSystem {
+                    action: "copy tracked file",
+                    path: destination.to_path_buf(),
+                    source,
+                }),
+        }
     };
     let cleanup = fs::remove_file(&temporary_path).map_err(|source| HeadError::FileSystem {
         action: "remove temporary Git blob",

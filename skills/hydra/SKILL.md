@@ -73,7 +73,10 @@ hydra head create <name> --from <source> --target <target>
 
 Before creation, review the canonical project's `.hydra.json`, when present.
 Pay particular attention to overlay policy and configured `open` or `close`
-commands. Do not copy configuration or local metadata into a Head.
+commands. `storage.mode: "copy"` deliberately forces full copies of regular
+tracked and overlay files for deterministic tests or automation; report that
+cost-relevant policy before creation. Do not copy configuration or local
+metadata into a Head.
 
 Creation may pause for confirmation:
 

@@ -58,7 +58,8 @@ unwinding is available, the core disables that observer instead of allowing it
 to interrupt the creation transaction.
 
 The backend line is `Storage backend: full copy` when any materialized regular
-file required the safe copy fallback.
+file required the safe copy fallback or `storage.mode: "copy"` selected that
+backend explicitly.
 
 For every non-empty overlay plan, successful creation also prints its logical
 size and file count:
@@ -193,9 +194,15 @@ The structured `headsDirectory` reader supports:
   normal portable path components;
 - `local`, whose absolute path exists only in the non-versioned locator.
 
-Unknown variants, variant-inappropriate fields, unknown storage modes,
-separators or control characters in a suffix, and malformed or unsupported
-metadata are rejected before mutation.
+Unknown variants, variant-inappropriate fields, storage modes other than
+`auto` and `copy`, separators or control characters in a suffix, and malformed
+or unsupported metadata are rejected before mutation.
+
+`storage.mode: "auto"` probes and attempts native copy-on-write before the
+safe full-copy fallback. `storage.mode: "copy"` deterministically skips native
+clone probes and attempts for every regular tracked and overlay file. Overlay
+files retain the normal explicit full-copy confirmation; selecting the mode
+does not silently authorize their logical storage cost.
 
 Hydra validates the installation in this order:
 
@@ -335,8 +342,9 @@ For a regular entry that needs blob fallback, Hydra streams into a uniquely
 named temporary file in the Heads directory and:
 
 1. creates parent directories;
-2. attempts a native CoW clone from the temporary blob;
-3. falls back to an exclusive full copy when cloning is unavailable;
+2. attempts a native CoW clone from the temporary blob in `auto` mode;
+3. uses an exclusive full copy when cloning is unavailable or `copy` mode was
+   selected;
 4. synchronizes copied bytes;
 5. applies the executable bit represented by Git mode;
 6. removes the exact temporary blob.
@@ -371,8 +379,9 @@ The planner:
    workers, then restores the original path order;
 8. retries an argument batch as smaller ordered halves if the operating system
    reports an argument-list limit;
-9. probes every regular-file source against the Heads volume and records the
-   exact files that need full-copy fallback.
+9. in `auto` mode, probes every regular-file source against the Heads volume
+   and records the exact files that need full-copy fallback; in `copy` mode,
+   marks every regular overlay for the same confirmation without probing.
 
 An absent expanded rules file contributes no rules. An existing expanded file
 must be a regular file at a safe relative path.
@@ -479,6 +488,9 @@ repositories. Current coverage proves:
   missing-inventory reconstruction through `hydra repair`;
 - Gitignore overlay expansion, negation, conditional fallback confirmation,
   copy, and isolation;
+- deterministic full-copy creation for tracked files and overlays through
+  `storage.mode: "copy"`, including confirmation, persisted backend, and source
+  isolation;
 - rejection of unsafe names, unknown refs, missing targets, duplicates,
   existing branches, and existing destinations;
 - target-specific diagnostics for an explicit target that cannot be resolved;
@@ -530,19 +542,16 @@ cargo test --release -p hydra-cli \
    working tree when its tracked state matches `baseCommit`, while overlays
    clone from that same workspace. Hydra does not yet search existing Heads or
    a persistent content cache for another matching source.
-2. **Forced fallback coverage in Head creation.** Initialization directly
-   verifies both CoW and full-copy behavior. Head-creation tests accept either
-   detected backend but do not yet force the per-file fallback path.
-3. **Earlier partial creation crash reconciliation.** Atomic state publication
+2. **Earlier partial creation crash reconciliation.** Atomic state publication
    and rollback protect ordinary errors. Repair can remove a confirmed
    abandoned current-version lock and adopt a complete manifest-backed Head
    after a crash immediately before inventory publication. Termination before
    the recovery manifest is durably published can still leave branch,
    worktree, or filesystem combinations that are not adopted or rolled back
    automatically.
-4. **Cross-platform symlinks and durability.** Tracked and overlay symlink
+3. **Cross-platform symlinks and durability.** Tracked and overlay symlink
    materialization is implemented only on Unix. Direct runtime evidence for
    this workflow currently comes from the development platform and does not
    establish macOS-and-Linux completion by itself.
-5. **Submodule population.** Gitlink entries receive an empty directory only;
+4. **Submodule population.** Gitlink entries receive an empty directory only;
    submodule initialization and network access are intentionally not implicit.

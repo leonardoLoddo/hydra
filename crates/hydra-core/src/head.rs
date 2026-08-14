@@ -198,6 +198,7 @@ struct PreparedHead {
     target_ref: String,
     tracked_entries: Vec<TrackedEntry>,
     overlay_plan: OverlayPlan,
+    force_full_copy: bool,
 }
 
 fn prepare_head(
@@ -228,12 +229,14 @@ fn prepare_head(
     )?;
     let target_ref = resolve_target_ref(repository, options.target.as_deref(), &base_ref)?;
     let tracked_entries = git::tracked_entries(repository, &base_commit)?;
+    let force_full_copy = transaction.force_full_copy();
     report_progress.report(HeadCreationProgress::PlanningOverlays);
     let overlay_plan = plan_overlays(
         &repository.root,
         &heads_directory,
         transaction.overlay_rules(),
         &tracked_entries,
+        force_full_copy,
     );
     let overlay_plan = match overlay_plan {
         Err(HeadError::UnsafeOverlaySymlinks { paths })
@@ -245,6 +248,7 @@ fn prepare_head(
                 &heads_directory,
                 transaction.overlay_rules(),
                 &tracked_entries,
+                force_full_copy,
             )?
         }
         result => result?,
@@ -265,6 +269,7 @@ fn prepare_head(
         target_ref,
         tracked_entries,
         overlay_plan,
+        force_full_copy,
     })
 }
 
@@ -288,6 +293,7 @@ fn create_worktree(
         &prepared.head_path,
         &prepared.tracked_entries,
         reuse_tracked_sources,
+        prepared.force_full_copy,
     )?;
     if prepared.overlay_plan.file_count() > 0 {
         report_progress.report(HeadCreationProgress::MaterializingOverlayEntries {
@@ -299,6 +305,7 @@ fn create_worktree(
         &prepared.overlay_plan,
         &prepared.head_path,
         confirmed_full_copy,
+        prepared.force_full_copy,
     )? == StorageBackend::FullCopy
     {
         backend = StorageBackend::FullCopy;

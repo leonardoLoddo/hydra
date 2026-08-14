@@ -19,8 +19,7 @@ pub(super) struct ProjectConfiguration {
     project_id: String,
     heads_directory: HeadsDirectoryPolicy,
     branch_prefix: String,
-    #[serde(rename = "storage")]
-    _storage: StorageConfiguration,
+    storage: StorageConfiguration,
     overlay: OverlayConfiguration,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     commands: Option<CommandConfiguration>,
@@ -54,14 +53,15 @@ enum RelativeBase {
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct StorageConfiguration {
-    #[serde(rename = "mode")]
-    _mode: StorageMode,
+    mode: StorageMode,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Copy, Deserialize, Serialize)]
 enum StorageMode {
     #[serde(rename = "auto")]
     Auto,
+    #[serde(rename = "copy")]
+    Copy,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -153,6 +153,10 @@ impl ProjectConfiguration {
 
     pub(super) fn overlay_rules(&self) -> &[String] {
         &self.overlay.copy
+    }
+
+    pub(super) fn force_full_copy(&self) -> bool {
+        matches!(self.storage.mode, StorageMode::Copy)
     }
 
     pub(super) fn open_command(&self) -> Option<&OpenCommandConfiguration> {

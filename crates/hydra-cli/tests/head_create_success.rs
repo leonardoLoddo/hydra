@@ -1,6 +1,6 @@
 mod common;
 
-use std::{fs, path::Path, process::Stdio};
+use std::{fs, io::Write, path::Path, process::Stdio};
 
 use common::{
     TestDirectory, create_initialized_project, head_state_path, heads_directory, hydra_command,
@@ -208,6 +208,82 @@ fn head_create_builds_an_isolated_worktree_and_records_its_metadata() {
         metadata["createdAt"]
             .as_str()
             .is_some_and(|timestamp| timestamp.ends_with('Z'))
+    );
+}
+
+#[test]
+fn head_create_can_force_full_copy_for_tracked_files_and_overlays() {
+    let directory = TestDirectory::new("head-create-full-copy");
+    let repository = create_initialized_project(&directory);
+    fs::write(repository.join(".gitignore"), b".env\n").expect("overlay rules should be written");
+    commit_all(&repository, "add overlay rules");
+    fs::write(repository.join(".env"), b"secret\n").expect("overlay should be written");
+
+    let configuration_path = repository.join(".hydra.json");
+    let mut configuration: serde_json::Value = serde_json::from_slice(
+        &fs::read(&configuration_path).expect("configuration should be readable"),
+    )
+    .expect("configuration should be valid JSON");
+    configuration["storage"]["mode"] = "copy".into();
+    fs::write(
+        &configuration_path,
+        serde_json::to_vec_pretty(&configuration).expect("configuration should serialize"),
+    )
+    .expect("copy mode should be configured");
+
+    let mut child = hydra_command()
+        .args(["head", "create", "copy-mode"])
+        .current_dir(&repository)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("Hydra CLI should start");
+    child
+        .stdin
+        .take()
+        .expect("stdin should be piped")
+        .write_all(b"yes\n")
+        .expect("full-copy confirmation should be written");
+    let output = child.wait_with_output().expect("Hydra should finish");
+
+    assert!(
+        output.status.success(),
+        "forced full-copy creation should succeed, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    assert!(stdout.contains("Full copy required: 1 file(s), 7 byte(s)"));
+    assert!(stdout.contains("Storage backend: full copy"));
+
+    let head = heads_directory(&repository).join("copy-mode");
+    assert_eq!(
+        fs::read(head.join("src/app.txt")).expect("tracked file should be readable"),
+        b"base\n"
+    );
+    assert_eq!(
+        fs::read(head.join(".env")).expect("overlay should be readable"),
+        b"secret\n"
+    );
+    let state: serde_json::Value = serde_json::from_slice(
+        &fs::read(head_state_path(&repository)).expect("state should be readable"),
+    )
+    .expect("state should be valid JSON");
+    assert_eq!(
+        state["heads"]["copy-mode"]["materializationBackend"],
+        "copy"
+    );
+
+    fs::write(head.join("src/app.txt"), b"head tracked\n")
+        .expect("tracked Head file should be writable");
+    fs::write(head.join(".env"), b"head overlay\n").expect("overlay Head file should be writable");
+    assert_eq!(
+        fs::read(repository.join("src/app.txt")).expect("source tracked file should be readable"),
+        b"base\n"
+    );
+    assert_eq!(
+        fs::read(repository.join(".env")).expect("source overlay should be readable"),
+        b"secret\n"
     );
 }
 

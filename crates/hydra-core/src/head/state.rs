@@ -335,6 +335,10 @@ impl StateTransaction {
         self.configuration.overlay_rules()
     }
 
+    pub(super) fn force_full_copy(&self) -> bool {
+        self.configuration.force_full_copy()
+    }
+
     pub(super) fn exclude_unsafe_overlay_symlinks(
         &mut self,
         paths: &[PathBuf],

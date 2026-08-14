@@ -138,6 +138,7 @@ pub(super) fn plan_overlays(
     heads_directory: &Path,
     rules: &[String],
     tracked_entries: &[TrackedEntry],
+    force_full_copy: bool,
 ) -> Result<OverlayPlan, HeadError> {
     let canonical_source_root =
         fs::canonicalize(source_root).map_err(|source| HeadError::FileSystem {
@@ -168,17 +169,21 @@ pub(super) fn plan_overlays(
     }
     files.sort_by(|left, right| left.relative.cmp(&right.relative));
     assign_regular_identities(source_root, &mut files)?;
-    let mut probe = CopyOnWriteProbe::create(heads_directory)?;
-    let assessment = classify_copy_fallbacks_with(&mut files, |source| probe.assess(source));
-    let cleanup = probe.finish();
-    match (assessment, cleanup) {
-        (Ok(()), Ok(())) => {}
-        (Err(error), Ok(())) | (Ok(()), Err(error)) => return Err(error),
-        (Err(original), Err(cleanup)) => {
-            return Err(HeadError::RollbackFailed {
-                original: Box::new(original),
-                failures: vec![cleanup.to_string()],
-            });
+    if force_full_copy {
+        classify_copy_fallbacks_with(&mut files, |_| Ok(false))?;
+    } else {
+        let mut probe = CopyOnWriteProbe::create(heads_directory)?;
+        let assessment = classify_copy_fallbacks_with(&mut files, |source| probe.assess(source));
+        let cleanup = probe.finish();
+        match (assessment, cleanup) {
+            (Ok(()), Ok(())) => {}
+            (Err(error), Ok(())) | (Ok(()), Err(error)) => return Err(error),
+            (Err(original), Err(cleanup)) => {
+                return Err(HeadError::RollbackFailed {
+                    original: Box::new(original),
+                    failures: vec![cleanup.to_string()],
+                });
+            }
         }
     }
     let total_bytes = files.iter().try_fold(0_u64, |total, file| {
@@ -194,6 +199,7 @@ pub(super) fn materialize_overlays(
     plan: &OverlayPlan,
     head_path: &Path,
     confirmed_full_copy: bool,
+    force_full_copy: bool,
 ) -> Result<StorageBackend, HeadError> {
     let mut backend = StorageBackend::CopyOnWrite;
     let canonical_repository_root =
@@ -219,7 +225,9 @@ pub(super) fn materialize_overlays(
         validate_regular_overlay_source(&canonical_repository_root, &file.source)?;
         let destination = head_path.join(&file.relative);
 
-        let file_backend = if reflink_copy::reflink(&file.source, &destination).is_ok() {
+        let file_backend = if !force_full_copy
+            && reflink_copy::reflink(&file.source, &destination).is_ok()
+        {
             StorageBackend::CopyOnWrite
         } else {
             remove_failed_reflink_destination(&destination)?;

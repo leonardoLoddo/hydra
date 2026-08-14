@@ -995,7 +995,7 @@ delle mutazioni Git.
 
 ## 8. Storage
 
-La sola modalità attualmente supportata è:
+La modalità predefinita è:
 
 ```json
 {
@@ -1004,6 +1004,21 @@ La sola modalità attualmente supportata è:
   }
 }
 ```
+
+Per forzare deterministicamente il fallback sicuro, per esempio in test o
+automazioni, puoi configurare:
+
+```json
+{
+  "storage": {
+    "mode": "copy"
+  }
+}
+```
+
+In questa modalità Hydra non tenta il copy-on-write per i file regolari della
+nuova Head. Gli overlay continuano a mostrare numero e peso logico e richiedono
+la normale conferma esplicita prima di duplicare i byte.
 
 Hydra verifica il volume che ospita le Head:
 
@@ -1040,8 +1055,9 @@ può riusare direttamente quei file come sorgenti copy-on-write. In presenza di
 modifiche tracciate legge invece i contenuti dal commit Git tramite un unico
 flusso batch; le modifiche locali non finiscono nella nuova Head.
 
-Il backend è una decisione locale. Non viene inserito nella configurazione
-versionata; Hydra registra invece il backend effettivamente usato da ogni Head.
+Il backend effettivo rimane una decisione locale e Hydra lo registra per ogni
+Head. La configurazione versionata può imporre la politica `copy`, ma non
+memorizza le capacità del volume né il risultato di una materializzazione.
 
 Modalità come `cow-only`, `copy` o preferenze globali non sono ancora
 disponibili.
@@ -1143,7 +1159,8 @@ Regole:
 - `headsDirectory` è una politica portabile, non un percorso assoluto
   condiviso;
 - `branchPrefix` viene anteposto al nome della Head;
-- `storage.mode` accetta oggi soltanto `auto`;
+- `storage.mode` accetta `auto` oppure `copy`; `copy` forza il fallback sicuro
+  per test e automazioni senza eliminare la conferma degli overlay;
 - `overlay.copy` contiene regole Gitignore e direttive `...`.
 
 Per `commands.open` e per la strategy `command` di `commands.close`, `program`
