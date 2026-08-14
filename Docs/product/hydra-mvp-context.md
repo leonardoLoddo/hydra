@@ -336,6 +336,7 @@ Hydra separa configurazione condivisa, locator locale e stato fisico.
 | `<heads-directory>/.hydra/directory.json` | Marker di ownership e target stabile del guard OS per le mutazioni di stato | No |
 | `<heads-directory>/.hydra/heads.json` | Inventario delle Head fisiche locali | No |
 | `<heads-directory>/.hydra/pending-<name>.json` | Intento durevole di una creazione non ancora pubblicata | No |
+| `<heads-directory>/.hydra/recovery-<name>.json` | Record centrale di recupero esatto della singola Head | No |
 | directory amministrativa Git privata della worktree, `hydra-head.json` | Manifest di recupero esatto della singola Head | No |
 
 La configurazione nel progetto descrive come quel progetto deve essere
@@ -936,8 +937,9 @@ e deve poter:
 - rimuovere un lock abbandonato soltanto se appartiene allo schema corrente e
   dopo conferma esplicita, senza dedurre l'attività da PID persistiti;
 - adottare atomicamente in un inventario esistente una worktree Hydra omessa
-  soltanto quando il suo manifest privato conserva metadati esatti e coerenti
-  con nome, percorso gestito e branch osservati da Git.
+  soltanto quando un record di recupero centrale o privato conserva metadati
+  esatti e coerenti con nome, percorso gestito e branch osservati da Git; se
+  entrambi esistono devono coincidere.
 - ripulire dopo conferma un journal di creazione interrotta prima della
   registrazione della worktree, eliminando il branch privato soltanto se non
   esistono directory o worktree associate e la ref punta ancora esattamente al
@@ -1112,14 +1114,16 @@ I file locali:
 - non memorizzano informazioni ricavabili in modo affidabile da Git se non utili alla riconciliazione;
 - non contengono PID, porte, agenti o runtime nell’MVP.
 
-Ogni nuova Head conserva inoltre una copia versionata dei propri metadati
-esatti nel file privato `hydra-head.json` della linked worktree Git. Il
-manifest non sostituisce l'inventario e non viene dedotto dal branch: serve
-soltanto a ricostruire atomicamente un `heads.json` assente. Il repair può
-procedere solo se tutte le worktree con il prefisso Hydra configurato hanno un
-manifest coerente con nome, percorso gestito e ref simbolica. Non ricostruisce
-parzialmente l'inventario, non sostituisce un inventario malformato e non
-inventa metadati per Head prive di manifest.
+Ogni nuova Head conserva inoltre due copie versionate degli stessi metadati
+esatti: il record centrale `.hydra/recovery-<name>.json` e il file privato
+`hydra-head.json` della linked worktree Git. Non sostituiscono l'inventario e
+non vengono dedotti dal branch: servono a ricostruire atomicamente un
+`heads.json` assente anche se una delle due copie viene persa. Il repair può
+procedere solo se tutte le worktree con il prefisso Hydra configurato hanno
+almeno un record coerente con nome, percorso gestito e ref simbolica; quando
+entrambi esistono devono coincidere. Non ricostruisce parzialmente
+l'inventario, non sostituisce un inventario malformato e non inventa metadati
+per Head prive di evidenza autorevole.
 
 Git rimane autorevole per:
 

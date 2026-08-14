@@ -545,7 +545,8 @@ fn plan_untracked_hydra_worktree(
             });
         }
     }
-    let Some(recovered) = recovery::read_manifest(repository, &worktree.path)? else {
+    let Some(recovered) = read_head_recovery(repository, heads_directory, name, &worktree.path)?
+    else {
         return Ok(report_only());
     };
     let recovered_path = validated_head_path(heads_directory, name, &recovered.metadata)?;
@@ -603,7 +604,9 @@ fn build_missing_inventory_state(
         if name.is_empty() {
             continue;
         }
-        let Some(recovered) = recovery::read_manifest(repository, &worktree.path)? else {
+        let Some(recovered) =
+            read_head_recovery(repository, heads_directory, name, &worktree.path)?
+        else {
             all_recoverable = false;
             issues.push(RepairIssue::UntrackedHydraWorktree {
                 name: name.to_owned(),
@@ -652,6 +655,25 @@ fn build_missing_inventory_state(
         },
         recovered_inventory,
     ))
+}
+
+fn read_head_recovery(
+    repository: &Repository,
+    heads_directory: &Path,
+    name: &str,
+    worktree: &Path,
+) -> Result<Option<recovery::RecoveredHead>, HeadError> {
+    let private = recovery::read_manifest(repository, worktree)?;
+    let central = recovery::read_central_recovery(heads_directory, name)?;
+    match (private, central) {
+        (Some(private), Some(central))
+            if private.name == central.name && private.metadata == central.metadata =>
+        {
+            Ok(Some(private))
+        }
+        (Some(recovered), None) | (None, Some(recovered)) => Ok(Some(recovered)),
+        (None, None) | (Some(_), Some(_)) => Ok(None),
+    }
 }
 
 fn plan_pending_creations(

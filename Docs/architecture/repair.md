@@ -62,22 +62,24 @@ format, or edits the ownership marker.
 
 ### Missing inventory
 
-Every newly created Head stores a versioned recovery manifest in its private
-Git linked-worktree administrative directory. The manifest preserves the exact
-inventory metadata that Git alone cannot reconstruct: base and target intent,
-the resolved base commit, materialization backend, creation time, managed path,
-and private ref.
+Every newly created Head stores the same versioned recovery record centrally
+at `<heads-directory>/.hydra/recovery-<name>.json` and as `hydra-head.json` in
+its private Git linked-worktree administrative directory. These records
+preserve the exact inventory metadata that Git alone cannot reconstruct: base
+and target intent, the resolved base commit, materialization backend, creation
+time, managed path, and private ref.
 
 When `heads.json` is absent, Hydra offers to rebuild it only when every
-registered worktree using the configured Hydra branch prefix has a manifest
-whose Head name, managed path, and symbolic branch agree with current Git and
-the owned Heads directory. One missing or inconsistent manifest makes the
-complete reconstruction report-only; Hydra does not publish a partial
-inventory or infer the missing fields.
+registered worktree using the configured Hydra branch prefix has authoritative
+recovery evidence whose Head name, managed path, and symbolic branch agree
+with current Git and the owned Heads directory. One valid central or private
+record is sufficient. When both exist, they must be identical. Missing or
+disagreeing evidence makes the complete reconstruction report-only; Hydra does
+not publish a partial inventory or infer the missing fields.
 
-A malformed, non-regular, or unsupported recovery manifest is a validation
+A malformed, non-regular, or unsupported recovery record is a validation
 error rather than a repair candidate. Hydra leaves the missing inventory,
-worktree, branch, and manifest untouched for diagnosis.
+worktree, branch, and recovery evidence untouched for diagnosis.
 
 After confirmation, Hydra acquires the normal state lock, verifies that the
 inventory is still absent, rebuilds the complete recovery plan, requires its
@@ -93,8 +95,9 @@ can adopt that Head only when:
 1. the inventory does not already contain the derived Head name;
 2. the registered path is a present directory and its private branch ref still
    exists;
-3. the worktree has a current, valid private recovery manifest;
-4. manifest name and private ref equal the name and symbolic branch observed
+3. the Head has a current, valid central or private recovery record, with both
+   records identical when both exist;
+4. recovery name and private ref equal the name and symbolic branch observed
    from Git;
 5. the manifest path equals `<owned-heads-directory>/<name>` and the registered
    worktree path exactly.
@@ -106,8 +109,8 @@ then atomically adds the recovered metadata while preserving all existing
 inventory entries, worktrees, and branches. The command returns after adoption
 so any other inconsistency can be planned again from the new state.
 
-A missing or semantically inconsistent manifest leaves the worktree
-report-only. A malformed, non-regular, or unsupported manifest is a validation
+Missing or semantically inconsistent recovery evidence leaves the worktree
+report-only. A malformed, non-regular, or unsupported record is a validation
 error and remains untouched.
 
 ### Interrupted pre-worktree creation
@@ -161,8 +164,8 @@ inventory toward an arbitrary external destination.
 
 Hydra reports but does not guess a mutation for:
 
-- a Hydra-prefixed Git worktree missing from inventory and lacking a matching
-  recovery manifest;
+- a Hydra-prefixed Git worktree missing from inventory and lacking matching
+  recovery evidence;
 - a pending creation that already has a worktree, managed filesystem entry, or
   advanced private branch;
 - a registered worktree whose physical directory is missing;
@@ -173,7 +176,7 @@ Hydra reports but does not guess a mutation for:
 - metadata refs that differ from the configured branch prefix;
 - ambiguous duplicate branch-to-worktree associations.
 
-An untracked worktree without a matching recovery manifest does not contain
+An untracked worktree without matching recovery evidence does not contain
 enough authoritative information to reconstruct `baseRef`, `baseCommit`,
 `targetRef`, creation time, and the materialization backend. Repair therefore
 preserves the worktree and branch and requests manual diagnosis instead of
@@ -181,7 +184,7 @@ fabricating intent.
 
 The current command does not remove active lock files, repair locator or
 ownership identity, or relocate the whole Heads directory. Missing inventories
-containing Heads without recovery manifests remain explicitly report-only.
+containing Heads without recovery evidence remain explicitly report-only.
 
 ---
 
@@ -227,13 +230,16 @@ Disposable-repository tests prove:
   byte-for-byte unchanged;
 - missing inventory requires confirmation and remains absent after refusal;
 - confirmed recovery reproduces the original inventory bytes from exact
-  recovery manifests while preserving worktrees and branches;
-- one missing recovery manifest disables complete automatic reconstruction;
+  recovery records while preserving worktrees and branches, including when a
+  private manifest was lost;
+- a Head missing both recovery records disables complete automatic
+  reconstruction;
 - malformed inventory is rejected and preserved rather than replaced;
-- a manifest-backed untracked Head requires confirmation and restores its
+- a recovery-backed untracked Head requires confirmation and restores its
   exact original metadata without changing existing inventory entries;
-- missing or inconsistent manifests do not authorize adoption, and a manifest
-  change after planning cancels publication without leaving a lock;
+- missing or inconsistent recovery evidence does not authorize adoption, and
+  an evidence change after planning cancels publication without leaving a
+  lock;
 - interrupted pre-worktree creation cleanup requires confirmation, preserves a
   branch changed after planning, and leaves a durable journal when safe cleanup
   cannot be proven;

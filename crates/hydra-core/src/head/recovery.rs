@@ -1,5 +1,5 @@
 use std::{
-    fs,
+    fs, io,
     path::{Path, PathBuf},
 };
 
@@ -10,10 +10,12 @@ use super::{
     git::{self, Repository},
     persistence::create_file_atomically,
     state::HeadMetadata,
+    validate_head_name,
 };
 
 const RECOVERY_FILE_NAME: &str = "hydra-head.json";
 const RECOVERY_VERSION: u32 = 1;
+const CENTRAL_RECOVERY_PREFIX: &str = "recovery-";
 const PENDING_PREFIX: &str = "pending-";
 const PENDING_SUFFIX: &str = ".json";
 
@@ -209,14 +211,42 @@ pub(super) fn create_manifest(
     metadata: &HeadMetadata,
 ) -> Result<(), HeadError> {
     let path = git::worktree_private_file(repository, worktree, RECOVERY_FILE_NAME)?;
-    let record = RecoveryRecord {
-        version: RECOVERY_VERSION,
-        name: name.to_owned(),
-        metadata: metadata.clone(),
-    };
-    let mut contents = serde_json::to_vec_pretty(&record).map_err(HeadError::SerializeState)?;
-    contents.push(b'\n');
+    let contents = serialize_recovery_record(name, metadata)?;
     create_file_atomically(&path, &contents)
+}
+
+pub(super) fn create_central_recovery(
+    heads_directory: &Path,
+    name: &str,
+    metadata: &HeadMetadata,
+) -> Result<PathBuf, HeadError> {
+    let path = central_recovery_path(heads_directory, name)?;
+    let contents = serialize_recovery_record(name, metadata)?;
+    create_file_atomically(&path, &contents)?;
+    Ok(path)
+}
+
+pub(super) fn read_central_recovery(
+    heads_directory: &Path,
+    name: &str,
+) -> Result<Option<RecoveredHead>, HeadError> {
+    read_recovery_record(
+        &central_recovery_path(heads_directory, name)?,
+        "central Head recovery record",
+    )
+}
+
+pub(super) fn remove_central_recovery(heads_directory: &Path, name: &str) -> Result<(), HeadError> {
+    let path = central_recovery_path(heads_directory, name)?;
+    match fs::remove_file(&path) {
+        Ok(()) => Ok(()),
+        Err(source) if source.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(source) => Err(HeadError::FileSystem {
+            action: "remove central Head recovery record",
+            path,
+            source,
+        }),
+    }
 }
 
 pub(super) fn read_manifest(
@@ -224,34 +254,52 @@ pub(super) fn read_manifest(
     worktree: &Path,
 ) -> Result<Option<RecoveredHead>, HeadError> {
     let path = git::worktree_private_file(repository, worktree, RECOVERY_FILE_NAME)?;
-    let metadata = match fs::symlink_metadata(&path) {
+    read_recovery_record(&path, "Head recovery manifest")
+}
+
+fn serialize_recovery_record(name: &str, metadata: &HeadMetadata) -> Result<Vec<u8>, HeadError> {
+    let record = RecoveryRecord {
+        version: RECOVERY_VERSION,
+        name: name.to_owned(),
+        metadata: metadata.clone(),
+    };
+    let mut contents = serde_json::to_vec_pretty(&record).map_err(HeadError::SerializeState)?;
+    contents.push(b'\n');
+    Ok(contents)
+}
+
+fn read_recovery_record(
+    path: &Path,
+    kind: &'static str,
+) -> Result<Option<RecoveredHead>, HeadError> {
+    let metadata = match fs::symlink_metadata(path) {
         Ok(metadata) => metadata,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(source) => {
             return Err(HeadError::FileSystem {
-                action: "inspect Head recovery manifest",
-                path,
+                action: "inspect Head recovery record",
+                path: path.to_path_buf(),
                 source,
             });
         }
     };
     if !metadata.is_file() {
-        return Err(HeadError::UnsafeProjectFile(path));
+        return Err(HeadError::UnsafeProjectFile(path.to_path_buf()));
     }
-    let contents = fs::read(&path).map_err(|source| HeadError::FileSystem {
-        action: "read Head recovery manifest",
-        path: path.clone(),
+    let contents = fs::read(path).map_err(|source| HeadError::FileSystem {
+        action: "read Head recovery record",
+        path: path.to_path_buf(),
         source,
     })?;
     let record: RecoveryRecord =
         serde_json::from_slice(&contents).map_err(|source| HeadError::InvalidLocalMetadata {
-            kind: "Head recovery manifest",
-            path: path.clone(),
+            kind,
+            path: path.to_path_buf(),
             source,
         })?;
     if record.version != RECOVERY_VERSION {
         return Err(HeadError::UnsupportedLocalMetadataVersion {
-            kind: "Head recovery manifest",
+            kind,
             version: record.version,
         });
     }
@@ -259,4 +307,21 @@ pub(super) fn read_manifest(
         name: record.name,
         metadata: record.metadata,
     }))
+}
+
+fn central_recovery_path(heads_directory: &Path, name: &str) -> Result<PathBuf, HeadError> {
+    validate_head_name(name)?;
+    Ok(heads_directory
+        .join(".hydra")
+        .join(format!("{CENTRAL_RECOVERY_PREFIX}{name}.json")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn central_recovery_paths_reject_names_outside_the_hydra_grammar() {
+        assert!(central_recovery_path(Path::new("/managed"), "nested/name").is_err());
+    }
 }

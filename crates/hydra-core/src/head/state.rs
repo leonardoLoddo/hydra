@@ -32,7 +32,7 @@ struct LocalState {
     heads: BTreeMap<String, HeadMetadata>,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct HeadMetadata {
     worktree_path: String,
@@ -379,7 +379,11 @@ impl StateTransaction {
         self.finish_commit(result)
     }
 
-    pub(super) fn remove(mut self, name: &str) -> Result<(), HeadError> {
+    pub(super) fn remove(
+        mut self,
+        name: &str,
+        cleanup: impl FnOnce() -> Result<(), HeadError>,
+    ) -> Result<(), HeadError> {
         self.state
             .heads
             .remove(name)
@@ -390,6 +394,9 @@ impl StateTransaction {
                 bytes.push(b'\n');
                 replace_state_atomically(&self.state_path, &self.original_state, &bytes)
             });
+        let result = result.and_then(|()| {
+            cleanup().map_err(|error| HeadError::HeadCommittedWithCleanupFailure(Box::new(error)))
+        });
         self.finish_commit(result)
     }
 

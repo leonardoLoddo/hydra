@@ -84,6 +84,12 @@ fn recovery_manifest_path(repository: &Path, name: &str) -> PathBuf {
     )
 }
 
+fn central_recovery_path(repository: &Path, name: &str) -> PathBuf {
+    heads_directory(repository)
+        .join(".hydra")
+        .join(format!("recovery-{name}.json"))
+}
+
 fn write_pending_creation(repository: &Path, name: &str) -> PathBuf {
     let head_ref = format!("refs/heads/hydra/{name}");
     let head_path = heads_directory(repository).join(name);
@@ -310,7 +316,7 @@ fn confirmed_repair_adopts_a_manifest_backed_head_without_changing_existing_entr
 }
 
 #[test]
-fn untracked_head_recovery_rechecks_the_manifest_after_planning() {
+fn untracked_head_recovery_rechecks_all_recovery_evidence_after_planning() {
     let directory = TestDirectory::new("repair-manifest-head-race");
     let repository = create_initialized_project(&directory);
     create_head(&repository, "payment");
@@ -319,6 +325,8 @@ fn untracked_head_recovery_rechecks_the_manifest_after_planning() {
     assert_eq!(plan.recoverable_untracked_heads, ["payment"]);
     fs::remove_file(recovery_manifest_path(&repository, "payment"))
         .expect("fixture should remove the recovery manifest after planning");
+    fs::remove_file(central_recovery_path(&repository, "payment"))
+        .expect("fixture should remove central recovery after planning");
 
     let result =
         hydra_core::apply_untracked_head_recovery(&repository, &plan.recoverable_untracked_heads)
@@ -336,7 +344,7 @@ fn untracked_head_recovery_rechecks_the_manifest_after_planning() {
 }
 
 #[test]
-fn repair_does_not_adopt_a_head_with_an_inconsistent_recovery_manifest() {
+fn repair_does_not_adopt_a_head_when_recovery_records_disagree() {
     let directory = TestDirectory::new("repair-inconsistent-head-manifest");
     let repository = create_initialized_project(&directory);
     create_head(&repository, "payment");
@@ -585,6 +593,8 @@ fn confirmed_repair_rebuilds_a_missing_inventory_from_recovery_manifests() {
     let head = heads_directory(&repository).join("payment");
     let state_path = head_state_path(&repository);
     let state_before = fs::read(&state_path).expect("inventory should be readable");
+    fs::remove_file(central_recovery_path(&repository, "payment"))
+        .expect("fixture should retain only the private recovery manifest");
     fs::remove_file(&state_path).expect("disposable inventory should be removed");
 
     let output = run_repair(&repository, b"yes\n");
@@ -611,7 +621,44 @@ fn confirmed_repair_rebuilds_a_missing_inventory_from_recovery_manifests() {
 }
 
 #[test]
-fn repair_does_not_rebuild_when_a_head_has_no_recovery_manifest() {
+fn confirmed_repair_rebuilds_inventory_without_the_private_manifest() {
+    let directory = TestDirectory::new("repair-missing-private-manifest");
+    let repository = create_initialized_project(&directory);
+    create_head(&repository, "payment");
+    let head = heads_directory(&repository).join("payment");
+    let state_path = head_state_path(&repository);
+    let state_before = fs::read(&state_path).expect("inventory should be readable");
+    assert!(
+        central_recovery_path(&repository, "payment").is_file(),
+        "successful creation should retain central recovery metadata"
+    );
+    fs::remove_file(recovery_manifest_path(&repository, "payment"))
+        .expect("private recovery manifest should be removed");
+    fs::remove_file(&state_path).expect("disposable inventory should be removed");
+
+    let output = run_repair(&repository, b"yes\n");
+
+    assert!(
+        output.status.success(),
+        "central recovery should succeed, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8(output.stdout)
+            .expect("stdout should be UTF-8")
+            .ends_with("Rebuilt the missing inventory with 1 recovered Head.\n")
+    );
+    assert_eq!(
+        fs::read(&state_path).expect("inventory should be rebuilt"),
+        state_before
+    );
+    assert!(head.is_dir());
+    assert!(branch_exists(&repository, "payment"));
+    assert!(!head_state_lock_path(&repository).exists());
+}
+
+#[test]
+fn repair_does_not_rebuild_when_a_head_has_no_recovery_evidence() {
     let directory = TestDirectory::new("repair-missing-recovery-manifest");
     let repository = create_initialized_project(&directory);
     create_head(&repository, "payment");
@@ -619,6 +666,8 @@ fn repair_does_not_rebuild_when_a_head_has_no_recovery_manifest() {
     let state_path = head_state_path(&repository);
     fs::remove_file(recovery_manifest_path(&repository, "payment"))
         .expect("disposable recovery manifest should be removed");
+    fs::remove_file(central_recovery_path(&repository, "payment"))
+        .expect("central recovery record should be removed");
     fs::remove_file(&state_path).expect("disposable inventory should be removed");
 
     let output = run_repair(&repository, b"yes\n");
@@ -738,6 +787,8 @@ fn repair_reports_an_untracked_hydra_worktree_without_guessing_metadata() {
     let head = heads_directory(&repository).join("payment");
     fs::remove_file(recovery_manifest_path(&repository, "payment"))
         .expect("fixture should remove the exact recovery metadata");
+    fs::remove_file(central_recovery_path(&repository, "payment"))
+        .expect("fixture should remove the central recovery metadata");
     let state_path = head_state_path(&repository);
     let mut state: serde_json::Value =
         serde_json::from_slice(&fs::read(&state_path).expect("state should be readable"))

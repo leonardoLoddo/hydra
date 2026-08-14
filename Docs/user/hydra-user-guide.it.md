@@ -667,9 +667,9 @@ Hydra può proporti sei correzioni deterministiche:
 - rimuovere un `heads.json.lock` abbandonato, ma solo se appartiene al formato
   corrente e il guard del sistema operativo dimostra che nessun processo Hydra
   lo possiede;
-- ricostruire un `heads.json` assente dai manifest privati delle Head, ma solo
-  se tutte le worktree con prefisso Hydra hanno manifest coerenti con nome,
-  percorso gestito e branch Git;
+- ricostruire un `heads.json` assente dai record di recupero delle Head, ma
+  solo se tutte le worktree con prefisso Hydra hanno evidenza coerente con
+  nome, percorso gestito e branch Git;
 - aggiungere a un inventario esistente una Head omessa dopo un crash, ma solo
   quando la worktree registrata e il suo manifest coincidono esattamente per
   nome, percorso gestito e branch;
@@ -707,14 +707,16 @@ Rebuild the missing inventory with 1 recovered Head? [y/N]
 ```
 
 Se confermi, Hydra ricontrolla l'intero insieme sotto lock e crea
-atomicamente l'inventario senza modificare worktree o branch. Se una Head non
-ha il manifest o non coincide con Git, non viene creato un inventario parziale.
+atomicamente l'inventario senza modificare worktree o branch. È sufficiente il
+record centrale oppure quello privato; se esistono entrambi devono coincidere.
+Se una Head non ha evidenza coerente con Git, non viene creato un inventario
+parziale.
 
-Un manifest malformato, di versione non supportata o non rappresentato da un
-file regolare interrompe la validazione senza modificare manifest, worktree,
-branch o inventario.
+Un record di recupero malformato, di versione non supportata o non
+rappresentato da un file regolare interrompe la validazione senza modificare
+record, worktree, branch o inventario.
 
-Se l'inventario esiste ma omette una Head completa dotata di manifest, Hydra la
+Se l'inventario esiste ma omette una Head completa dotata di evidenza di recupero, Hydra la
 mostra come recuperabile e chiede, per esempio:
 
 ```text
@@ -724,7 +726,7 @@ Add 1 recovered Head to the inventory? [y/N]
 Se confermi, Hydra ricontrolla sotto lock l'intero insieme approvato e aggiunge
 atomicamente i metadati esatti senza cambiare le voci già registrate. Se il
 manifest, Git o l'inventario cambiano durante la conferma, non adotta nessuna
-Head. Un manifest assente o semanticamente incoerente lascia la worktree in
+Head. L'assenza di entrambi i record o la loro incoerenza lascia la worktree in
 sola segnalazione e non autorizza metadati dedotti.
 
 Per una creazione interrotta prima della worktree, Hydra mostra il nome e
@@ -733,8 +735,8 @@ branch soltanto se punta ancora esattamente al commit di base registrato nel
 journal. Se il branch è avanzato o sono comparsi path o worktree, non elimina
 nulla e richiede diagnosi.
 
-Altre incoerenze vengono soltanto segnalate: worktree Hydra senza manifest
-verificabile, directory registrate ma mancanti, directory non registrate,
+Altre incoerenze vengono soltanto segnalate: worktree Hydra senza evidenza di
+recupero verificabile, directory registrate ma mancanti, directory non registrate,
 branch assenti o differenti e associazioni ambigue. Hydra conserva file e ref
 perché Git da solo non contiene informazioni sufficienti per ricostruire con
 certezza base, target, backend e intenzione originaria.
@@ -1218,6 +1220,7 @@ Hydra separa:
 <heads-directory>/.hydra/directory.json
 <heads-directory>/.hydra/heads.json
 <heads-directory>/.hydra/pending-<name>.json
+<heads-directory>/.hydra/recovery-<name>.json
 <git-private-worktree-directory>/hydra-head.json
 ```
 
@@ -1227,8 +1230,9 @@ Hydra separa:
 - `heads.json` contiene l’inventario fisico delle Head locali;
 - ogni `pending-<name>.json` conserva l'intento di una creazione non ancora
   pubblicata e viene normalmente rimosso al successo o durante il rollback;
-- ogni `hydra-head.json` conserva i metadati esatti della singola Head per il
-  solo recupero di un inventario completamente assente.
+- ogni coppia `recovery-<name>.json` e `hydra-head.json` conserva gli stessi
+  metadati esatti della singola Head; una copia valida può consentire il
+  recupero se l'altra viene persa, mentre due copie presenti devono coincidere.
 
 Questi file:
 
@@ -1252,11 +1256,12 @@ il repair corrente non reinizializza il progetto.
 
 ### Manca `heads.json`
 
-Non ricrearlo a mano. Esegui `hydra repair`: per le Head create con un
-manifest di recupero verificabile, Hydra può proporre la ricostruzione esatta
-dell'inventario. Controlla l'elenco e conferma soltanto se tutte le Head attese
-sono presenti. Se anche una worktree Hydra non ha un manifest coerente, Hydra
-non scrive uno stato parziale e richiede diagnosi manuale.
+Non ricrearlo a mano. Esegui `hydra repair`: per le Head con almeno un record
+di recupero verificabile, Hydra può proporre la ricostruzione esatta
+dell'inventario anche se il manifest privato è stato perso. Controlla l'elenco
+e conferma soltanto se tutte le Head attese sono presenti. Se anche una
+worktree Hydra non ha evidenza coerente, o i due record superstiti divergono,
+Hydra non scrive uno stato parziale e richiede diagnosi manuale.
 
 Se `heads.json` esiste ma è malformato, Hydra lo conserva e restituisce un
 errore. Non cancellarlo per forzare il recupero: preservalo per la diagnosi.

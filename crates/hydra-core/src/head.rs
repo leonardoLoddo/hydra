@@ -174,18 +174,35 @@ pub fn create_head_with_progress(
             return Err(transaction.abort(remove_pending_after_error(&pending, error)));
         }
     };
+    let central_recovery = match recovery::create_central_recovery(
+        &prepared.heads_directory,
+        &options.name,
+        &metadata,
+    ) {
+        Ok(path) => path,
+        Err(error) => {
+            let error =
+                rollback_worktree(&repository, &prepared.head_path, &prepared.branch, error);
+            return Err(transaction.abort(remove_pending_after_error(&pending, error)));
+        }
+    };
     if let Err(error) =
         recovery::create_manifest(&repository, &prepared.head_path, &options.name, &metadata)
     {
         let error = rollback_worktree(&repository, &prepared.head_path, &prepared.branch, error);
-        return Err(transaction.abort(remove_pending_after_error(&pending, error)));
+        let error = remove_creation_recovery_after_error(&pending, &central_recovery, error);
+        return Err(transaction.abort(error));
     }
     if let Err(error) = transaction.commit(options.name.clone(), metadata) {
         if error.head_was_committed() {
             return Err(error);
         }
         let error = rollback_worktree(&repository, &prepared.head_path, &prepared.branch, error);
-        return Err(remove_pending_after_error(&pending, error));
+        return Err(remove_creation_recovery_after_error(
+            &pending,
+            &central_recovery,
+            error,
+        ));
     }
 
     recovery::remove_pending_creation(pending.path())
@@ -211,6 +228,35 @@ fn remove_pending_after_error(
             original: Box::new(original),
             failures: vec![cleanup.to_string()],
         },
+    }
+}
+
+fn remove_creation_recovery_after_error(
+    pending: &recovery::PendingCreation,
+    central_recovery: &Path,
+    original: HeadError,
+) -> HeadError {
+    let mut failures = Vec::new();
+    if let Err(cleanup) = std::fs::remove_file(central_recovery) {
+        failures.push(
+            HeadError::FileSystem {
+                action: "remove central Head recovery record",
+                path: central_recovery.to_path_buf(),
+                source: cleanup,
+            }
+            .to_string(),
+        );
+    }
+    if let Err(cleanup) = recovery::remove_pending_creation(pending.path()) {
+        failures.push(cleanup.to_string());
+    }
+    if failures.is_empty() {
+        original
+    } else {
+        HeadError::RollbackFailed {
+            original: Box::new(original),
+            failures,
+        }
     }
 }
 

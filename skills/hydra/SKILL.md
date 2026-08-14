@@ -192,16 +192,18 @@ that are not integrated, and its output must be reported.
   inconsistencies, then rerun and confirm only the changes the user explicitly
   authorizes. When the inventory is missing, approve reconstruction only if
   every expected Head appears in the recoverable set; Hydra will revalidate
-  the complete set and use exact private recovery manifests rather than infer
-  metadata from Git. A Head without a manifest, or an inconsistent Head,
-  disables partial automatic reconstruction, while a malformed or unsupported
-  manifest is a validation error to preserve for diagnosis. When an existing
-  inventory omits a manifest-backed worktree, authorize adoption only if the
+  the complete set and use exact central or private recovery records rather
+  than infer metadata from Git. Either record is sufficient; when both exist,
+  they must match exactly. A Head without recovery evidence, or with
+  disagreeing records, disables partial automatic reconstruction, while a
+  malformed or unsupported record is a validation error to preserve for
+  diagnosis. When an existing inventory omits a recovery-backed worktree,
+  authorize adoption only if the
   proposed Head name, managed path, and private branch all match the expected
   task; Hydra must revalidate the complete approved set under lock and preserve
   existing entries. If repair removes an abandoned lock or adopts a Head, rerun
   it before authorizing any other proposal. Repair does not justify editing
-  recovery manifests or lock markers, rewriting ownership or locator data,
+  recovery records or lock markers, rewriting ownership or locator data,
   replacing malformed inventory, or reconstructing ambiguous metadata by hand.
 - Authorize pending-creation cleanup only when Hydra reports no associated
   worktree or managed path and an absent or unchanged private branch at the

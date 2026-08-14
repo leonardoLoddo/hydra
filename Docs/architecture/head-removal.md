@@ -79,6 +79,8 @@ remove registered worktree
         ↓
 atomically remove inventory entry
         ↓
+remove central recovery record
+        ↓
 recheck branch reachability from current target
         ↓
 delete integrated private ref with expected-object compare
@@ -93,6 +95,9 @@ own.
 
 Inventory publication uses the existing byte-for-byte concurrent-state check,
 unique temporary file, atomic rename, and directory synchronization. The
+central recovery record is removed only after inventory publication and while
+the state lock is still held. Its absence is accepted for Heads created before
+central records were introduced. The
 private ref is deleted only afterward with:
 
 ```text
@@ -126,7 +131,9 @@ future `hydra repair`; Hydra does not guess at destructive reconciliation.
 
 Disposable-repository CLI tests prove:
 
-- clean integrated removal deletes worktree, inventory entry, and branch;
+- clean integrated removal deletes worktree, inventory entry, central recovery
+  record, and branch;
+- a legacy Head without a central recovery record remains removable;
 - tracked and untracked changes block ordinary removal without mutation;
 - unintegrated commits block ordinary removal without mutation;
 - forced removal discards worktree changes while preserving an unintegrated

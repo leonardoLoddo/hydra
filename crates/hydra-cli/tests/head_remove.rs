@@ -65,6 +65,12 @@ fn branch_exists(repository: &Path, name: &str) -> bool {
     .success()
 }
 
+fn central_recovery_path(repository: &Path, name: &str) -> std::path::PathBuf {
+    heads_directory(repository)
+        .join(".hydra")
+        .join(format!("recovery-{name}.json"))
+}
+
 #[test]
 fn head_remove_deletes_a_clean_integrated_head_branch_and_inventory_entry() {
     let directory = TestDirectory::new("head-remove-clean");
@@ -86,6 +92,33 @@ fn head_remove_deletes_a_clean_integrated_head_branch_and_inventory_entry() {
     assert_eq!(
         String::from_utf8(output.stdout).expect("stdout should be UTF-8"),
         "Removed Head payment\n"
+    );
+    assert!(!head.exists());
+    assert!(!head_is_recorded(&repository, "payment"));
+    assert!(!branch_exists(&repository, "payment"));
+    assert!(!central_recovery_path(&repository, "payment").exists());
+    assert!(!head_state_lock_path(&repository).exists());
+}
+
+#[test]
+fn head_remove_supports_a_legacy_head_without_central_recovery() {
+    let directory = TestDirectory::new("head-remove-legacy-recovery");
+    let repository = create_initialized_project(&directory);
+    create_head(&repository, "payment");
+    let head = heads_directory(&repository).join("payment");
+    fs::remove_file(central_recovery_path(&repository, "payment"))
+        .expect("legacy fixture should omit central recovery");
+
+    let output = hydra_command()
+        .args(["head", "remove", "payment"])
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(
+        output.status.success(),
+        "legacy removal should succeed, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
     );
     assert!(!head.exists());
     assert!(!head_is_recorded(&repository, "payment"));
@@ -113,6 +146,7 @@ fn head_remove_rejects_uncommitted_changes_without_mutation() {
     assert!(head.is_dir());
     assert!(head_is_recorded(&repository, "payment"));
     assert!(branch_exists(&repository, "payment"));
+    assert!(central_recovery_path(&repository, "payment").is_file());
     assert!(!head_state_lock_path(&repository).exists());
 }
 
@@ -176,6 +210,7 @@ fn forced_removal_discards_worktree_changes_but_preserves_an_unintegrated_branch
     assert!(!head.exists());
     assert!(!head_is_recorded(&repository, "payment"));
     assert!(branch_exists(&repository, "payment"));
+    assert!(!central_recovery_path(&repository, "payment").exists());
     let preserved = run_git(&repository, &["rev-parse", "refs/heads/hydra/payment"]);
     assert!(preserved.status.success());
     assert_eq!(

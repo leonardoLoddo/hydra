@@ -181,6 +181,7 @@ state, regardless of which managed Head invoked the command:
 | Directory ownership marker | `<heads-directory>/.hydra/directory.json` |
 | Local Head inventory | `<heads-directory>/.hydra/heads.json` |
 | Pending creation journal | `<heads-directory>/.hydra/pending-<name>.json` |
+| Central Head recovery record | `<heads-directory>/.hydra/recovery-<name>.json` |
 | Per-Head recovery manifest | linked-worktree private Git directory, `hydra-head.json` |
 
 Every path must be a regular file rather than a symlink. The reader accepts
@@ -279,6 +280,8 @@ materialize tracked entries
 materialize confirmed overlays
         ↓
 verify a clean Git worktree
+        ↓
+create the central recovery record
         ↓
 create the private recovery manifest
         ↓
@@ -455,12 +458,14 @@ Successful creation adds version-1 metadata containing:
 - UTC RFC 3339 `createdAt`.
 
 Before publishing the shared inventory, Hydra writes the same exact Head
-identity and intent to a versioned `hydra-head.json` manifest inside the
-linked worktree's private Git administrative directory. The file is created
-with no-clobber atomic publication and is not placed in the project working
-tree. It exists only to let `hydra repair` reconstruct a completely missing
-inventory or adopt this exact Head after a crash immediately before inventory
-publication, without inferring fields that Git does not preserve.
+identity and intent to two versioned, no-clobber recovery records: central
+`<heads-directory>/.hydra/recovery-<name>.json` and private
+`hydra-head.json` inside the linked worktree's Git administrative directory.
+Neither file is placed in the project working tree. The independent records
+let `hydra repair` reconstruct a completely missing inventory or adopt this
+exact Head without inferring fields that Git does not preserve. If both
+records exist, they must agree exactly; either one is sufficient when the
+other was lost.
 
 State publication:
 
@@ -471,12 +476,12 @@ State publication:
 4. synchronizes the parent directory on Unix;
 5. removes the state lock.
 
-A failure before state publication, including recovery-manifest creation,
-rolls back the registered worktree and the private branch, removes the pending
-record, then releases the lock. Removing the registered worktree also removes
-its private administrative manifest. Rollback operates on exact paths and refs
-created by the invocation. Cleanup failures retain the original error and the
-cleanup diagnostics.
+A failure before state publication, including recovery-record creation, rolls
+back the registered worktree and the private branch, removes the central and
+pending records, then releases the lock. Removing the registered worktree also
+removes its private administrative manifest. Rollback operates on exact paths
+and refs created by the invocation. Cleanup failures retain the original error
+and the cleanup diagnostics.
 
 After the state rename, the Head is committed. A subsequent directory-sync or
 lock-removal failure is reported as a post-commit cleanup failure, but Hydra
@@ -563,9 +568,10 @@ cargo test --release -p hydra-cli \
    a persistent content cache for another matching source.
 2. **Post-registration partial creation reconciliation.** A durable pending
    record now makes pre-worktree branch cleanup deterministic. Termination
-   after worktree registration but before the private recovery manifest is
+   after worktree registration but before the central recovery record is
    finalized still preserves the worktree and branch for diagnosis rather than
-   adopting or removing them automatically.
+   adopting or removing them automatically. After that record is published,
+   losing the private manifest no longer prevents exact recovery.
 3. **Cross-platform symlinks and durability.** Tracked and overlay symlink
    materialization is implemented only on Unix. Direct runtime evidence for
    this workflow currently comes from the development platform and does not

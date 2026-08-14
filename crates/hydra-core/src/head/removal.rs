@@ -6,6 +6,7 @@ use std::{
 use super::{
     HeadError,
     git::{self, Repository},
+    recovery,
     state::{StateTransaction, discover_project_repository},
     validate_head_name,
 };
@@ -47,7 +48,9 @@ pub fn remove_head(
         return Err(transaction.abort(error));
     }
 
-    if let Err(source) = transaction.remove(&options.name) {
+    if let Err(source) = transaction.remove(&options.name, || {
+        recovery::remove_central_recovery(&prepared.heads_directory, &options.name)
+    }) {
         return Err(HeadError::HeadRemovalIncomplete {
             name: options.name,
             preserved_branch: prepared.head_ref,
@@ -79,6 +82,7 @@ pub fn remove_head(
 }
 
 struct PreparedRemoval {
+    heads_directory: PathBuf,
     path: PathBuf,
     head_ref: String,
     head_commit: String,
@@ -145,6 +149,7 @@ fn prepare_removal(
     }
 
     Ok(PreparedRemoval {
+        heads_directory,
         path,
         head_ref: metadata.head_ref().to_owned(),
         head_commit,
