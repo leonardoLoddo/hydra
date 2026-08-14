@@ -39,7 +39,7 @@ repair candidate.
 
 ## Guided Repairs
 
-Hydra offers only five deterministic repairs, and applies none without an
+Hydra offers only six deterministic repairs, and applies none without an
 explicit affirmative answer.
 
 ### Abandoned current-version state lock
@@ -110,6 +110,27 @@ A missing or semantically inconsistent manifest leaves the worktree
 report-only. A malformed, non-regular, or unsupported manifest is a validation
 error and remains untouched.
 
+### Interrupted pre-worktree creation
+
+Head creation publishes a versioned pending-intent record inside the owned
+Heads metadata directory before it creates the private branch. Repair validates
+that the record filename, Head name, managed path, configured branch prefix,
+base commit, and private ref agree.
+
+The residue is automatically repairable only when no registered worktree and
+no filesystem entry exists for the managed path. An absent private ref permits
+removal of the journal alone. A present private ref permits cleanup only when
+it still points to the exact recorded base commit; deletion uses Git
+compare-and-swap so a concurrent advance cannot be discarded. A pending record
+left after successful inventory publication is cleaned without changing the
+recorded Head or its branch.
+
+After confirmation, Hydra reacquires the normal state lock and rebuilds the
+complete candidate set. It deletes an unchanged private ref before removing
+the journal, so a journal-cleanup failure retains enough evidence for another
+repair. A present or relocated worktree, a present path, an advanced branch,
+or inconsistent journal data is preserved for diagnosis.
+
 ### Stale inventory
 
 An entry is stale only when all of these facts hold:
@@ -142,6 +163,8 @@ Hydra reports but does not guess a mutation for:
 
 - a Hydra-prefixed Git worktree missing from inventory and lacking a matching
   recovery manifest;
+- a pending creation that already has a worktree, managed filesystem entry, or
+  advanced private branch;
 - a registered worktree whose physical directory is missing;
 - a present managed directory not registered with Git;
 - non-directory entries at managed Head paths;
@@ -181,9 +204,11 @@ changed class, Hydra preserves the current path and reports that no repair was
 applied or that another state operation owns it.
 
 Relocated worktrees are restored before inventory publication. Stale entries
-are removed together through one atomic state replacement. No repair path
-deletes a private branch, recursively removes a directory, edits tracked
-project code, or invokes a shell.
+are removed together through one atomic state replacement. Only confirmed
+cleanup of an exact pending pre-worktree creation may delete a private branch,
+and only with compare-and-swap at its recorded base commit. No repair path
+recursively removes a directory, edits tracked project code, or invokes a
+shell.
 
 Declining every prompt leaves Git, filesystem, inventory, and refs unchanged.
 
@@ -209,6 +234,9 @@ Disposable-repository tests prove:
   exact original metadata without changing existing inventory entries;
 - missing or inconsistent manifests do not authorize adoption, and a manifest
   change after planning cancels publication without leaving a lock;
+- interrupted pre-worktree creation cleanup requires confirmation, preserves a
+  branch changed after planning, and leaves a durable journal when safe cleanup
+  cannot be proven;
 - stale inventory requires confirmation;
 - confirmed stale cleanup removes only metadata and preserves the branch;
 - relocated worktrees require confirmation and return to the managed path only

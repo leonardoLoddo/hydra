@@ -180,6 +180,7 @@ state, regardless of which managed Head invoked the command:
 | Local project locator | `<git-common-dir>/hydra/project.json` |
 | Directory ownership marker | `<heads-directory>/.hydra/directory.json` |
 | Local Head inventory | `<heads-directory>/.hydra/heads.json` |
+| Pending creation journal | `<heads-directory>/.hydra/pending-<name>.json` |
 | Per-Head recovery manifest | linked-worktree private Git directory, `hydra-head.json` |
 
 Every path must be a regular file rather than a symlink. The reader accepts
@@ -265,6 +266,8 @@ persist confirmed unsafe-symlink exclusions, if any
         ↓
 replan overlays
         ↓
+publish exact pending-creation intent
+        ↓
 create private branch at baseCommit
         ↓
 register worktree without checkout
@@ -282,6 +285,8 @@ create the private recovery manifest
 atomically replace heads.json
         ↓
 release state lock
+        ↓
+remove pending-creation intent
 ```
 
 Branch creation and worktree registration are separate Git operations. A
@@ -292,6 +297,16 @@ created branch from authorizing deletion of a branch Hydra does not own.
 The worktree is registered with `--no-checkout`; Hydra writes the index and
 working files itself. This avoids an intermediate full checkout before
 copy-on-write materialization.
+
+Before branch creation, Hydra atomically publishes a version-1 pending record
+inside the owned Heads metadata directory. It preserves name, managed path,
+private ref, base ref and commit, and target ref. Ordinary rollback removes the
+record. If the process terminates, the record proves creation intent that Git
+alone cannot distinguish from a user-created branch. A confirmed `repair` may
+remove a pre-worktree residue only when no managed path or registered worktree
+exists and the private ref is absent or still points to the recorded base
+commit. Branch deletion uses compare-and-swap; advanced refs and every present
+worktree or directory are preserved.
 
 ---
 
@@ -457,10 +472,11 @@ State publication:
 5. removes the state lock.
 
 A failure before state publication, including recovery-manifest creation,
-rolls back the registered worktree and the private branch, then releases the
-lock. Removing the registered worktree also removes its private administrative
-manifest. Rollback operates on exact paths and refs created by the invocation.
-Cleanup failures retain the original error and the cleanup diagnostics.
+rolls back the registered worktree and the private branch, removes the pending
+record, then releases the lock. Removing the registered worktree also removes
+its private administrative manifest. Rollback operates on exact paths and refs
+created by the invocation. Cleanup failures retain the original error and the
+cleanup diagnostics.
 
 After the state rename, the Head is committed. A subsequent directory-sync or
 lock-removal failure is reported as a post-commit cleanup failure, but Hydra
@@ -486,6 +502,9 @@ repositories. Current coverage proves:
 - metadata fields and clean Git status;
 - exact recovery-manifest publication before inventory commit and
   missing-inventory reconstruction through `hydra repair`;
+- durable pending intent before branch and worktree mutation, cleanup on normal
+  success and handled failures, and confirmed compare-and-swap repair of an
+  interrupted pre-worktree branch;
 - Gitignore overlay expansion, negation, conditional fallback confirmation,
   copy, and isolation;
 - deterministic full-copy creation for tracked files and overlays through
@@ -542,13 +561,11 @@ cargo test --release -p hydra-cli \
    working tree when its tracked state matches `baseCommit`, while overlays
    clone from that same workspace. Hydra does not yet search existing Heads or
    a persistent content cache for another matching source.
-2. **Earlier partial creation crash reconciliation.** Atomic state publication
-   and rollback protect ordinary errors. Repair can remove a confirmed
-   abandoned current-version lock and adopt a complete manifest-backed Head
-   after a crash immediately before inventory publication. Termination before
-   the recovery manifest is durably published can still leave branch,
-   worktree, or filesystem combinations that are not adopted or rolled back
-   automatically.
+2. **Post-registration partial creation reconciliation.** A durable pending
+   record now makes pre-worktree branch cleanup deterministic. Termination
+   after worktree registration but before the private recovery manifest is
+   finalized still preserves the worktree and branch for diagnosis rather than
+   adopting or removing them automatically.
 3. **Cross-platform symlinks and durability.** Tracked and overlay symlink
    materialization is implemented only on Unix. Direct runtime evidence for
    this workflow currently comes from the development platform and does not

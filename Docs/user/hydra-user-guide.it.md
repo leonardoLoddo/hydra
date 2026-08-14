@@ -662,7 +662,7 @@ Se tutto è coerente, il comando termina senza modifiche:
 Hydra state is consistent.
 ```
 
-Hydra può proporti cinque correzioni deterministiche:
+Hydra può proporti sei correzioni deterministiche:
 
 - rimuovere un `heads.json.lock` abbandonato, ma solo se appartiene al formato
   corrente e il guard del sistema operativo dimostra che nessun processo Hydra
@@ -673,6 +673,10 @@ Hydra può proporti cinque correzioni deterministiche:
 - aggiungere a un inventario esistente una Head omessa dopo un crash, ma solo
   quando la worktree registrata e il suo manifest coincidono esattamente per
   nome, percorso gestito e branch;
+- ripulire una creazione interrotta prima della registrazione della worktree,
+  ma soltanto quando il journal durevole coincide con nome, percorso, ref e
+  commit di base, non esistono directory o worktree associate e il branch non
+  è avanzato;
 - rimuovere dall’inventario una Head la cui directory e registrazione Git non
   esistono più, conservando sempre il branch privato;
 - riportare nel percorso gestito una worktree spostata, quando Git associa in
@@ -722,6 +726,12 @@ atomicamente i metadati esatti senza cambiare le voci già registrate. Se il
 manifest, Git o l'inventario cambiano durante la conferma, non adotta nessuna
 Head. Un manifest assente o semanticamente incoerente lascia la worktree in
 sola segnalazione e non autorizza metadati dedotti.
+
+Per una creazione interrotta prima della worktree, Hydra mostra il nome e
+richiede conferma. Ricontrolla quindi tutto sotto lock e rimuove l'eventuale
+branch soltanto se punta ancora esattamente al commit di base registrato nel
+journal. Se il branch è avanzato o sono comparsi path o worktree, non elimina
+nulla e richiede diagnosi.
 
 Altre incoerenze vengono soltanto segnalate: worktree Hydra senza manifest
 verificabile, directory registrate ma mancanti, directory non registrate,
@@ -1207,13 +1217,16 @@ Hydra separa:
 <git-common-dir>/hydra/project.json
 <heads-directory>/.hydra/directory.json
 <heads-directory>/.hydra/heads.json
+<heads-directory>/.hydra/pending-<name>.json
 <git-private-worktree-directory>/hydra-head.json
 ```
 
 - `project.json` individua l’installazione locale da qualunque worktree;
 - `directory.json` prova l’ownership tramite `projectId` e `installationId` e,
   senza cambiarne il contenuto, fornisce il target stabile del guard OS;
-- `heads.json` contiene l’inventario fisico delle Head locali.
+- `heads.json` contiene l’inventario fisico delle Head locali;
+- ogni `pending-<name>.json` conserva l'intento di una creazione non ancora
+  pubblicata e viene normalmente rimosso al successo o durante il rollback;
 - ogni `hydra-head.json` conserva i metadati esatti della singola Head per il
   solo recupero di un inventario completamente assente.
 

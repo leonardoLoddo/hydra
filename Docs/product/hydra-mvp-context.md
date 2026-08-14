@@ -335,6 +335,7 @@ Hydra separa configurazione condivisa, locator locale e stato fisico.
 | `<git-common-dir>/hydra/project.json` | Locator canonico e identità dell'installazione locale | No |
 | `<heads-directory>/.hydra/directory.json` | Marker di ownership e target stabile del guard OS per le mutazioni di stato | No |
 | `<heads-directory>/.hydra/heads.json` | Inventario delle Head fisiche locali | No |
+| `<heads-directory>/.hydra/pending-<name>.json` | Intento durevole di una creazione non ancora pubblicata | No |
 | directory amministrativa Git privata della worktree, `hydra-head.json` | Manifest di recupero esatto della singola Head | No |
 
 La configurazione nel progetto descrive come quel progetto deve essere
@@ -937,6 +938,10 @@ e deve poter:
 - adottare atomicamente in un inventario esistente una worktree Hydra omessa
   soltanto quando il suo manifest privato conserva metadati esatti e coerenti
   con nome, percorso gestito e branch osservati da Git.
+- ripulire dopo conferma un journal di creazione interrotta prima della
+  registrazione della worktree, eliminando il branch privato soltanto se non
+  esistono directory o worktree associate e la ref punta ancora esattamente al
+  commit di base registrato.
 
 Le correzioni distruttive o ambigue richiedono sempre una conferma esplicita.
 

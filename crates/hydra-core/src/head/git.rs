@@ -643,6 +643,19 @@ pub(super) fn delete_branch(repository: &Repository, branch: &str) -> Result<(),
     }
 }
 
+pub(super) fn delete_ref_if_at(
+    repository: &Repository,
+    reference: &str,
+    expected_commit: &str,
+) -> Result<(), HeadError> {
+    run_git(
+        &repository.root,
+        &["update-ref", "-d", reference, expected_commit],
+        "removing the incomplete Head branch",
+    )
+    .map(|_| ())
+}
+
 fn git_path(path: &Path, argument: &str, field: &'static str) -> Result<PathBuf, HeadError> {
     let output = run_git(
         path,

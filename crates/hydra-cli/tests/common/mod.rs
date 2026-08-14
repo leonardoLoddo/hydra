@@ -122,4 +122,10 @@ pub fn assert_no_head_creation_artifacts(repository: &Path, name: &str) {
         !head_state_lock_path(repository).exists(),
         "failed creation must release the state lock"
     );
+    assert!(
+        !heads_directory
+            .join(format!(".hydra/pending-{name}.json"))
+            .exists(),
+        "handled creation failure must remove its pending journal"
+    );
 }

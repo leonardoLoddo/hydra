@@ -341,6 +341,9 @@ fn repair() -> ExitCode {
     if plan.missing_inventory.is_some() {
         return repair_missing_inventory(&plan);
     }
+    if !plan.recoverable_pending_creations.is_empty() {
+        return repair_pending_creations(&plan);
+    }
     if !plan.recoverable_untracked_heads.is_empty() {
         return repair_untracked_heads(&plan);
     }
@@ -416,6 +419,51 @@ fn repair() -> ExitCode {
         }
         Err(error) => {
             eprintln!("error: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn repair_pending_creations(plan: &hydra_core::RepairPlan) -> ExitCode {
+    let stdin = io::stdin();
+    let mut input = stdin.lock();
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    match request_pending_creation_confirmation(
+        &mut input,
+        &mut output,
+        plan.recoverable_pending_creations.len(),
+    ) {
+        Ok(true) => match hydra_core::apply_pending_creation_recovery(
+            Path::new("."),
+            &plan.recoverable_pending_creations,
+        ) {
+            Ok(result) if result.cleaned_creations.len() == 1 => {
+                println!("Cleaned up 1 incomplete Head creation.");
+                ExitCode::SUCCESS
+            }
+            Ok(result) if !result.cleaned_creations.is_empty() => {
+                println!(
+                    "Cleaned up {} incomplete Head creations.",
+                    result.cleaned_creations.len()
+                );
+                ExitCode::SUCCESS
+            }
+            Ok(_) => {
+                println!("No repairs applied; pending creation state changed during confirmation.");
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("error: {error}");
+                ExitCode::FAILURE
+            }
+        },
+        Ok(false) => {
+            println!("No repairs applied.");
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("error: failed to read repair confirmation: {error}");
             ExitCode::FAILURE
         }
     }
@@ -565,6 +613,11 @@ fn show_repair_issue(issue: &hydra_core::RepairIssue) {
             path: _,
             head_ref: _,
         } => println!("Recoverable untracked Head: {name}"),
+        hydra_core::RepairIssue::IncompleteHeadCreation {
+            name,
+            path: _,
+            head_ref: _,
+        } => println!("Incomplete Head creation: {name}"),
         hydra_core::RepairIssue::StaleInventory {
             name,
             path,
@@ -663,6 +716,25 @@ fn request_untracked_head_recovery_confirmation(
             output,
             "Add {count} recovered Heads to the inventory? [y/N] "
         )?;
+    }
+    output.flush()?;
+    let mut response = String::new();
+    input.read_line(&mut response)?;
+    Ok(matches!(
+        response.trim().to_ascii_lowercase().as_str(),
+        "y" | "yes"
+    ))
+}
+
+fn request_pending_creation_confirmation(
+    input: &mut impl BufRead,
+    output: &mut impl Write,
+    count: usize,
+) -> io::Result<bool> {
+    if count == 1 {
+        write!(output, "Clean up 1 incomplete Head creation? [y/N] ")?;
+    } else {
+        write!(output, "Clean up {count} incomplete Head creations? [y/N] ")?;
     }
     output.flush()?;
     let mut response = String::new();

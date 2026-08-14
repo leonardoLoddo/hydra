@@ -209,6 +209,12 @@ fn head_create_builds_an_isolated_worktree_and_records_its_metadata() {
             .as_str()
             .is_some_and(|timestamp| timestamp.ends_with('Z'))
     );
+    assert!(
+        !heads_directory(&repository)
+            .join(".hydra/pending-payment.json")
+            .exists(),
+        "committed creation must remove its pending journal"
+    );
 }
 
 #[test]

@@ -8,12 +8,77 @@ use std::{
 };
 
 #[cfg(unix)]
-use std::os::unix::fs::symlink;
+use std::{
+    env,
+    os::unix::fs::{PermissionsExt, symlink},
+};
 
 use common::{
     TestDirectory, assert_no_head_creation_artifacts, create_initialized_project,
     head_state_lock_path, head_state_path, heads_directory, hydra_command, run_git,
 };
+
+#[cfg(unix)]
+#[test]
+fn interrupted_creation_leaves_durable_intent_before_worktree_registration() {
+    let directory = TestDirectory::new("head-interrupted-before-worktree");
+    let repository = create_initialized_project(&directory);
+    let wrapper_directory = directory.path().join("git-wrapper");
+    fs::create_dir(&wrapper_directory).expect("Git wrapper directory should be created");
+    let wrapper = wrapper_directory.join("git");
+    fs::write(
+        &wrapper,
+        concat!(
+            "#!/bin/sh\n",
+            "case \" $* \" in\n",
+            "  *\" worktree add \"*) kill -KILL \"$PPID\"; exit 1 ;;\n",
+            "esac\n",
+            "exec \"$HYDRA_TEST_REAL_GIT\" \"$@\"\n"
+        ),
+    )
+    .expect("Git wrapper should be written");
+    fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o755))
+        .expect("Git wrapper should be executable");
+    let original_path = env::var_os("PATH").expect("test PATH should exist");
+    let real_git = env::split_paths(&original_path)
+        .map(|directory| directory.join("git"))
+        .find(|candidate| candidate.is_file())
+        .expect("real Git should be present on PATH");
+    let wrapped_path =
+        env::join_paths(std::iter::once(wrapper_directory).chain(env::split_paths(&original_path)))
+            .expect("wrapped PATH should be valid");
+
+    let output = hydra_command()
+        .args(["head", "create", "payment"])
+        .current_dir(&repository)
+        .env("PATH", wrapped_path)
+        .env("HYDRA_TEST_REAL_GIT", real_git)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(!output.status.success(), "fixture should terminate Hydra");
+    assert!(
+        heads_directory(&repository)
+            .join(".hydra/pending-payment.json")
+            .is_file(),
+        "creation intent must be durable before worktree registration"
+    );
+    assert!(head_state_lock_path(&repository).is_file());
+    assert!(
+        run_git(
+            &repository,
+            &[
+                "show-ref",
+                "--verify",
+                "--quiet",
+                "refs/heads/hydra/payment"
+            ]
+        )
+        .status
+        .success()
+    );
+    assert!(!heads_directory(&repository).join("payment").exists());
+}
 
 #[test]
 fn head_create_releases_the_lock_when_local_state_is_malformed() {

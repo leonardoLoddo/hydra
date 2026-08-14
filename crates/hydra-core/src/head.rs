@@ -28,9 +28,9 @@ pub use open::{OpenedHead, open_head};
 use overlay::{OverlayPlan, materialize_overlays, plan_overlays};
 pub use removal::{RemoveHeadOptions, RemovedHead, remove_head};
 pub use repair::{
-    InventoryRecoveryResult, RepairIssue, RepairPlan, RepairResult,
-    apply_abandoned_state_lock_recovery, apply_inventory_recovery, apply_repairs,
-    apply_untracked_head_recovery, plan_repairs,
+    InventoryRecoveryResult, PendingCreationRecoveryResult, RepairIssue, RepairPlan, RepairResult,
+    apply_abandoned_state_lock_recovery, apply_inventory_recovery, apply_pending_creation_recovery,
+    apply_repairs, apply_untracked_head_recovery, plan_repairs,
 };
 use state::{HeadMetadata, StateSnapshot, StateTransaction, discover_project_repository};
 
@@ -128,8 +128,21 @@ pub fn create_head_with_progress(
         Err(error) => return Err(transaction.abort(error)),
     };
 
+    let pending = match recovery::create_pending_creation(
+        &prepared.heads_directory,
+        &options.name,
+        &prepared.head_path,
+        &format!("refs/heads/{}", prepared.branch),
+        &prepared.base_ref,
+        &prepared.base_commit,
+        &prepared.target_ref,
+    ) {
+        Ok(pending) => pending,
+        Err(error) => return Err(transaction.abort(error)),
+    };
+
     if let Err(error) = git::create_branch(&repository, &prepared.branch, &prepared.base_commit) {
-        return Err(transaction.abort(error));
+        return Err(transaction.abort(remove_pending_after_error(&pending, error)));
     }
     let creation = create_worktree(
         &repository,
@@ -142,7 +155,7 @@ pub fn create_head_with_progress(
         Err(error) => {
             let error =
                 rollback_worktree(&repository, &prepared.head_path, &prepared.branch, error);
-            return Err(transaction.abort(error));
+            return Err(transaction.abort(remove_pending_after_error(&pending, error)));
         }
     };
 
@@ -158,26 +171,25 @@ pub fn create_head_with_progress(
         Err(error) => {
             let error =
                 rollback_worktree(&repository, &prepared.head_path, &prepared.branch, error);
-            return Err(transaction.abort(error));
+            return Err(transaction.abort(remove_pending_after_error(&pending, error)));
         }
     };
     if let Err(error) =
         recovery::create_manifest(&repository, &prepared.head_path, &options.name, &metadata)
     {
         let error = rollback_worktree(&repository, &prepared.head_path, &prepared.branch, error);
-        return Err(transaction.abort(error));
+        return Err(transaction.abort(remove_pending_after_error(&pending, error)));
     }
     if let Err(error) = transaction.commit(options.name.clone(), metadata) {
         if error.head_was_committed() {
             return Err(error);
         }
-        return Err(rollback_worktree(
-            &repository,
-            &prepared.head_path,
-            &prepared.branch,
-            error,
-        ));
+        let error = rollback_worktree(&repository, &prepared.head_path, &prepared.branch, error);
+        return Err(remove_pending_after_error(&pending, error));
     }
+
+    recovery::remove_pending_creation(pending.path())
+        .map_err(|error| HeadError::HeadCommittedWithCleanupFailure(Box::new(error)))?;
 
     Ok(CreatedHead {
         name: options.name,
@@ -187,6 +199,19 @@ pub fn create_head_with_progress(
         overlay_files: prepared.overlay_plan.file_count(),
         overlay_bytes: prepared.overlay_plan.total_bytes(),
     })
+}
+
+fn remove_pending_after_error(
+    pending: &recovery::PendingCreation,
+    original: HeadError,
+) -> HeadError {
+    match recovery::remove_pending_creation(pending.path()) {
+        Ok(()) => original,
+        Err(cleanup) => HeadError::RollbackFailed {
+            original: Box::new(original),
+            failures: vec![cleanup.to_string()],
+        },
+    }
 }
 
 struct PreparedHead {

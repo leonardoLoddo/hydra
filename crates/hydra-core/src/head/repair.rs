@@ -25,6 +25,7 @@ pub struct RepairPlan {
     pub recoverable_inventory: Vec<String>,
     pub abandoned_state_lock: Option<PathBuf>,
     pub recoverable_untracked_heads: Vec<String>,
+    pub recoverable_pending_creations: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -45,6 +46,11 @@ pub enum RepairIssue {
         path: PathBuf,
     },
     RecoverableUntrackedHead {
+        name: String,
+        path: PathBuf,
+        head_ref: String,
+    },
+    IncompleteHeadCreation {
         name: String,
         path: PathBuf,
         head_ref: String,
@@ -108,6 +114,11 @@ pub struct RepairResult {
 #[derive(Debug)]
 pub struct InventoryRecoveryResult {
     pub recovered_heads: Vec<String>,
+}
+
+#[derive(Debug)]
+pub struct PendingCreationRecoveryResult {
+    pub cleaned_creations: Vec<String>,
 }
 
 /// Compares Hydra inventory with Git worktree and branch state without mutation.
@@ -247,6 +258,84 @@ pub fn apply_untracked_head_recovery(
     let recovered_heads = plan.recoverable_untracked_heads;
     transaction.commit_many(recovered)?;
     Ok(InventoryRecoveryResult { recovered_heads })
+}
+
+/// Cleans explicitly approved pre-worktree creation records after revalidation.
+///
+/// A private branch is removed only when it still points to the recorded base
+/// commit and no matching worktree or managed path exists.
+///
+/// # Errors
+///
+/// Returns [`HeadError`] when installation validation, locking, Git
+/// comparison, compare-and-swap branch deletion, or journal cleanup fails.
+pub fn apply_pending_creation_recovery(
+    source_path: &Path,
+    approved_creations: &[String],
+) -> Result<PendingCreationRecoveryResult, HeadError> {
+    let repository = discover_project_repository(source_path)?;
+    let transaction = StateTransaction::open(&repository)?;
+    let heads_directory = match transaction.heads_directory() {
+        Ok(path) => path,
+        Err(error) => return Err(transaction.abort(error)),
+    };
+    let recovery = build_present_repair_state(
+        &repository,
+        &heads_directory,
+        transaction.branch_prefix(),
+        transaction.heads(),
+    );
+    let (plan, _) = match recovery {
+        Ok(recovery) => recovery,
+        Err(error) => return Err(transaction.abort(error)),
+    };
+    let approved: BTreeSet<&str> = approved_creations.iter().map(String::as_str).collect();
+    let current: BTreeSet<&str> = plan
+        .recoverable_pending_creations
+        .iter()
+        .map(String::as_str)
+        .collect();
+    if current.is_empty() || approved != current {
+        transaction.release()?;
+        return Ok(PendingCreationRecoveryResult {
+            cleaned_creations: Vec::new(),
+        });
+    }
+
+    let cleanup = (|| {
+        let pending_by_name = recovery::read_pending_creations(&heads_directory)?
+            .into_iter()
+            .map(|pending| (pending.name().to_owned(), pending))
+            .collect::<BTreeMap<_, _>>();
+        for name in &plan.recoverable_pending_creations {
+            let pending = pending_by_name.get(name).ok_or_else(|| {
+                HeadError::ConcurrentStateChange(pending_journal_path(&heads_directory, name))
+            })?;
+            if !transaction.contains_head(name)
+                && git::ref_exists(&repository, pending.intent().head_ref())?
+            {
+                git::delete_ref_if_at(
+                    &repository,
+                    pending.intent().head_ref(),
+                    pending.intent().base_commit(),
+                )?;
+            }
+            recovery::remove_pending_creation(pending.path())?;
+        }
+        Ok::<_, HeadError>(plan.recoverable_pending_creations)
+    })();
+    let cleaned_creations = match cleanup {
+        Ok(cleaned) => cleaned,
+        Err(error) => return Err(transaction.abort(error)),
+    };
+    transaction.release()?;
+    Ok(PendingCreationRecoveryResult { cleaned_creations })
+}
+
+fn pending_journal_path(heads_directory: &Path, name: &str) -> PathBuf {
+    heads_directory
+        .join(".hydra")
+        .join(format!("pending-{name}.json"))
 }
 
 /// Removes explicitly approved inventory entries that are still provably stale.
@@ -399,6 +488,15 @@ fn build_present_repair_state(
         }
     }
 
+    let (pending_issues, recoverable_pending_creations) = plan_pending_creations(
+        repository,
+        heads_directory,
+        branch_prefix,
+        heads,
+        &worktrees,
+    )?;
+    issues.extend(pending_issues);
+
     Ok((
         RepairPlan {
             issues,
@@ -408,6 +506,7 @@ fn build_present_repair_state(
             recoverable_inventory: Vec::new(),
             abandoned_state_lock: None,
             recoverable_untracked_heads,
+            recoverable_pending_creations,
         },
         recovered_untracked_heads,
     ))
@@ -549,9 +648,56 @@ fn build_missing_inventory_state(
             recoverable_inventory,
             abandoned_state_lock: None,
             recoverable_untracked_heads: Vec::new(),
+            recoverable_pending_creations: Vec::new(),
         },
         recovered_inventory,
     ))
+}
+
+fn plan_pending_creations(
+    repository: &Repository,
+    heads_directory: &Path,
+    branch_prefix: &str,
+    heads: &BTreeMap<String, HeadMetadata>,
+    worktrees: &[RegisteredWorktree],
+) -> Result<(Vec<RepairIssue>, Vec<String>), HeadError> {
+    let mut issues = Vec::new();
+    let mut recoverable = Vec::new();
+    for pending in recovery::read_pending_creations(heads_directory)? {
+        super::validate_head_name(pending.name())?;
+        let expected_path = heads_directory.join(pending.name());
+        let expected_ref = format!("refs/heads/{branch_prefix}{}", pending.name());
+        if pending.intent().worktree_path() != expected_path
+            || pending.intent().head_ref() != expected_ref
+        {
+            return Err(HeadError::UnsafeHeadPath(
+                pending.intent().worktree_path().to_path_buf(),
+            ));
+        }
+        let already_recorded = heads.contains_key(pending.name());
+        let has_worktree = worktrees.iter().any(|worktree| {
+            worktree.path == expected_path || worktree.branch.as_deref() == Some(&expected_ref)
+        });
+        let path_exists = expected_path
+            .try_exists()
+            .map_err(|source| HeadError::FileSystem {
+                action: "inspect pending Head path",
+                path: expected_path.clone(),
+                source,
+            })?;
+        let branch_exists = git::ref_exists(repository, &expected_ref)?;
+        let branch_is_unchanged = !branch_exists
+            || git::commit_for_ref(repository, &expected_ref)? == pending.intent().base_commit();
+        issues.push(RepairIssue::IncompleteHeadCreation {
+            name: pending.name().to_owned(),
+            path: expected_path,
+            head_ref: expected_ref,
+        });
+        if already_recorded || (!has_worktree && !path_exists && branch_is_unchanged) {
+            recoverable.push(pending.name().to_owned());
+        }
+    }
+    Ok((issues, recoverable))
 }
 
 fn attach_state_lock_issue(plan: &mut RepairPlan, state_path: &Path) -> Result<(), HeadError> {
