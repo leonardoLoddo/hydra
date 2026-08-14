@@ -73,20 +73,7 @@ pub(super) fn serialize_initial_metadata(
     let project_root = path_as_json_string(repository_root)?;
     let heads_directory = path_as_json_string(heads_directory)?;
 
-    let configuration = serialize_json(&ProjectConfiguration {
-        version: 2,
-        project_id: project_id.clone(),
-        heads_directory: HeadsDirectoryPolicy::Sibling {
-            suffix: ".heads".to_owned(),
-        },
-        branch_prefix: "hydra/".to_owned(),
-        storage: StorageConfiguration {
-            mode: "auto".to_owned(),
-        },
-        overlay: OverlayConfiguration {
-            copy: vec!["... .gitignore".to_owned()],
-        },
-    })?;
+    let configuration = serialize_project_configuration(&project_id)?;
     let locator = serialize_json(&ProjectLocator {
         version: 1,
         project_id: project_id.clone(),
@@ -109,6 +96,23 @@ pub(super) fn serialize_initial_metadata(
         locator,
         marker,
         inventory,
+    })
+}
+
+pub(super) fn serialize_project_configuration(project_id: &str) -> Result<Vec<u8>, InitError> {
+    serialize_json(&ProjectConfiguration {
+        version: 2,
+        project_id: project_id.to_owned(),
+        heads_directory: HeadsDirectoryPolicy::Sibling {
+            suffix: ".heads".to_owned(),
+        },
+        branch_prefix: "hydra/".to_owned(),
+        storage: StorageConfiguration {
+            mode: "auto".to_owned(),
+        },
+        overlay: OverlayConfiguration {
+            copy: vec!["... .gitignore".to_owned()],
+        },
     })
 }
 

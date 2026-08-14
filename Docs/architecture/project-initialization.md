@@ -230,17 +230,39 @@ Initialization validates all predictable destination conflicts before creating
 an artifact.
 
 It refuses to proceed when any filesystem entry, including a dangling symlink,
-already occupies:
+already occupies `.hydra.json`.
 
-- `.hydra.json`;
+A pre-existing default Heads directory is reusable only together with the
+current Git common directory's local state, and only when all of these
+conditions hold:
+
+- Heads, Heads metadata, and local state paths are real directories;
+- locator, ownership marker, and inventory are regular files with supported
+  versions and no unknown top-level fields;
+- locator project root and Heads path resolve exactly to the current canonical
+  repository and default sibling directory;
+- locator and marker project and installation identities agree;
+- the inventory is empty;
+- the Heads directory contains only `.hydra`, its metadata directory contains
+  only `directory.json` and `heads.json`, and local state contains only
+  `project.json`.
+
+This recognizes an unused directory already owned by the same local
+installation without claiming unrelated content. Hydra deliberately refuses
+reuse when any Head, pending operation, recovery record, extra path, missing
+file, malformed metadata, or identity mismatch exists. In particular, it does
+not guess a lost prior branch prefix, overlay policy, storage mode, or adapter
+configuration for existing Heads.
+
+Outside that exact recovery case, initialization refuses to proceed when an
+entry already occupies:
+
 - the default sibling Heads directory;
 - `<git-common-dir>/hydra`.
 
-The existing Heads directory is never claimed, emptied, or reused implicitly.
-The same rule applies to the local locator directory: initialization creates
-it exclusively and never follows or claims a pre-existing directory or symlink.
-This protects unrelated data and removes the check-then-use window for that
-trust boundary while ownership reconciliation is not yet implemented.
+The existing directory is never emptied, and no symlink is followed as
+ownership evidence. The local locator directory is created exclusively during
+fresh initialization and is reused only through the complete validation above.
 
 Serialization of all four JSON documents also completes in memory before the
 first filesystem mutation.
@@ -273,6 +295,29 @@ report success
 
 `.hydra.json` is published last. Its presence therefore means that all earlier
 steps returned successfully during the same process.
+
+When the exact empty owned installation described above already exists, Hydra
+instead:
+
+```text
+validate locator, marker, empty inventory, and exact directory contents
+        ↓
+serialize the default configuration with the existing projectId
+        ↓
+probe storage capability in the owned Heads directory
+        ↓
+recheck metadata bytes and directory contents
+        ↓
+atomically publish only .hydra.json
+        ↓
+report success
+```
+
+The storage probe uses unique files and removes them before revalidation.
+Existing locator, marker, inventory, directories, and identities remain
+byte-for-byte unchanged. Concurrently changed evidence cancels publication;
+the no-clobber configuration write also prevents two initializers from
+replacing one another's result.
 
 The storage probe creates uniquely named source and target files inside the new
 Heads directory. It attempts the platform clone primitive through the
@@ -312,6 +357,10 @@ Rollback removes only artifacts created by the current invocation.
 | Publishing project configuration | Remove locator, marker, inventory, and empty metadata directories |
 | Temporary-file write or publication | Remove every temporary and final link owned by the failed publication |
 
+Recovery of an empty owned installation owns only the new configuration file
+and its temporary publication link. Failure never authorizes deletion of the
+pre-existing Heads directory or local metadata.
+
 Cleanup is deliberately limited to `remove_file` and `remove_dir` on exact
 paths. `remove_dir` succeeds only for an empty directory, so rollback cannot
 recursively erase unexpected content.
@@ -333,6 +382,8 @@ therefore diagnosable and never silently hidden.
 - repository name that cannot be persisted losslessly;
 - existing project configuration;
 - existing Heads directory;
+- incomplete, changed, non-empty, or identity-inconsistent existing Hydra
+  installation;
 - existing or unsafe local locator directory;
 - failed or invalid storage capability probe;
 - JSON serialization failure;
@@ -362,7 +413,12 @@ Coverage currently proves:
 - schema versions and initial configuration values;
 - full UUID entropy in the generated project and installation identifiers;
 - correct use of the Git common directory from a linked worktree;
-- refusal to reuse a pre-existing default Heads directory;
+- refusal to reuse an unrelated pre-existing default Heads directory;
+- reconstruction of default configuration for an exact empty owned Heads
+  directory while preserving locator, marker, and inventory bytes;
+- refusal to reuse incomplete or identity-inconsistent local metadata;
+- refusal to guess configuration when the inventory or Heads directory has
+  existing content;
 - refusal to claim or follow a pre-existing local locator directory;
 - preservation of dangling configuration symlinks;
 - preservation of trailing whitespace in repository paths;
@@ -383,19 +439,16 @@ and stderr rather than only internal calls.
 The following product requirements are not yet implemented by the current
 initialization workflow:
 
-1. **Recognition of an owned existing Heads directory.** The current
-   implementation safely rejects every pre-existing default directory. It
-   cannot yet distinguish a directory owned by the same project from unrelated
-   data during `hydra init`; ownership is validated when opening an existing
-   installation for Head creation.
-2. **Crash reconciliation.** File publication is atomic, but an external
+1. **Crash reconciliation before complete local ownership publication.** File
+   publication is atomic, but an external
    interruption between transaction steps can leave local metadata files or
-   empty directories without `.hydra.json`. Initialization does not yet resume
-   or reconcile that state.
-3. **Non-Unix directory durability.** Unix parent directories are synchronized
+   empty directories before locator, marker, and empty inventory form the
+   complete evidence required for safe reuse. Initialization preserves but
+   does not resume those partial states.
+2. **Non-Unix directory durability.** Unix parent directories are synchronized
    after metadata publication. The non-Unix implementation currently provides
    atomic visibility but does not claim the same power-loss durability.
-4. **Non-UTF-8 repository names.** Unix Git paths are preserved byte-for-byte,
+3. **Non-UTF-8 repository names.** Unix Git paths are preserved byte-for-byte,
    but a repository name that cannot be represented in JSON is rejected rather
    than encoded into a persistent surrogate.
 

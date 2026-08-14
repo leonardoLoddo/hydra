@@ -2,7 +2,7 @@ mod common;
 
 use std::{fs, path::Path, process::Command};
 
-use common::{TestDirectory, hydra_command};
+use common::{TestDirectory, create_initialized_project, heads_directory, hydra_command};
 
 fn initialize_repository(path: &Path) {
     let git = Command::new("git")
@@ -149,6 +149,64 @@ fn init_defaults_to_the_current_directory() {
             .path()
             .join("SampleProject.heads/.hydra/heads.json")
             .is_file()
+    );
+}
+
+#[test]
+fn init_recovers_configuration_for_the_same_owned_heads_directory() {
+    let directory = TestDirectory::new("recover-owned-heads");
+    let repository = create_initialized_project(&directory);
+
+    let locator_path = repository.join(".git/hydra/project.json");
+    let marker_path = heads_directory(&repository).join(".hydra/directory.json");
+    let inventory_path = heads_directory(&repository).join(".hydra/heads.json");
+    let locator_before = fs::read(&locator_path).expect("locator should be readable");
+    let marker_before = fs::read(&marker_path).expect("marker should be readable");
+    let inventory_before = fs::read(&inventory_path).expect("inventory should be readable");
+    let locator: serde_json::Value =
+        serde_json::from_slice(&locator_before).expect("locator should be valid JSON");
+    fs::remove_file(repository.join(".hydra.json"))
+        .expect("configuration loss should be simulated");
+
+    let output = hydra_command()
+        .arg("init")
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(
+        output.status.success(),
+        "owned directory recovery should succeed, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let configuration: serde_json::Value = serde_json::from_slice(
+        &fs::read(repository.join(".hydra.json")).expect("configuration should be reconstructed"),
+    )
+    .expect("configuration should be valid JSON");
+    assert_eq!(configuration["projectId"], locator["projectId"]);
+    assert_eq!(
+        fs::read(&locator_path).expect("locator should remain readable"),
+        locator_before
+    );
+    assert_eq!(
+        fs::read(&marker_path).expect("marker should remain readable"),
+        marker_before
+    );
+    assert_eq!(
+        fs::read(&inventory_path).expect("inventory should remain readable"),
+        inventory_before
+    );
+    assert!(heads_directory(&repository).is_dir());
+
+    let status = hydra_command()
+        .arg("status")
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+    assert!(
+        status.status.success(),
+        "recovered installation should be usable, stderr: {}",
+        String::from_utf8_lossy(&status.stderr)
     );
 }
 

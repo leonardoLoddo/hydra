@@ -19,7 +19,11 @@ truth and use only documented Hydra commands for Head lifecycle operations.
 4. If Hydra reports that the project is not initialized, run `hydra init
    [PATH]` only when the user has
    authorized Hydra project setup. Treat the generated `.hydra.json` as shared,
-   versioned policy and review it before proposing a commit.
+   versioned policy and review it before proposing a commit. Init may reuse an
+   exact owned Heads directory only when its inventory and operational content
+   are empty. If existing Heads require configuration recovery, stop and
+   recover the authoritative `.hydra.json` from version control or backup;
+   never accept guessed defaults or edit ownership metadata.
 5. Run `hydra head list` and decide whether this task should resume an existing
    Head or create a new one. Never reuse a Head merely because its name looks
    related: inspect it with `hydra head status <name>` and stop if its ownership,

@@ -3,6 +3,7 @@ mod configuration;
 mod error;
 mod git;
 mod persistence;
+mod recovery;
 pub(crate) mod storage;
 
 use std::{
@@ -12,9 +13,10 @@ use std::{
 
 use serde::Deserialize;
 
-use configuration::serialize_initial_metadata;
+use configuration::{serialize_initial_metadata, serialize_project_configuration};
 use git::{Repository, discover_repository, repository_name_as_str};
-use persistence::{InitialFiles, create_initial_files};
+use persistence::{InitialFiles, create_initial_files, write_atomic};
+use recovery::{ExistingInstallationPaths, load_existing_installation};
 
 pub use error::{CleanupFailure, InitError};
 pub use storage::StorageBackend;
@@ -25,7 +27,7 @@ const LOCATOR_FILE_NAME: &str = "project.json";
 const HEADS_METADATA_DIRECTORY_NAME: &str = ".hydra";
 const DIRECTORY_MARKER_FILE_NAME: &str = "directory.json";
 const STATE_FILE_NAME: &str = "heads.json";
-const SUPPORTED_LOCATOR_VERSION: u32 = 1;
+const SUPPORTED_LOCAL_METADATA_VERSION: u32 = 1;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -74,6 +76,31 @@ pub fn initialize(path: &Path) -> Result<InitializedProject, InitError> {
     let marker_path = heads_metadata_directory.join(DIRECTORY_MARKER_FILE_NAME);
     let inventory_path = heads_metadata_directory.join(STATE_FILE_NAME);
 
+    if path_entry_exists(&configuration_path, "inspect project configuration")? {
+        return Err(InitError::AlreadyInitialized(configuration_path));
+    }
+
+    let existing_paths = ExistingInstallationPaths {
+        repository_root: &repository_root,
+        heads_directory: &heads_directory,
+        state_directory: &state_directory,
+        locator_path: &locator_path,
+        heads_metadata_directory: &heads_metadata_directory,
+        marker_path: &marker_path,
+        inventory_path: &inventory_path,
+    };
+    if let Some(existing) = load_existing_installation(&existing_paths)? {
+        let configuration = serialize_project_configuration(existing.project_id())?;
+        let storage_backend = storage::probe_storage(&heads_directory)?;
+        existing.verify_unchanged()?;
+        write_atomic(&configuration_path, &configuration)?;
+        return Ok(InitializedProject {
+            repository_root,
+            heads_directory,
+            storage_backend,
+        });
+    }
+
     validate_destinations(
         &configuration_path,
         &heads_directory,
@@ -116,7 +143,7 @@ fn canonical_parent_repository(repository: Repository) -> Repository {
     else {
         return repository;
     };
-    if locator.version != SUPPORTED_LOCATOR_VERSION || !locator.project_root.is_absolute() {
+    if locator.version != SUPPORTED_LOCAL_METADATA_VERSION || !locator.project_root.is_absolute() {
         return repository;
     }
     let Ok(project_repository) = discover_repository(&locator.project_root) else {

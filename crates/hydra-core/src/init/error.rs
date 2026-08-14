@@ -16,6 +16,19 @@ pub enum InitError {
     LocalStateExists(PathBuf),
     StateDirectoryExists(PathBuf),
     UnsafeStateDirectory(PathBuf),
+    ExistingInstallationIncomplete(PathBuf),
+    ExistingOwnershipMismatch(PathBuf),
+    ExistingInstallationChanged(PathBuf),
+    ExistingHeadsRequireConfiguration(PathBuf),
+    InvalidLocalMetadata {
+        kind: &'static str,
+        path: PathBuf,
+        source: serde_json::Error,
+    },
+    UnsupportedLocalMetadataVersion {
+        kind: &'static str,
+        version: u32,
+    },
     SerializeConfiguration(serde_json::Error),
     FileSystem {
         action: &'static str,
@@ -47,18 +60,7 @@ impl fmt::Display for InitError {
                 operation,
                 status,
                 stderr,
-            } => {
-                let status = status.map_or_else(|| "unknown".to_owned(), |code| code.to_string());
-                let stderr = stderr.trim_end_matches(['\r', '\n']);
-                write!(
-                    formatter,
-                    "Git failed while resolving {operation} with status {status}"
-                )?;
-                if !stderr.is_empty() {
-                    write!(formatter, ": {stderr}")?;
-                }
-                Ok(())
-            }
+            } => format_git_failure(formatter, operation, *status, stderr),
             Self::InvalidGitOutput(field) => {
                 write!(formatter, "Git returned an invalid {field}")
             }
@@ -99,6 +101,14 @@ impl fmt::Display for InitError {
                 "local Hydra state directory {} is not a real directory",
                 path.display()
             ),
+            error @ (Self::ExistingInstallationIncomplete(_)
+            | Self::ExistingOwnershipMismatch(_)
+            | Self::ExistingInstallationChanged(_)
+            | Self::ExistingHeadsRequireConfiguration(_)
+            | Self::InvalidLocalMetadata { .. }
+            | Self::UnsupportedLocalMetadataVersion { .. }) => {
+                format_existing_installation_error(formatter, error)
+            }
             Self::SerializeConfiguration(error) => {
                 write!(
                     formatter,
@@ -141,6 +151,59 @@ impl fmt::Display for InitError {
     }
 }
 
+fn format_git_failure(
+    formatter: &mut fmt::Formatter<'_>,
+    operation: &str,
+    status: Option<i32>,
+    stderr: &str,
+) -> fmt::Result {
+    let status = status.map_or_else(|| "unknown".to_owned(), |code| code.to_string());
+    let stderr = stderr.trim_end_matches(['\r', '\n']);
+    write!(
+        formatter,
+        "Git failed while resolving {operation} with status {status}"
+    )?;
+    if !stderr.is_empty() {
+        write!(formatter, ": {stderr}")?;
+    }
+    Ok(())
+}
+
+fn format_existing_installation_error(
+    formatter: &mut fmt::Formatter<'_>,
+    error: &InitError,
+) -> fmt::Result {
+    match error {
+        InitError::ExistingInstallationIncomplete(path) => write!(
+            formatter,
+            "existing Hydra installation is incomplete at {}",
+            path.display()
+        ),
+        InitError::ExistingOwnershipMismatch(path) => write!(
+            formatter,
+            "existing Hydra ownership metadata do not match at {}",
+            path.display()
+        ),
+        InitError::ExistingInstallationChanged(path) => write!(
+            formatter,
+            "existing Hydra installation changed during validation at {}",
+            path.display()
+        ),
+        InitError::ExistingHeadsRequireConfiguration(path) => write!(
+            formatter,
+            "cannot safely reconstruct configuration for existing Heads recorded at {}",
+            path.display()
+        ),
+        InitError::InvalidLocalMetadata { kind, path, source } => {
+            write!(formatter, "invalid {kind} at {}: {source}", path.display())
+        }
+        InitError::UnsupportedLocalMetadataVersion { kind, version } => {
+            write!(formatter, "unsupported {kind} version {version}")
+        }
+        _ => unreachable!("only existing-installation errors are routed here"),
+    }
+}
+
 fn format_cleanup_failures(
     formatter: &mut fmt::Formatter<'_>,
     cleanup_failures: &[CleanupFailure],
@@ -159,6 +222,7 @@ impl Error for InitError {
         match self {
             Self::GitUnavailable(error) => Some(error),
             Self::SerializeConfiguration(error) => Some(error),
+            Self::InvalidLocalMetadata { source, .. } => Some(source),
             Self::FileSystem { source, .. } => Some(source),
             Self::RollbackFailed { original, .. } => Some(original.as_ref()),
             Self::CleanupFailed {
@@ -175,6 +239,11 @@ impl Error for InitError {
             | Self::LocalStateExists(_)
             | Self::StateDirectoryExists(_)
             | Self::UnsafeStateDirectory(_)
+            | Self::ExistingInstallationIncomplete(_)
+            | Self::ExistingOwnershipMismatch(_)
+            | Self::ExistingInstallationChanged(_)
+            | Self::ExistingHeadsRequireConfiguration(_)
+            | Self::UnsupportedLocalMetadataVersion { .. }
             | Self::InvalidStorageProbe(_) => None,
         }
     }

@@ -142,7 +142,7 @@ fn create_directory(path: &Path, action: &'static str) -> Result<(), InitError> 
     })
 }
 
-fn write_atomic(path: &Path, contents: &[u8]) -> Result<(), InitError> {
+pub(super) fn write_atomic(path: &Path, contents: &[u8]) -> Result<(), InitError> {
     let file_name = path
         .file_name()
         .ok_or_else(|| InitError::UnsupportedRepositoryPath(path.to_path_buf()))?;

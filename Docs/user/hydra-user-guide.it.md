@@ -219,6 +219,14 @@ git commit -m "chore: configure Hydra"
 I locator, marker di ownership e inventari fisici sono locali alla macchina e
 non devono essere aggiunti al repository.
 
+Se `.hydra.json` manca ma la directory sorella e il locator locale esistono
+già, `hydra init` li riutilizza soltanto quando marker, percorsi e identità
+coincidono, l'inventario è vuoto e non esiste alcun altro contenuto operativo.
+Conserva byte per byte i metadati locali, verifica di nuovo lo storage e ricrea
+la configurazione predefinita con lo stesso `projectId`. Revisiona e versiona
+anche questa configurazione. Una directory estranea, incompleta, non vuota o
+con ownership discordante viene preservata e rifiutata.
+
 ### 4.3 Crea una Head
 
 Per creare una Head dal `HEAD` corrente:
@@ -1299,6 +1307,14 @@ corretto. Hydra non crea una Head parziale quando questa validazione fallisce.
 Locator e marker non descrivono la stessa installazione. Non correggere gli ID
 a mano e non riutilizzare implicitamente la directory. Il comando `repair`
 corrente richiede un’installazione già validabile e non corregge l’identità.
+
+### “cannot safely reconstruct configuration for existing Heads”
+
+La directory appartiene all'installazione locale, ma contiene Head o residui
+che dipendono da una policy condivisa non più disponibile. Hydra non rigenera
+i default perché potrebbe cambiare branch prefix, overlay o comandi. Non
+modificare i metadati locali: recupera la `.hydra.json` autorevole dal controllo
+versione o da un backup, quindi usa `hydra status` e `hydra repair`.
 
 ### “does not match the versioned directory policy”
 

@@ -196,7 +196,14 @@ WorkingArea/
 
 Il percorso rimane configurabile. Hydra salva in `.hydra.json` il percorso concreto, preferibilmente relativo alla root del progetto, e non deriva nuovamente la destinazione a ogni comando.
 
-Se la directory predefinita esiste già ma non appartiene al progetto corrente, `hydra init` deve interrompersi senza riutilizzarla e richiedere una destinazione differente. Una directory delle Head già inizializzata può essere riconosciuta tramite i metadati Git e Hydra.
+Se la directory predefinita esiste già ma non appartiene al progetto corrente,
+`hydra init` deve interrompersi senza riutilizzarla e richiedere una
+destinazione differente. L'implementazione riconosce tramite locator e marker
+una directory già appartenente alla stessa installazione locale solo quando
+l'inventario è vuoto e non esistono Head, record di recovery o contenuti
+ulteriori. In quel caso conserva identità e metadati locali e ricrea soltanto
+la configurazione predefinita mancante. Se esistono Head, Hydra non inventa la
+vecchia policy condivisa e richiede diagnosi.
 
 ### Separazione tra isolamento Git e materializzazione
 
@@ -632,6 +639,12 @@ Hydra:
 7. inizializza lo stato locale;
 8. verifica le capacità di materializzazione del volume;
 9. non modifica i file applicativi del progetto.
+
+Se `.hydra.json` manca ma locator, marker e inventario vuoto provano che la
+directory sorella appartiene già esattamente alla stessa installazione locale,
+`init` può riutilizzarla senza riscrivere i metadati. La presenza di Head o
+residui operativi rende invece la policy precedente non ricostruibile con
+certezza e blocca il riuso automatico.
 
 Al termine, `hydra init` dichiara il backend verificato sul volume delle Head:
 `copy-on-write` quando la prova nativa riesce, oppure `full copy` quando è stato
