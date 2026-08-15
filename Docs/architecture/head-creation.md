@@ -243,11 +243,19 @@ A confirmed unsafe-symlink exclusion is persisted while this same lock is
 held. Hydra compares `.hydra.json` byte-for-byte with the version loaded for
 the operation, writes and synchronizes a unique sibling temporary file,
 atomically renames it over the configuration, and synchronizes the parent
-directory on Unix. A concurrent configuration edit is rejected rather than
-overwritten. The configuration update is a separately authorized durable
-result: if a later full-copy prompt is declined or Head creation fails for an
-unrelated reason, the accepted exclusions remain versioned working-tree
-changes.
+directory on Unix. An edit visible at the final byte-for-byte comparison is
+rejected rather than overwritten. The rename guarantees that readers observe
+either the complete old file or the complete new file; it is not a portable
+filesystem compare-and-swap. An external editor that replaces `.hydra.json`
+after that comparison but before the rename can therefore still be
+overwritten. The Hydra state lock serializes cooperating Hydra mutations, but
+advisory locking cannot make arbitrary editors participate. Users and agents
+must not edit `.hydra.json` while deciding or confirming this automatic
+exclusion update and must inspect the resulting diff afterward.
+
+The configuration update is a separately authorized durable result: if a
+later full-copy prompt is declined or Head creation fails for an unrelated
+reason, the accepted exclusions remain versioned working-tree changes.
 
 Tracked materialization and overlay planning also use the canonical parent
 project as their source. A dirty or divergent calling Head therefore cannot

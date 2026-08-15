@@ -85,8 +85,13 @@ metadata into a Head.
 Creation may pause for confirmation:
 
 - If Hydra lists unsafe overlay symlinks, decline unless the user explicitly
-  authorizes excluding the listed paths from shared policy. After approval,
-  inspect and report the `.hydra.json` diff; commit it only when authorized.
+  authorizes excluding the listed paths from shared policy. Ensure no person,
+  editor, or other tool is concurrently editing `.hydra.json` before answering:
+  Hydra rejects changes visible at its final comparison and publishes a
+  complete file atomically, but portable filesystems do not provide a content
+  compare-and-swap against an external save in the final pre-rename window.
+  After approval, inspect and report the `.hydra.json` diff; commit it only
+  when authorized.
 - If Hydra reports that full copy is required, report the file count and byte
   size and answer yes only after the user authorizes that storage cost.
 - A negative answer or EOF is a safe cancellation. Do not bypass either prompt

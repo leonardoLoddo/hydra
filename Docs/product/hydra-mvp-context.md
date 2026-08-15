@@ -615,6 +615,16 @@ configurazione versionata rimane una modifica visibile che l'utente deve
 revisionare e committare. Hydra non deve estendere questa autorizzazione a file
 speciali, collisioni con file tracciati o altri errori di sicurezza.
 
+La pubblicazione atomica garantisce che un lettore osservi il file precedente
+oppure quello nuovo completo, mai JSON scritto a metà. Prima della
+pubblicazione Hydra rilegge il file e rifiuta una modifica già visibile, ma le
+API filesystem portabili non offrono un compare-and-swap atomico basato sul
+contenuto. Un editor esterno che sostituisce `.hydra.json` nella finestra tra
+l'ultimo confronto e il rename può quindi essere sovrascritto. Il lock di
+stato serializza le mutazioni Hydra cooperanti, non gli editor arbitrari:
+l'utente non deve modificare la configurazione durante questa conferma e deve
+revisionare subito la diff risultante.
+
 ---
 
 ## 7. MVP v0.1

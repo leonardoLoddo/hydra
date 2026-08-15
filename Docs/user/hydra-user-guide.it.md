@@ -980,8 +980,12 @@ materializzati normalmente.
 
 Invio, EOF, `n` o qualunque altra risposta annullano la creazione senza
 modificare `.hydra.json`, branch, worktree o inventario. La configurazione
-viene salvata atomicamente e Hydra rifiuta di sovrascriverla se è cambiata nel
-frattempo. Dopo una risposta positiva, controlla e versiona la modifica:
+viene salvata atomicamente: non è mai visibile come JSON scritto a metà. Hydra
+rifiuta una modifica che rileva rileggendo il file prima della pubblicazione,
+ma il filesystem non fornisce un compare-and-swap portabile sul contenuto. Un
+editor esterno che salva proprio tra quell'ultimo controllo e il rename può
+ancora essere sovrascritto. Non modificare `.hydra.json` mentre questo prompt è
+aperto. Dopo una risposta positiva, controlla e versiona subito la modifica:
 
 ```bash
 git diff -- .hydra.json
