@@ -23,6 +23,7 @@ Hydra/
 └── crates/
     ├── hydra-cli/
     │   ├── src/
+    │   │   ├── head_create.rs
     │   │   ├── inspection.rs
     │   │   ├── main.rs
     │   │   ├── output.rs
@@ -133,6 +134,12 @@ it renders the relative paths returned by the core and translates an explicit
 answer into retry authorization. Selection of the exact exclusion rules,
 validation, atomic `.hydra.json` replacement, and the ordering before Git
 mutation remain core responsibilities.
+
+The private `head_create.rs` CLI module owns orchestration of the interactive
+creation retries, progress rendering, confirmation prompts, and the final
+success or error output. Domain planning, filesystem mutation, rollback, and
+recovery remain in `hydra-core`; `main.rs` only dispatches the parsed creation
+arguments to this adapter.
 
 The private `repair.rs` CLI module owns repair-plan rendering, interactive
 confirmation, and conversion of the selected core repair result into terminal
