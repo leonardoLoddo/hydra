@@ -6,6 +6,7 @@ use std::{
 
 use super::{
     HeadError,
+    command_template::{self, CommandTemplateError},
     git::{self, Repository},
     inspection::inspect_head,
     removal::{RemoveHeadOptions, remove_head},
@@ -354,34 +355,12 @@ fn expand(
     template: &str,
     placeholders: &BTreeMap<&'static str, &str>,
 ) -> Result<String, HeadError> {
-    let mut remaining = template;
-    let mut expanded = String::with_capacity(template.len());
-    while let Some(open) = remaining.find('{') {
-        let (literal, placeholder_and_rest) = remaining.split_at(open);
-        if literal.contains('}') {
-            return Err(unsupported_placeholder(template));
+    command_template::expand(template, placeholders).map_err(|error| match error {
+        CommandTemplateError::UnsupportedPlaceholder => unsupported_placeholder(template),
+        CommandTemplateError::Nul => {
+            HeadError::InvalidCloseCommand("program and arguments must not contain NUL".to_owned())
         }
-        expanded.push_str(literal);
-        let Some(close) = placeholder_and_rest.find('}') else {
-            return Err(unsupported_placeholder(template));
-        };
-        let (placeholder, rest) = placeholder_and_rest.split_at(close + 1);
-        let value = placeholders
-            .get(placeholder)
-            .ok_or_else(|| unsupported_placeholder(template))?;
-        expanded.push_str(value);
-        remaining = rest;
-    }
-    if remaining.contains('}') {
-        return Err(unsupported_placeholder(template));
-    }
-    expanded.push_str(remaining);
-    if expanded.contains('\0') {
-        return Err(HeadError::InvalidCloseCommand(
-            "program and arguments must not contain NUL".to_owned(),
-        ));
-    }
-    Ok(expanded)
+    })
 }
 
 fn unsupported_placeholder(template: &str) -> HeadError {

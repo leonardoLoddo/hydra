@@ -51,6 +51,7 @@ Hydra/
             ├── head.rs
             ├── head/
             │   ├── close.rs
+            │   ├── command_template.rs
             │   ├── error.rs
             │   ├── git.rs
             │   ├── inspection.rs
@@ -211,6 +212,7 @@ Head creation follows the same small-orchestrator rule:
 | Module | Responsibility |
 |---|---|
 | `head/close.rs` | Select native or configured close behavior, execute command adapters safely, observe target changes, and compose protected removal |
+| `head/command_template.rs` | Expand the shared placeholder grammar and reject unsupported or process-unsafe template values before an adapter is started |
 | `head.rs` | Validate and orchestrate the complete creation transaction |
 | `head/git.rs` | Discover Git state and own ref, branch, index, worktree, and verification commands |
 | `head/materializer.rs` | Materialize Git tree entries without a standard checkout |

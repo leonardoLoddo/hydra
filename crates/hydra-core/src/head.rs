@@ -1,4 +1,5 @@
 mod close;
+mod command_template;
 mod error;
 mod git;
 mod inspection;
