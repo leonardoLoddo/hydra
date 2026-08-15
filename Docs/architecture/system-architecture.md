@@ -27,7 +27,9 @@ Hydra/
     │   │   ├── inspection.rs
     │   │   ├── main.rs
     │   │   ├── output.rs
-    │   │   └── repair.rs
+    │   │   ├── repair.rs
+    │   │   └── repair/
+    │   │       └── presentation.rs
     │   └── tests/
     │       ├── common/mod.rs
     │       ├── cli_contract.rs
@@ -141,10 +143,11 @@ success or error output. Domain planning, filesystem mutation, rollback, and
 recovery remain in `hydra-core`; `main.rs` only dispatches the parsed creation
 arguments to this adapter.
 
-The private `repair.rs` CLI module owns repair-plan rendering, interactive
-confirmation, and conversion of the selected core repair result into terminal
-output and exit status. `main.rs` retains only command definition and dispatch;
-repair classification, validation, and mutation remain in `hydra-core`.
+The private `repair.rs` CLI module owns repair orchestration and conversion of
+the selected core repair result into terminal output and exit status. Its
+`repair/presentation.rs` child owns issue rendering and confirmation prompts.
+`main.rs` retains only command definition and dispatch; repair classification,
+validation, and mutation remain in `hydra-core`.
 
 CLI integration tests execute the compiled `hydra` binary and assert externally
 observable behavior. Tests that mutate Git or the filesystem use newly created
