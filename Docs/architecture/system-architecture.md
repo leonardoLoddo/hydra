@@ -58,6 +58,7 @@ Hydra/
             │   ├── error.rs
             │   ├── git.rs
             │   ├── git/
+            │   │   ├── integration.rs
             │   │   └── protocol.rs
             │   ├── inspection.rs
             │   ├── materializer.rs
@@ -231,6 +232,7 @@ Head creation follows the same small-orchestrator rule:
 | `head/command_template.rs` | Expand the shared placeholder grammar and reject unsupported or process-unsafe template values before an adapter is started |
 | `head.rs` | Validate and orchestrate the complete creation transaction |
 | `head/git.rs` | Discover Git state and own ref, branch, index, worktree, and verification commands |
+| `head/git/integration.rs` | Own ancestry checks and compare-and-swap ref, merge-tree, commit-tree, and checked-out fast-forward operations |
 | `head/git/protocol.rs` | Decode NUL-delimited Git worktree and status records while preserving platform path semantics |
 | `head/materializer.rs` | Materialize Git tree entries without a standard checkout |
 | `head/materializer/blob_batch.rs` | Own and validate the persistent `git cat-file --batch` protocol used to stream tracked blobs |
