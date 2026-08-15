@@ -74,6 +74,7 @@ Hydra/
                 ├── error.rs
                 ├── git.rs
                 ├── persistence.rs
+                ├── recovery.rs
                 └── storage.rs
 ```
 
@@ -184,6 +185,7 @@ internal responsibilities remain separated:
 | `init/configuration.rs` | Build and serialize the schema-annotated shared configuration, local locator, ownership marker, and initial inventory |
 | `init/storage.rs` | Probe native CoW support and verify the full-copy fallback |
 | `init/persistence.rs` | Sequence filesystem mutations and publish metadata atomically |
+| `init/recovery.rs` | Validate authoritative ownership evidence and recognize an empty existing installation whose missing default configuration can be reconstructed safely |
 | `init/artifacts.rs` | Track exact owned artifacts and perform non-recursive rollback |
 | `init/error.rs` | Define and render typed initialization and cleanup failures |
 
