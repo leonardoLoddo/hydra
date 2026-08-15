@@ -65,7 +65,8 @@ Hydra/
             │   │   └── blob_batch.rs
             │   ├── overlay.rs
             │   ├── overlay/
-            │   │   └── hash.rs
+            │   │   ├── hash.rs
+            │   │   └── materialization.rs
             │   ├── open.rs
             │   ├── persistence.rs
             │   ├── repair.rs
@@ -233,8 +234,9 @@ Head creation follows the same small-orchestrator rule:
 | `head/git/protocol.rs` | Decode NUL-delimited Git worktree and status records while preserving platform path semantics |
 | `head/materializer.rs` | Materialize Git tree entries without a standard checkout |
 | `head/materializer/blob_batch.rs` | Own and validate the persistent `git cat-file --batch` protocol used to stream tracked blobs |
-| `head/overlay.rs` | Expand overlay rules, select safe source files, copy them, and verify content identity |
+| `head/overlay.rs` | Expand overlay rules, select safe source files, and produce a deterministic materialization plan |
 | `head/overlay/hash.rs` | Compute overlay identities through bounded parallel `git hash-object` batches and restore deterministic order |
+| `head/overlay/materialization.rs` | Revalidate planned overlay sources, materialize files and symlinks, and verify destination identities |
 | `head/open.rs` | Validate an existing Head, expand configured placeholders, and execute the open adapter without a shell |
 | `head/removal.rs` | Validate and orchestrate protected worktree, inventory, and private-branch removal |
 | `head/repair.rs` | Define the public repair models and expose the stable planning and application API |
