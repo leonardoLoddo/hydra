@@ -25,7 +25,8 @@ Hydra/
     │   ├── src/
     │   │   ├── inspection.rs
     │   │   ├── main.rs
-    │   │   └── output.rs
+    │   │   ├── output.rs
+    │   │   └── repair.rs
     │   └── tests/
     │       ├── common/mod.rs
     │       ├── cli_contract.rs
@@ -131,6 +132,11 @@ it renders the relative paths returned by the core and translates an explicit
 answer into retry authorization. Selection of the exact exclusion rules,
 validation, atomic `.hydra.json` replacement, and the ordering before Git
 mutation remain core responsibilities.
+
+The private `repair.rs` CLI module owns repair-plan rendering, interactive
+confirmation, and conversion of the selected core repair result into terminal
+output and exit status. `main.rs` retains only command definition and dispatch;
+repair classification, validation, and mutation remain in `hydra-core`.
 
 CLI integration tests execute the compiled `hydra` binary and assert externally
 observable behavior. Tests that mutate Git or the filesystem use newly created
