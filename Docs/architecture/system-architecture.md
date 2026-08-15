@@ -67,6 +67,9 @@ Hydra/
             │   ├── open.rs
             │   ├── persistence.rs
             │   ├── repair.rs
+            │   ├── repair/
+            │   │   ├── application.rs
+            │   │   └── planning.rs
             │   ├── removal.rs
             │   ├── state.rs
             │   └── state/
@@ -231,7 +234,9 @@ Head creation follows the same small-orchestrator rule:
 | `head/overlay/hash.rs` | Compute overlay identities through bounded parallel `git hash-object` batches and restore deterministic order |
 | `head/open.rs` | Validate an existing Head, expand configured placeholders, and execute the open adapter without a shell |
 | `head/removal.rs` | Validate and orchestrate protected worktree, inventory, and private-branch removal |
-| `head/repair.rs` | Compare inventory with Git and filesystem state, classify inconsistencies, and apply only confirmed deterministic repairs |
+| `head/repair.rs` | Define the public repair models and expose the stable planning and application API |
+| `head/repair/planning.rs` | Compare inventory with Git, filesystem, recovery evidence, and lock state without mutation |
+| `head/repair/application.rs` | Revalidate approved plans under the state transaction and apply only deterministic repairs |
 | `head/state.rs` | Manage the physical inventory transaction and classify commit boundaries |
 | `head/state/configuration.rs` | Parse and validate version-2 directory policies and shared Head settings |
 | `head/state/installation.rs` | Resolve the Git-common locator, verify directory ownership and worktree boundaries, and locate the physical inventory |
