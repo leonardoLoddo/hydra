@@ -23,5 +23,8 @@ serde_json.workspace = true
 sha2.workspace = true
 tempfile.workspace = true
 
+[dev-dependencies]
+reflink-copy.workspace = true
+
 [lints]
 workspace = true

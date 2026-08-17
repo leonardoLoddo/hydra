@@ -519,7 +519,10 @@ repositories. Current coverage proves:
   success and handled failures, and confirmed compare-and-swap repair of an
   interrupted pre-worktree branch;
 - Gitignore overlay expansion, negation, conditional fallback confirmation,
-  copy, and isolation;
+  copy, and isolation; an independent probe makes the CLI integration assert
+  the CoW or fallback branch that the actual test volume supports, while
+  deterministic unit coverage verifies classification independently of the
+  host filesystem;
 - deterministic full-copy creation for tracked files and overlays through
   `storage.mode: "copy"`, including confirmation, persisted backend, and source
   isolation;

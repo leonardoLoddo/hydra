@@ -308,6 +308,7 @@ dependencies = [
  "clap",
  "clap_complete",
  "hydra-core",
+ "reflink-copy",
  "serde",
  "serde_json",
  "sha2",

@@ -1,14 +1,24 @@
 mod common;
 
-use std::{fs, io::Write, process::Stdio};
+use std::{fs, io::Write, path::Path, process::Stdio};
 
 use common::{
     TestDirectory, assert_no_head_creation_artifacts, create_initialized_project, heads_directory,
     hydra_command, run_git,
 };
 
+fn overlay_copy_on_write_is_supported(repository: &Path) -> bool {
+    let probe = tempfile::Builder::new()
+        .prefix(".hydra-overlay-test-probe-")
+        .tempdir_in(heads_directory(repository))
+        .expect("overlay capability probe directory should be created");
+    let destination = probe.path().join("candidate");
+
+    reflink_copy::reflink(repository.join(".env"), destination).is_ok()
+}
+
 #[test]
-fn head_create_does_not_prompt_only_because_overlays_are_present() {
+fn head_create_overlay_prompt_matches_the_test_volume_capability() {
     let directory = TestDirectory::new("head-overlay-no-prompt");
     let repository = create_initialized_project(&directory);
     fs::write(repository.join(".gitignore"), b".env\n").expect("overlay rules should be written");
@@ -30,6 +40,8 @@ fn head_create_does_not_prompt_only_because_overlays_are_present() {
     assert!(output.status.success());
     fs::write(repository.join(".env"), b"secret\n").expect("overlay should be written");
 
+    let copy_on_write_supported = overlay_copy_on_write_is_supported(&repository);
+
     let output = hydra_command()
         .args(["head", "create", "payment"])
         .current_dir(&repository)
@@ -37,14 +49,22 @@ fn head_create_does_not_prompt_only_because_overlays_are_present() {
         .output()
         .expect("Hydra CLI should start");
 
-    assert!(
-        output.status.success(),
-        "copy-on-write overlay should not need confirmation, stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
     let stdout = String::from_utf8(output.stdout).expect("output should be UTF-8");
-    assert!(stdout.contains("Overlay: 1 file(s), 7 byte(s)"));
-    assert!(!stdout.contains("[y/N]"));
+    if copy_on_write_supported {
+        assert!(
+            output.status.success(),
+            "copy-on-write overlay should not need confirmation, stderr: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(stdout.contains("Overlay: 1 file(s), 7 byte(s)"));
+        assert!(!stdout.contains("[y/N]"));
+    } else {
+        assert!(!output.status.success());
+        assert!(stdout.contains("Full copy required: 1 file(s), 7 byte(s)"));
+        assert!(stdout.contains("Continue? [y/N]"));
+        assert!(String::from_utf8_lossy(&output.stderr).contains("Head creation cancelled"));
+        assert_no_head_creation_artifacts(&repository, "payment");
+    }
 }
 
 #[test]
