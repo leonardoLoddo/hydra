@@ -1352,6 +1352,7 @@ Per l’MVP, file JSON e scritture atomiche sono sufficienti. SQLite e dipendenz
 | Repair e riconciliazione | MVP |
 | Guida utente italiana mantenuta | MVP |
 | Skill operativa installabile per agenti AI | MVP |
+| Materiali per contributor e tester pubblici (`CONTRIBUTING.md`, `SECURITY.md`, template issue e note curate di `v0.1.0`) | Dopo la prima release |
 | Distribuzione pubblicabile e multiprovider della skill | Successivo |
 | Schema della configurazione pubblicato tramite SchemaStore | Successivo |
 | Head Recipe condivisibili e materializzabili | Successivo |
@@ -1369,6 +1370,13 @@ Per l’MVP, file JSON e scritture atomiche sono sufficienti. SQLite e dipendenz
 | Filesystem virtuale Hydra | Solo se diventa necessario garantire CoW su volumi non compatibili |
 
 Dashboard, runtime e agenti rimangono parte della visione, ma vengono costruiti sopra un motore delle Head già affidabile.
+
+La prima release non è bloccata dalla formalizzazione dei materiali per una
+community pubblica. Dopo la pubblicazione di `v0.1.0`, il repository deve
+aggiungere `CONTRIBUTING.md`, `SECURITY.md`, template GitHub distinti per bug e
+feedback della preview e consolidare le note iniziali della release. Questi
+artefatti trasformano l'esperienza raccolta dalla prima distribuzione in
+procedure stabili per contributor e tester successivi.
 
 ### Skill operativa per agenti AI
 
