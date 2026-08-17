@@ -1368,11 +1368,25 @@ risolva interamente dentro la root.
 
 Le evoluzioni pianificate comprendono:
 
+- rinomina del repository pubblico in `leonardoLoddo/hydra-heads` e prime
+  release di anteprima destinate a un gruppo ristretto di colleghi;
+- distribuzione tramite la Formula `hydra-heads` di un tap Homebrew dedicato,
+  con aggiornamenti derivati da release GitHub immutabili e non da branch in
+  movimento;
 - distribuzione della skill come artefatto Agent Skills portabile, facilmente
   scaricabile, installabile, aggiornabile e pubblicabile sui provider
   compatibili, con adapter specifici senza copie divergenti delle istruzioni;
 - richiesta esplicita, durante una futura installazione interattiva di Hydra,
   per scegliere se installare anche la skill, senza copiarla silenziosamente;
+  la prima scelta disponibile sarà Codex e sarà sempre possibile rifiutare;
+- artwork Hydra mantenuto in `hydra-art.txt` e wordmark `HYDRA` mostrati
+  da `hydra skill install codex`, con un fallback compatto per terminali o log
+  non adatti; Homebrew rimarrà non interattivo e mostrerà nei caveat prima
+  `hydra --help` come punto di ingresso generale e poi il comando opzionale
+  `hydra skill install codex`;
+- gestione futura della skill Codex tramite i comandi espliciti `hydra skill
+  status codex`, `hydra skill update codex` e `hydra skill remove codex`, senza
+  sovrascrivere o cancellare silenziosamente contenuti modificati dall'utente;
 - pubblicazione dello schema ufficiale della configurazione tramite
   SchemaStore, seguita dalla reintroduzione sicura degli aiuti per editor;
 - installazione automatica del completamento tramite futuri pacchetti o

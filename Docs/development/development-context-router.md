@@ -15,6 +15,7 @@ It does not own product behavior, CLI contracts, Git semantics, storage design, 
 | [`rust-tdd-context.md`](rust-tdd-context.md) | Any Rust code, test, bug fix, refactor, dependency, Cargo configuration, quality gate, platform-specific implementation, unsafe boundary, or regression assessment | Binding Rust engineering and test-driven development standard. It defines the Red-Green-Refactor workflow, test layers, anti-regression duties, and completion gates. |
 | [`commit-conventions.md`](commit-conventions.md) | Creating, amending, squashing, reviewing, proposing, or documenting commits; choosing commit types or scopes; describing breaking changes; preparing history for releases or changelogs | Binding Conventional Commits standard for Hydra. It defines the allowed message format, types, scopes, descriptions, bodies, footers, atomicity rules, and examples. |
 | [`hydra-skill-context.md`](hydra-skill-context.md) | Creating, changing, packaging, documenting, validating, or assessing the impact on Hydra's installable AI-agent skill; changing any command, workflow, configuration, safety, troubleshooting, or recovery guidance projected into the skill | Binding maintenance standard for `skills/hydra/`. It defines artifact boundaries, authoritative inputs, mandatory synchronization triggers, and verification. |
+| [`release-distribution.md`](release-distribution.md) | Repository naming, versions, release automation, GitHub Releases, packaged artifacts, Homebrew distribution, interactive onboarding, or release-time skill packaging | Planned release and distribution contract. It separates non-interactive package management from explicit onboarding and defines publication and preview-readiness gates. |
 
 ---
 
@@ -27,6 +28,9 @@ It does not own product behavior, CLI contracts, Git semantics, storage design, 
   what an AI agent should execute, decide, validate, or report while using
   Hydra, and whenever the skill artifact or its installation documentation is
   changed.
+- Consult `release-distribution.md` before changing repository identity,
+  version automation, release workflows, packaged assets, Homebrew metadata,
+  installer or onboarding behavior, or release-time skill distribution.
 - Combine this route with the product route whenever behavior visible to Hydra users may change.
 - Combine it with [`../architecture/architecture-context-router.md`](../architecture/architecture-context-router.md) whenever work affects crate boundaries, dependency direction, initialization, persistence sequencing, or rollback.
 - Combine it with future technical routers for CLI, Git, storage, configuration, or security when those domains are affected.

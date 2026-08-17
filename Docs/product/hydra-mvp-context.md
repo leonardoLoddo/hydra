@@ -1419,6 +1419,21 @@ esplicitamente all'utente se desidera installare anche la skill. La skill non
 deve essere aggiunta silenziosamente insieme al binario: la scelta e la
 destinazione applicabile devono essere comprensibili prima della copia.
 
+La prima distribuzione di anteprima è destinata a un gruppo ristretto di
+colleghi tramite release versionate del repository pubblico pianificato
+`leonardoLoddo/hydra-heads` e una Formula Homebrew distinta chiamata
+`hydra-heads`. Homebrew rimane non interattivo: installa gli artefatti
+versionati, mentre `hydra skill install codex` mostra l'artwork mantenuto nel
+repository, il wordmark `HYDRA`, la destinazione risolta e chiede conferma prima
+di installare la skill. Il solo provider iniziale è Codex e il rifiuto deve
+rimanere sempre disponibile e sicuro. Al termine dell'installazione la Formula
+mostra nei caveat prima `hydra --help` come punto di ingresso generale e poi il
+comando opzionale `hydra skill install codex`, senza eseguirlo automaticamente.
+Versioni, artefatti e aggiornamento della Formula derivano da release
+immutabili create secondo le Conventional Commits; il contratto di
+distribuzione è mantenuto in
+[`../development/release-distribution.md`](../development/release-distribution.md).
+
 ### Head Recipe condivisibili
 
 Una Head fisica rimane un'istanza locale e non viene versionata. In futuro
