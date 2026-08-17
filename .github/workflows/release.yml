@@ -1,0 +1,227 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing vX.Y.Z tag to package
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Resolve release tag
+        id: release
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_TAG: ${{ github.ref_name }}
+          MANUAL_TAG: ${{ inputs.tag }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            tag="$MANUAL_TAG"
+          else
+            tag="$PUSH_TAG"
+          fi
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+      - name: Check out release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.release.outputs.tag }}
+      - name: Verify release version
+        shell: bash
+        env:
+          EXPECTED_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          actual=$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[] | select(.name == "hydra-cli") | .version')
+          [[ "$actual" == "$EXPECTED_VERSION" ]]
+      - name: Test workspace
+        run: cargo test --workspace --locked
+      - name: Build release binary
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            export MACOSX_DEPLOYMENT_TARGET=11.0
+          fi
+          cargo build --release --locked --target "${{ matrix.target }}" -p hydra-cli
+      - name: Package release archive
+        shell: bash
+        run: |
+          scripts/package-release.sh \
+            "${{ steps.release.outputs.version }}" \
+            "${{ matrix.target }}" \
+            "target/${{ matrix.target }}/release/hydra" \
+            release-assets
+      - name: Upload release archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-${{ matrix.target }}
+          path: release-assets/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish verified release assets
+    needs: build
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - name: Resolve release tag
+        id: release
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_TAG: ${{ github.ref_name }}
+          MANUAL_TAG: ${{ inputs.tag }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            tag="$MANUAL_TAG"
+          else
+            tag="$PUSH_TAG"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+      - name: Download release archives
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+      - name: Attest release archives
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: release-assets/*.tar.gz
+      - name: Upload assets to the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: gh release upload "$TAG" release-assets/* --clobber
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: gh release edit "$TAG" --draft=false --latest
+
+  formula:
+    name: Generate Homebrew Formula
+    needs: publish
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.publish.outputs.tag }}
+      - name: Download release archives
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+      - name: Render Formula
+        run: |
+          scripts/render-homebrew-formula.sh \
+            "${{ needs.publish.outputs.version }}" \
+            release-assets \
+            Formula/hydra-heads.rb
+      - name: Upload Formula
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: homebrew-formula
+          path: Formula/hydra-heads.rb
+          if-no-files-found: error
+
+  homebrew-smoke:
+    name: Homebrew smoke test (${{ matrix.architecture }})
+    needs:
+      - publish
+      - formula
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            architecture: arm64
+          - runner: macos-15-intel
+            architecture: x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.publish.outputs.tag }}
+      - name: Download Formula
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: homebrew-formula
+          path: Formula
+      - name: Audit Formula
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+        run: |
+          brew style Formula/hydra-heads.rb
+          brew audit --strict Formula/hydra-heads.rb
+      - name: Smoke-test install, skill lifecycle, and uninstall
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+        run: |
+          brew install --formula Formula/hydra-heads.rb 2>&1 | tee homebrew-install.log
+          scripts/verify-homebrew-caveats.sh homebrew-install.log hydra-art.txt
+          brew test Formula/hydra-heads.rb
+          brew uninstall hydra-heads
+
+  update-tap:
+    name: Update Homebrew tap
+    needs:
+      - publish
+      - homebrew-smoke
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download Formula
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: homebrew-formula
+          path: Formula
+      - name: Publish Formula to the tap
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          VERSION: ${{ needs.publish.outputs.version }}
+        shell: bash
+        run: |
+          encoded=$(base64 < Formula/hydra-heads.rb | tr -d '\n')
+          existing_sha=$(gh api repos/leonardoLoddo/homebrew-tap/contents/Formula/hydra-heads.rb --jq .sha 2>/dev/null || true)
+          if [[ -n "$existing_sha" ]]; then
+            gh api --method PUT repos/leonardoLoddo/homebrew-tap/contents/Formula/hydra-heads.rb \
+              -f message="chore: update hydra-heads to v$VERSION" \
+              -f content="$encoded" \
+              -f sha="$existing_sha"
+          else
+            gh api --method PUT repos/leonardoLoddo/homebrew-tap/contents/Formula/hydra-heads.rb \
+              -f message="chore: add hydra-heads v$VERSION" \
+              -f content="$encoded"
+          fi
