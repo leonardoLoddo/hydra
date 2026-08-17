@@ -4,7 +4,7 @@ use std::{fs, io::Write, path::Path, process::Stdio};
 
 use common::{
     TestDirectory, create_initialized_project, head_state_path, heads_directory, hydra_command,
-    run_git,
+    overlay_copy_on_write_is_supported, run_git,
 };
 
 fn relocate_heads_directory(
@@ -63,12 +63,26 @@ fn commit_all(repository: &Path, message: &str) {
     assert!(output.status.success());
 }
 
-fn create_head(repository: &Path, name: &str) {
-    let output = hydra_command()
+fn create_head_confirming_fallback(repository: &Path, name: &str) -> std::process::Output {
+    let mut child = hydra_command()
         .args(["head", "create", name])
         .current_dir(repository)
-        .output()
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .expect("Hydra CLI should start");
+    child
+        .stdin
+        .take()
+        .expect("stdin should be piped")
+        .write_all(b"yes\n")
+        .expect("full-copy confirmation should be written");
+    child.wait_with_output().expect("Hydra should finish")
+}
+
+fn create_head(repository: &Path, name: &str) {
+    let output = create_head_confirming_fallback(repository, name);
     assert!(
         output.status.success(),
         "Head creation should succeed, stderr: {}",
@@ -699,6 +713,11 @@ fn head_create_materializes_cow_gitignore_overlays_without_confirmation() {
     fs::write(repository.join("cache/logs/skip.log"), b"skip\n")
         .expect("excluded overlay should be written");
 
+    if !overlay_copy_on_write_is_supported(&repository, &repository.join(".env")) {
+        eprintln!("skipping native CoW overlay test: test volume does not support reflinks");
+        return;
+    }
+
     let output = hydra_command()
         .args(["head", "create", "overlay"])
         .current_dir(&repository)
@@ -789,12 +808,7 @@ fn head_create_preserves_a_safe_relative_overlay_symlink() {
     )
     .expect("dependency symlink should be created");
 
-    let output = hydra_command()
-        .args(["head", "create", "dependencies"])
-        .current_dir(&repository)
-        .stdin(Stdio::null())
-        .output()
-        .expect("Hydra CLI should start");
+    let output = create_head_confirming_fallback(&repository, "dependencies");
 
     assert!(
         output.status.success(),
@@ -860,11 +874,7 @@ fn head_create_preserves_overlay_file_permissions() {
     fs::set_permissions(&executable, fs::Permissions::from_mode(0o751))
         .expect("overlay permissions should be set");
 
-    let output = hydra_command()
-        .args(["head", "create", "permissions"])
-        .current_dir(&repository)
-        .output()
-        .expect("Hydra CLI should start");
+    let output = create_head_confirming_fallback(&repository, "permissions");
 
     assert!(
         output.status.success(),

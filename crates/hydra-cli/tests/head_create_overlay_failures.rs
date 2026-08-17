@@ -1,21 +1,11 @@
 mod common;
 
-use std::{fs, io::Write, path::Path, process::Stdio};
+use std::{fs, io::Write, process::Stdio};
 
 use common::{
     TestDirectory, assert_no_head_creation_artifacts, create_initialized_project, heads_directory,
-    hydra_command, run_git,
+    hydra_command, overlay_copy_on_write_is_supported, run_git,
 };
-
-fn overlay_copy_on_write_is_supported(repository: &Path) -> bool {
-    let probe = tempfile::Builder::new()
-        .prefix(".hydra-overlay-test-probe-")
-        .tempdir_in(heads_directory(repository))
-        .expect("overlay capability probe directory should be created");
-    let destination = probe.path().join("candidate");
-
-    reflink_copy::reflink(repository.join(".env"), destination).is_ok()
-}
 
 #[test]
 fn head_create_overlay_prompt_matches_the_test_volume_capability() {
@@ -40,7 +30,8 @@ fn head_create_overlay_prompt_matches_the_test_volume_capability() {
     assert!(output.status.success());
     fs::write(repository.join(".env"), b"secret\n").expect("overlay should be written");
 
-    let copy_on_write_supported = overlay_copy_on_write_is_supported(&repository);
+    let copy_on_write_supported =
+        overlay_copy_on_write_is_supported(&repository, &repository.join(".env"));
 
     let output = hydra_command()
         .args(["head", "create", "payment"])

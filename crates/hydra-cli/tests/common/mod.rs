@@ -96,6 +96,17 @@ pub fn heads_directory(repository: &Path) -> PathBuf {
 }
 
 #[allow(dead_code)]
+pub fn overlay_copy_on_write_is_supported(repository: &Path, source: &Path) -> bool {
+    let probe = tempfile::Builder::new()
+        .prefix(".hydra-overlay-test-probe-")
+        .tempdir_in(heads_directory(repository))
+        .expect("overlay capability probe directory should be created");
+    let destination = probe.path().join("candidate");
+
+    reflink_copy::reflink(source, destination).is_ok()
+}
+
+#[allow(dead_code)]
 pub fn head_state_path(repository: &Path) -> PathBuf {
     heads_directory(repository).join(".hydra/heads.json")
 }
