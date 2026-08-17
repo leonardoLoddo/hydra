@@ -197,7 +197,10 @@ plugin cannot parse inherited package versions. Targeted TOML updaters change
 `workspace.package.version` and both Hydra entries in `Cargo.lock` in the same
 release pull request. The checked-in `version.txt` is only the coordinator's
 required release marker; release-tooling validation requires it to equal the
-version reported for every workspace package by locked Cargo metadata.
+version reported for every workspace package by locked Cargo metadata. The
+configured initial release version must equal that marker so a repository with
+no prior tag starts at the intended preview version rather than the strategy's
+stable-release default.
 
 The release matrix builds native archives for macOS Apple Silicon, macOS Intel,
 Linux ARM64, and Linux x86-64. The preview baseline is macOS 11 or newer and

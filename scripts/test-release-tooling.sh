@@ -32,6 +32,7 @@ abort "error: cargo-workspace cannot parse version.workspace" if Array(config["p
 abort "error: release version files are not configured atomically" unless config["extra-files"] == expected_extra_files
 
 release_version = File.read("version.txt").strip
+abort "error: initial release version and version.txt disagree" unless config["initial-version"] == release_version
 metadata = JSON.parse(`cargo metadata --locked --no-deps --format-version 1`)
 abort "error: cargo metadata failed" unless $?.success?
 package_versions = metadata.fetch("packages").map { |package| package.fetch("version") }.uniq
