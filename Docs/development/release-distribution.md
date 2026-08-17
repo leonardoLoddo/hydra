@@ -21,6 +21,21 @@ Moving the current `leonardoLoddo/hydra` repository to that name is an
 operational release-readiness step, not an open naming decision. The executable
 remains named `hydra`.
 
+## License
+
+Hydra is available under `MIT OR Apache-2.0`, at the recipient's option.
+`LICENSE-MIT` contains the MIT terms and the copyright notice for Leonardo
+Loddo. `LICENSE-APACHE` contains the unmodified Apache License 2.0 terms, while
+the root `LICENSE` file states the choice without creating another set of
+terms. Workspace and package Cargo metadata must use the same SPDX expression.
+
+Release archives and source distributions include all three files. Generated
+Homebrew metadata represents the choice as:
+
+```ruby
+license any_of: ["MIT", "Apache-2.0"]
+```
+
 ## Repository and Homebrew Topology
 
 The source repository and the Homebrew tap have separate responsibilities:
@@ -197,7 +212,6 @@ supported merely because a binary can start there.
 The following decisions or artifacts are still required before the first
 preview release:
 
-- choose and add an explicit open-source license;
 - create the project README with install, opt-in skill, update, uninstall,
   support, and preview-status guidance;
 - rename the GitHub source repository and update every canonical link;
