@@ -180,20 +180,32 @@ jobs:
         with:
           name: homebrew-formula
           path: Formula
-      - name: Audit Formula
+      - name: Audit and smoke-test the Formula from a temporary tap
         env:
           HOMEBREW_NO_AUTO_UPDATE: "1"
         run: |
-          brew style Formula/hydra-heads.rb
-          brew audit --strict Formula/hydra-heads.rb
-      - name: Smoke-test install, skill lifecycle, and uninstall
-        env:
-          HOMEBREW_NO_AUTO_UPDATE: "1"
-        run: |
-          brew install --formula Formula/hydra-heads.rb 2>&1 | tee homebrew-install.log
+          tap_name=hydra/release-smoke
+          brew tap-new --no-git "$tap_name"
+          tap_root=$(brew --repository "$tap_name")
+          formula="$tap_root/Formula/hydra-heads.rb"
+          cp Formula/hydra-heads.rb "$formula"
+
+          cleanup() {
+            if brew list --formula hydra-heads >/dev/null 2>&1; then
+              brew uninstall hydra-heads
+            fi
+            brew untap "$tap_name"
+          }
+          trap cleanup EXIT
+
+          brew style "$formula"
+          brew audit --strict "$formula"
+          brew install "$tap_name/hydra-heads" 2>&1 | tee homebrew-install.log
           scripts/verify-homebrew-caveats.sh homebrew-install.log hydra-art.txt
-          brew test Formula/hydra-heads.rb
+          brew test "$tap_name/hydra-heads"
           brew uninstall hydra-heads
+          brew untap "$tap_name"
+          trap - EXIT
 
   update-tap:
     name: Update Homebrew tap
