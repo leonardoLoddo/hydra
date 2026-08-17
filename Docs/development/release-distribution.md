@@ -190,6 +190,15 @@ publication, native runner matrix, and separately scoped tap update require a
 small explicit transaction that remains easier to audit directly. Every
 third-party action is pinned to an immutable commit SHA.
 
+Hydra keeps Cargo's inherited `version.workspace = true` declarations as the
+canonical package-version relationship. Release Please uses its `simple`
+strategy as the single release coordinator because its `cargo-workspace`
+plugin cannot parse inherited package versions. Targeted TOML updaters change
+`workspace.package.version` and both Hydra entries in `Cargo.lock` in the same
+release pull request. The checked-in `version.txt` is only the coordinator's
+required release marker; release-tooling validation requires it to equal the
+version reported for every workspace package by locked Cargo metadata.
+
 The release matrix builds native archives for macOS Apple Silicon, macOS Intel,
 Linux ARM64, and Linux x86-64. The preview baseline is macOS 11 or newer and
 glibc 2.35 or newer, built on native macOS 15 and Ubuntu 22.04 runners.

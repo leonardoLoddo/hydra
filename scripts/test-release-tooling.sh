@@ -9,6 +9,35 @@ bash -n \
   scripts/render-homebrew-formula.sh \
   scripts/verify-homebrew-caveats.sh
 
+ruby <<'RUBY'
+require "json"
+
+config = JSON.parse(File.read("release-please-config.json"))
+expected_extra_files = [
+  {
+    "type" => "toml",
+    "path" => "Cargo.toml",
+    "jsonpath" => "$.workspace.package.version",
+  },
+  {
+    "type" => "toml",
+    "path" => "Cargo.lock",
+    "jsonpath" => "$.package[?(@.name.value=='hydra-cli'||@.name.value=='hydra-core')].version",
+  },
+]
+
+abort "error: release strategy must support inherited Cargo versions" unless config["release-type"] == "simple"
+abort "error: release version marker is not configured" unless config["version-file"] == "version.txt"
+abort "error: cargo-workspace cannot parse version.workspace" if Array(config["plugins"]).any? { |plugin| plugin["type"] == "cargo-workspace" }
+abort "error: release version files are not configured atomically" unless config["extra-files"] == expected_extra_files
+
+release_version = File.read("version.txt").strip
+metadata = JSON.parse(`cargo metadata --locked --no-deps --format-version 1`)
+abort "error: cargo metadata failed" unless $?.success?
+package_versions = metadata.fetch("packages").map { |package| package.fetch("version") }.uniq
+abort "error: version.txt and Cargo package versions disagree" unless package_versions == [release_version]
+RUBY
+
 cargo build --locked -p hydra-cli
 version=$(target/debug/hydra --version | awk '{print $2}')
 test_root=$(mktemp -d "${TMPDIR:-/tmp}/hydra-release-tooling.XXXXXX")
