@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+authors.workspace = true
+description.workspace = true
+homepage.workspace = true
+repository.workspace = true
 publish = false
 
 [[bin]]
@@ -14,9 +18,9 @@ path = "src/main.rs"
 clap.workspace = true
 clap_complete.workspace = true
 hydra-core = { path = "../hydra-core" }
-
-[dev-dependencies]
+serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 tempfile.workspace = true
 
 [lints]

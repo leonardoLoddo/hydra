@@ -15,6 +15,7 @@ mod head_create;
 mod inspection;
 mod output;
 mod repair;
+mod skill;
 
 #[derive(Parser)]
 #[command(
@@ -22,7 +23,7 @@ mod repair;
     version,
     about = "Git-native workspace manager for isolated development Heads",
     long_about = "Git-native workspace manager for isolated development Heads.\n\nHydra creates independent working directories while preserving familiar Git refs, branches, and repository workflows.",
-    after_help = "Command syntax:\n  hydra init [PATH]\n  hydra status\n  hydra repair\n  hydra doctor storage\n  hydra completions <SHELL>\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head open <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra <command> --help' for details."
+    after_help = "Command syntax:\n  hydra init [PATH]\n  hydra status\n  hydra repair\n  hydra doctor storage\n  hydra completions <SHELL>\n  hydra skill install codex\n  hydra skill status codex\n  hydra skill update codex\n  hydra skill remove codex\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head open <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra <command> --help' for details."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -64,6 +65,14 @@ enum Command {
         #[arg(value_enum)]
         shell: CompletionShell,
     },
+    /// Install and manage optional AI-agent skills
+    #[command(
+        after_help = "Command syntax:\n  hydra skill install codex\n  hydra skill status codex\n  hydra skill update codex\n  hydra skill remove codex\n\nCodex is the only provider currently supported."
+    )]
+    Skill {
+        #[command(subcommand)]
+        command: SkillCommand,
+    },
     /// Create and manage Heads
     #[command(
         after_help = "Command syntax:\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head open <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra head <command> --help' for details."
@@ -76,6 +85,53 @@ enum Command {
     Complete {
         #[command(subcommand)]
         command: CompletionCommand,
+    },
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum SkillProvider {
+    Codex,
+}
+
+#[derive(Subcommand)]
+enum SkillCommand {
+    /// Install the optional Hydra skill
+    Install {
+        #[arg(value_enum)]
+        provider: SkillProvider,
+        /// Confirm installation without an interactive prompt
+        #[arg(long, conflicts_with = "no")]
+        yes: bool,
+        /// Decline installation without an interactive prompt
+        #[arg(long)]
+        no: bool,
+    },
+    /// Report whether the installed skill is current and unmodified
+    Status {
+        #[arg(value_enum)]
+        provider: SkillProvider,
+    },
+    /// Update an unmodified skill installed by Hydra
+    Update {
+        #[arg(value_enum)]
+        provider: SkillProvider,
+        /// Confirm the update without an interactive prompt
+        #[arg(long, conflicts_with = "no")]
+        yes: bool,
+        /// Decline the update without an interactive prompt
+        #[arg(long)]
+        no: bool,
+    },
+    /// Remove an unmodified skill installed by Hydra
+    Remove {
+        #[arg(value_enum)]
+        provider: SkillProvider,
+        /// Confirm removal without an interactive prompt
+        #[arg(long, conflicts_with = "no")]
+        yes: bool,
+        /// Decline removal without an interactive prompt
+        #[arg(long)]
+        no: bool,
     },
 }
 
@@ -200,6 +256,7 @@ fn main() -> ExitCode {
             command: DoctorCommand::Storage,
         } => doctor_storage(),
         Command::Completions { shell } => print_completions(shell),
+        Command::Skill { command } => run_skill(&command),
         Command::Head {
             command: HeadCommand::Create { name, from, target },
         } => head_create::run(&name, from.as_deref(), target.as_deref()),
@@ -224,6 +281,51 @@ fn main() -> ExitCode {
         Command::Complete {
             command: CompletionCommand::Heads,
         } => print_head_candidates(),
+    }
+}
+
+fn run_skill(command: &SkillCommand) -> ExitCode {
+    let (action, confirmation) = match command {
+        SkillCommand::Install {
+            provider: SkillProvider::Codex,
+            yes,
+            no,
+        } => (
+            skill::Action::Install,
+            skill::Confirmation { yes: *yes, no: *no },
+        ),
+        SkillCommand::Status {
+            provider: SkillProvider::Codex,
+        } => (
+            skill::Action::Status,
+            skill::Confirmation {
+                yes: false,
+                no: false,
+            },
+        ),
+        SkillCommand::Update {
+            provider: SkillProvider::Codex,
+            yes,
+            no,
+        } => (
+            skill::Action::Update,
+            skill::Confirmation { yes: *yes, no: *no },
+        ),
+        SkillCommand::Remove {
+            provider: SkillProvider::Codex,
+            yes,
+            no,
+        } => (
+            skill::Action::Remove,
+            skill::Confirmation { yes: *yes, no: *no },
+        ),
+    };
+    match skill::run(action, confirmation) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("error: {error}");
+            ExitCode::FAILURE
+        }
     }
 }
 

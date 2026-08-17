@@ -223,3 +223,12 @@ that are not integrated, and its output must be reported.
 
 Preserve recoverability over convenience: leave the Head and its private branch
 in place whenever safe integration or removal cannot be proven.
+
+## Manage this skill only when requested
+
+Do not update or remove the active Hydra skill merely because a newer Hydra
+binary exists. When the user explicitly asks to manage it, use `hydra skill
+status codex` first. Use `hydra skill update codex` or `hydra skill remove
+codex` only after the user confirms the destination and action. Hydra preserves
+unknown or locally modified skill content; do not bypass that refusal with a
+manual copy or recursive deletion.

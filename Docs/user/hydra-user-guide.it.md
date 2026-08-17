@@ -4,7 +4,8 @@ Questa guida descrive come usare Hydra e come personalizzarne il comportamento.
 È mantenuta insieme al codice: comandi e opzioni presentati come disponibili
 devono esistere nel binario corrente.
 
-Hydra è ancora in sviluppo e non è stato distribuito pubblicamente. Le sezioni
+Hydra è ancora in sviluppo e la prima release pubblica non è stata ancora
+completata. Le sezioni
 marcate **Pianificato — non ancora disponibile** descrivono il flusso previsto,
 ma non costituiscono istruzioni eseguibili.
 
@@ -40,6 +41,10 @@ hydra status
 hydra repair
 hydra doctor storage
 hydra completions <SHELL>
+hydra skill install codex [--yes | --no]
+hydra skill status codex
+hydra skill update codex [--yes | --no]
+hydra skill remove codex [--yes | --no]
 hydra head create <NAME> [--from <REF>] [--target <BRANCH>]
 hydra head list
 hydra head status <NAME>
@@ -57,6 +62,7 @@ hydra init --help
 hydra repair --help
 hydra doctor storage --help
 hydra completions --help
+hydra skill --help
 hydra head --help
 hydra head create --help
 hydra head open --help
@@ -120,21 +126,41 @@ stabile.
 
 ### 3.1 Installa la skill per agenti AI
 
-Il repository distribuisce la skill operativa in `skills/hydra/`. Per provarla
-localmente con Codex, dalla root del repository verifica prima che non esista
-già una skill omonima, quindi copiala nella directory delle skill personali:
+Il repository distribuisce la skill operativa canonica in `skills/hydra/` e il
+binario può installarla nella directory personale attualmente documentata da
+Codex, `$HOME/.agents/skills/hydra`:
 
 ```bash
-skill_root="${CODEX_HOME:-$HOME/.codex}/skills"
-test ! -e "$skill_root/hydra" &&
-  mkdir -p "$skill_root" &&
-  cp -R skills/hydra "$skill_root/hydra"
+hydra skill install codex
 ```
 
-Se il primo controllo fallisce, non sovrascrivere la skill esistente: rimuovila
-o aggiornala soltanto dopo averne verificato origine e modifiche locali.
+Su un terminale interattivo Hydra mostra la destinazione e chiede conferma con
+default negativo. Un input vuoto o non disponibile non installa nulla. Per
+automazioni la scelta deve essere esplicita:
 
-Riavvia la sessione dell'agente dopo l'installazione. Puoi invocarla
+```bash
+hydra skill install codex --yes
+hydra skill install codex --no
+```
+
+Una directory già esistente viene preservata. Hydra aggiunge un manifest di
+provenienza con versione e checksum SHA-256; `update` e `remove` operano solo
+quando manifest, struttura e contenuti dimostrano che la copia è stata gestita
+da Hydra e non è stata modificata localmente:
+
+```bash
+hydra skill status codex
+hydra skill update codex
+hydra skill remove codex
+```
+
+Anche aggiornamento e rimozione usano una conferma predefinita negativa quando
+devono modificare lo stato; `--yes` e `--no` sono disponibili per automazioni.
+Una skill sconosciuta, un symlink, un file aggiuntivo o un checksum diverso
+causano un rifiuto sicuro senza sovrascrittura o cancellazione.
+
+Codex rileva normalmente le modifiche automaticamente. Riavvia la sessione
+soltanto se la skill non appare o l'aggiornamento non è visibile. Puoi invocarla
 esplicitamente con `$hydra`, per esempio:
 
 ```text
@@ -1368,25 +1394,18 @@ risolva interamente dentro la root.
 
 Le evoluzioni pianificate comprendono:
 
-- rinomina del repository pubblico in `leonardoLoddo/hydra-heads` e prime
-  release di anteprima destinate a un gruppo ristretto di colleghi;
+- prime release di anteprima dal repository pubblico
+  `leonardoLoddo/hydra`, destinate a un gruppo ristretto di colleghi;
 - distribuzione tramite la Formula `hydra-heads` di un tap Homebrew dedicato,
   con aggiornamenti derivati da release GitHub immutabili e non da branch in
   movimento;
 - distribuzione della skill come artefatto Agent Skills portabile, facilmente
   scaricabile, installabile, aggiornabile e pubblicabile sui provider
   compatibili, con adapter specifici senza copie divergenti delle istruzioni;
-- richiesta esplicita, durante una futura installazione interattiva di Hydra,
-  per scegliere se installare anche la skill, senza copiarla silenziosamente;
-  la prima scelta disponibile sarà Codex e sarà sempre possibile rifiutare;
-- artwork Hydra mantenuto in `hydra-art.txt` e wordmark `HYDRA` mostrati
-  da `hydra skill install codex`, con un fallback compatto per terminali o log
-  non adatti; Homebrew rimarrà non interattivo e mostrerà nei caveat prima
-  `hydra --help` come punto di ingresso generale e poi il comando opzionale
-  `hydra skill install codex`;
-- gestione futura della skill Codex tramite i comandi espliciti `hydra skill
-  status codex`, `hydra skill update codex` e `hydra skill remove codex`, senza
-  sovrascrivere o cancellare silenziosamente contenuti modificati dall'utente;
+- artwork Hydra completo mantenuto in `hydra-art.txt`, incluso il wordmark
+  `HYDRA`, mostrato nei caveat alla fine dell'installazione Homebrew; subito
+  sotto appariranno prima `hydra --help` come punto di ingresso generale e poi
+  il comando opzionale `hydra skill install codex`;
 - pubblicazione dello schema ufficiale della configurazione tramite
   SchemaStore, seguita dalla reintroduzione sicura degli aiuti per editor;
 - installazione automatica del completamento tramite futuri pacchetti o

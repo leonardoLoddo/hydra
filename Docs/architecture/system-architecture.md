@@ -28,6 +28,7 @@ Hydra/
     │   │   ├── main.rs
     │   │   ├── output.rs
     │   │   ├── repair.rs
+    │   │   ├── skill.rs
     │   │   └── repair/
     │   │       └── presentation.rs
     │   └── tests/
@@ -112,7 +113,8 @@ hydra-cli ──────> hydra-core
      │                 ├── Git process boundary
      │                 └── filesystem and persistence
      │
-     └── terminal input/output and exit status
+     ├── terminal input/output and exit status
+     └── Codex skill distribution adapter
 ```
 
 `hydra-core` MUST NOT depend on `hydra-cli`. Domain behavior must remain
@@ -155,6 +157,15 @@ the selected core repair result into terminal output and exit status. Its
 `repair/presentation.rs` child owns issue rendering and confirmation prompts.
 `main.rs` retains only command definition and dispatch; repair classification,
 validation, and mutation remain in `hydra-core`.
+
+The private `skill.rs` CLI module is a narrow distribution adapter rather than
+Hydra repository-domain behavior. It resolves Codex's documented personal
+skill location, renders default-negative confirmations, stages the canonical
+embedded skill, and owns its provider-specific provenance manifest. It may
+mutate only `$HOME/.agents/skills/hydra`; it must reject symlinks, unknown
+trees, extra entries, and checksum mismatches before update or removal. It does
+not read or mutate a Hydra project's Git repository, Heads directory, or local
+metadata, so this host-specific lifecycle does not belong in `hydra-core`.
 
 CLI integration tests execute the compiled `hydra` binary and assert externally
 observable behavior. Tests that mutate Git or the filesystem use newly created

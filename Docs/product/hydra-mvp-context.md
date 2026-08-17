@@ -1405,30 +1405,32 @@ La skill non integra o rimuove automaticamente una Head: lascia per default il
 workspace disponibile alla revisione e richiede un'autorizzazione esplicita
 prima delle operazioni che aggiornano il target o possono scartare file.
 
-In una fase successiva, la stessa sorgente canonica deve diventare facilmente
-scaricabile, installabile, aggiornabile e pubblicabile per tutti gli host che
-supportano lo standard aperto Agent Skills. Hydra non mantiene copie divergenti
+La CLI rende ora la stessa sorgente canonica installabile, ispezionabile,
+aggiornabile e rimovibile per Codex tramite `hydra skill`. In una fase
+successiva la distribuzione potrà essere estesa agli altri host che supportano
+lo standard aperto Agent Skills. Hydra non mantiene copie divergenti
 delle istruzioni per singolo vendor: plugin, marketplace, estensioni, archivi o
 installer specifici del provider sono adapter di distribuzione e devono
 proiettare lo stesso artefatto portabile. Ogni canale deve documentare percorso,
 versione, verifica dell'origine, aggiornamento e rimozione senza trasformare un
 formato proprietario nella fonte del comportamento operativo.
 
-Quando un futuro installer interattivo installa Hydra, deve chiedere
-esplicitamente all'utente se desidera installare anche la skill. La skill non
-deve essere aggiunta silenziosamente insieme al binario: la scelta e la
-destinazione applicabile devono essere comprensibili prima della copia.
+`hydra skill install codex` chiede esplicitamente all'utente se desidera
+installare la skill, mostra `$HOME/.agents/skills/hydra` e usa una scelta
+predefinita negativa. La Formula non aggiunge mai la skill insieme al binario.
+Le automazioni devono passare `--yes` o `--no`; presenza di Codex o input non
+interattivo non implicano consenso.
 
 La prima distribuzione di anteprima è destinata a un gruppo ristretto di
-colleghi tramite release versionate del repository pubblico pianificato
-`leonardoLoddo/hydra-heads` e una Formula Homebrew distinta chiamata
+colleghi tramite release versionate del repository pubblico
+`leonardoLoddo/hydra` e una Formula Homebrew distinta chiamata
 `hydra-heads`. Homebrew rimane non interattivo: installa gli artefatti
-versionati, mentre `hydra skill install codex` mostra l'artwork mantenuto nel
-repository, il wordmark `HYDRA`, la destinazione risolta e chiede conferma prima
-di installare la skill. Il solo provider iniziale è Codex e il rifiuto deve
-rimanere sempre disponibile e sicuro. Al termine dell'installazione la Formula
-mostra nei caveat prima `hydra --help` come punto di ingresso generale e poi il
-comando opzionale `hydra skill install codex`, senza eseguirlo automaticamente.
+versionati e al termine mostra nei caveat l'intero `hydra-art.txt`, incluso il
+wordmark `HYDRA`. Subito sotto l'artwork mostra prima `hydra --help` come punto
+di ingresso generale e poi il comando opzionale `hydra skill install codex`,
+senza eseguirlo automaticamente. Quest'ultimo mostra la destinazione risolta e
+chiede conferma prima di installare la skill. Il solo provider iniziale è Codex
+e il rifiuto deve rimanere sempre disponibile e sicuro.
 Versioni, artefatti e aggiornamento della Formula derivano da release
 immutabili create secondo le Conventional Commits; il contratto di
 distribuzione è mantenuto in
