@@ -1,4 +1,6 @@
-# Hydra
+<h1 align="center">
+  <img src="assets/hydra-banner.png" alt="Hydra — One repository. Many isolated Heads.">
+</h1>
 
 [![CI](https://github.com/leonardoLoddo/hydra/actions/workflows/ci.yml/badge.svg)](https://github.com/leonardoLoddo/hydra/actions/workflows/ci.yml)
 [![License: MIT or Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
