@@ -35,6 +35,13 @@ Homebrew metadata represents the choice as:
 license any_of: ["MIT", "Apache-2.0"]
 ```
 
+The repository README may use presentation assets that do not belong in binary
+archives. Each release archive therefore exposes the compact
+`packaging/release/README.md` as its root `README.md` and excludes the repository
+banner. The compact README must remain sufficient to identify the archive,
+start the binary, manage the optional skill, find the canonical documentation,
+and understand the license without carrying multi-megabyte visual assets.
+
 ## Repository and Homebrew Topology
 
 The source repository and the Homebrew tap have separate responsibilities:

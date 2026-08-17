@@ -30,6 +30,12 @@ for expected in \
   tar -tzf "$archive" | grep -F -x "$expected" >/dev/null
 done
 
+if tar -tzf "$archive" | grep -F -x './assets/hydra-banner.png' >/dev/null; then
+  echo "error: release archive includes the repository banner" >&2
+  exit 1
+fi
+tar -xOf "$archive" ./README.md | grep -F -x '# Hydra release archive' >/dev/null
+
 cp \
   "$archive.sha256" \
   "$assets/hydra-$version-x86_64-apple-darwin.tar.gz.sha256"

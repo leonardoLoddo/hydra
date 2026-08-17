@@ -38,7 +38,7 @@ cp "$repository_root/skills/hydra/agents/openai.yaml" "$package_root/skills/hydr
 cp "$repository_root/LICENSE" "$package_root/LICENSE"
 cp "$repository_root/LICENSE-MIT" "$package_root/LICENSE-MIT"
 cp "$repository_root/LICENSE-APACHE" "$package_root/LICENSE-APACHE"
-cp "$repository_root/README.md" "$package_root/README.md"
+cp "$repository_root/packaging/release/README.md" "$package_root/README.md"
 cp "$repository_root/CHANGELOG.md" "$package_root/CHANGELOG.md"
 
 archive_name="hydra-${version}-${target}.tar.gz"
