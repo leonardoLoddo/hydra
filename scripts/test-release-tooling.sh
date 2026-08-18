@@ -11,6 +11,7 @@ bash -n \
 
 ruby <<'RUBY'
 require "json"
+require "yaml"
 
 config = JSON.parse(File.read("release-please-config.json"))
 expected_extra_files = [
@@ -37,6 +38,20 @@ metadata = JSON.parse(`cargo metadata --locked --no-deps --format-version 1`)
 abort "error: cargo metadata failed" unless $?.success?
 package_versions = metadata.fetch("packages").map { |package| package.fetch("version") }.uniq
 abort "error: version.txt and Cargo package versions disagree" unless package_versions == [release_version]
+
+workflow = YAML.safe_load(File.read(".github/workflows/release.yml"), aliases: true)
+publish_steps = workflow.fetch("jobs").fetch("publish").fetch("steps")
+repository_bound_steps = [
+  "Upload assets to the draft release",
+  "Publish the GitHub release",
+]
+repository_bound_steps.each do |step_name|
+  step = publish_steps.find { |candidate| candidate["name"] == step_name }
+  abort "error: missing release publication step: #{step_name}" unless step
+  unless step.fetch("env", {})["GH_REPO"] == "leonardoLoddo/hydra"
+    abort "error: release publication step does not identify the repository: #{step_name}"
+  end
+end
 RUBY
 
 cargo build --locked -p hydra-cli

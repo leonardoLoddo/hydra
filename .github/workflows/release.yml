@@ -120,11 +120,13 @@ jobs:
       - name: Upload assets to the draft release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: leonardoLoddo/hydra
           TAG: ${{ steps.release.outputs.tag }}
         run: gh release upload "$TAG" release-assets/* --clobber
       - name: Publish the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: leonardoLoddo/hydra
           TAG: ${{ steps.release.outputs.tag }}
         run: gh release edit "$TAG" --draft=false --latest
 

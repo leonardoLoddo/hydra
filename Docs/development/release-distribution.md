@@ -229,6 +229,11 @@ where technically possible. The source workflow must not hold a broad personal
 token when a narrower GitHub App or fine-grained token can satisfy the same
 operation.
 
+Release publication jobs that intentionally run without a source checkout must
+identify `leonardoLoddo/hydra` explicitly when invoking GitHub CLI. Publication
+must not depend on discovering repository identity from the runner's current
+directory.
+
 ## Preview Acceptance
 
 Before inviting colleagues, a preview release must verify at least:
