@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document defines the planned release and distribution contract for Hydra.
+This document defines the release and distribution contract for Hydra.
 It owns repository naming, release automation, Homebrew publication, packaged
 assets, and the boundary between a non-interactive package manager and Hydra's
 interactive skill installer. It does not make an unavailable installer or
@@ -246,9 +246,10 @@ selected workflow revision: on a tag-triggered run this is the tag commit,
 while a manual recovery run may use corrected tooling from the selected branch
 without moving the tag or changing the tagged release sources.
 
-## Preview Acceptance
+## Preview Validation
 
-Before inviting colleagues, a preview release must verify at least:
+During the colleague preview, release evidence and direct tester feedback must
+verify at least:
 
 - installation on a clean supported macOS machine without a preinstalled Rust
   toolchain;

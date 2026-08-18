@@ -1352,7 +1352,7 @@ Per l’MVP, file JSON e scritture atomiche sono sufficienti. SQLite e dipendenz
 | Repair e riconciliazione | MVP |
 | Guida utente italiana mantenuta | MVP |
 | Skill operativa installabile per agenti AI | MVP |
-| Materiali per contributor e tester pubblici (`CONTRIBUTING.md`, `SECURITY.md`, template issue e note curate di `v0.1.0`) | Dopo la prima release |
+| Materiali per contributor e tester pubblici (`CONTRIBUTING.md`, `SECURITY.md`, template issue e note curate di `v0.1.0`) | Prima preview pubblica |
 | Distribuzione pubblicabile e multiprovider della skill | Successivo |
 | Schema della configurazione pubblicato tramite SchemaStore | Successivo |
 | Head Recipe condivisibili e materializzabili | Successivo |
@@ -1371,12 +1371,11 @@ Per l’MVP, file JSON e scritture atomiche sono sufficienti. SQLite e dipendenz
 
 Dashboard, runtime e agenti rimangono parte della visione, ma vengono costruiti sopra un motore delle Head già affidabile.
 
-La prima release non è bloccata dalla formalizzazione dei materiali per una
-community pubblica. Dopo la pubblicazione di `v0.1.0`, il repository deve
-aggiungere `CONTRIBUTING.md`, `SECURITY.md`, template GitHub distinti per bug e
-feedback della preview e consolidare le note iniziali della release. Questi
-artefatti trasformano l'esperienza raccolta dalla prima distribuzione in
-procedure stabili per contributor e tester successivi.
+La prima release non era bloccata dalla formalizzazione dei materiali per una
+community pubblica. Con la preview `v0.1.0`, `CONTRIBUTING.md`, `SECURITY.md`, i
+template GitHub distinti per bug e feedback e le note curate nel changelog
+trasformano l'esperienza della prima distribuzione in procedure stabili per
+contributor e tester successivi.
 
 ### Skill operativa per agenti AI
 

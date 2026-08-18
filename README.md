@@ -16,7 +16,7 @@ agents can work in parallel without sharing uncommitted files.
 
 ## Install
 
-The first Homebrew preview will be installed from the dedicated tap:
+Install the current Homebrew preview from the dedicated tap:
 
 ```bash
 brew install leonardoLoddo/tap/hydra-heads
@@ -25,8 +25,8 @@ brew install leonardoLoddo/tap/hydra-heads
 The Formula is named `hydra-heads` because Homebrew already distributes an
 unrelated package named `hydra`. The installed executable is still `hydra`.
 
-Until the first GitHub release is published, build from source with the pinned
-Rust toolchain:
+To work from the repository instead, build from source with the pinned Rust
+toolchain:
 
 ```bash
 git clone https://github.com/leonardoLoddo/hydra.git
@@ -125,10 +125,11 @@ Release automation builds native archives for:
 - Linux ARM64 (`aarch64-unknown-linux-gnu`);
 - Linux x86-64 (`x86_64-unknown-linux-gnu`).
 
-Homebrew installation is prepared for both macOS architectures. Linux users
-can download the native archives from GitHub Releases. WSL is expected to use
-the Linux build, but is not yet claimed as verified until the complete workflow
-is exercised on WSL. Native Windows is not part of this preview.
+Homebrew installation is verified by release automation on both macOS
+architectures. Linux users can download the native archives from GitHub
+Releases. WSL is expected to use the Linux build, but is not yet claimed as
+verified until the complete workflow is exercised on WSL. Native Windows is
+not part of this preview.
 
 The preview build baseline is macOS 11 or newer and Linux distributions with
 glibc 2.35 or newer (including Ubuntu 22.04 or newer).
@@ -148,6 +149,12 @@ cargo test --workspace
 See [AGENTS.md](AGENTS.md) and the
 [documentation router](Docs/hydra-context-router.md) for the project contracts,
 TDD workflow, and safety invariants.
+
+Bug reports and preview feedback are welcome through the repository's
+[issue templates](https://github.com/leonardoLoddo/hydra/issues/new/choose).
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing a change and report
+security-sensitive defects through the private process in
+[SECURITY.md](SECURITY.md).
 
 ## License
 

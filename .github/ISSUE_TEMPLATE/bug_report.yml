@@ -1,0 +1,70 @@
+name: Bug report
+description: Report reproducible incorrect or unsafe Hydra behavior
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing Hydra. Do not publish credentials, private source code, or security-sensitive details here. Use SECURITY.md for vulnerabilities.
+  - type: input
+    id: version
+    attributes:
+      label: Hydra version
+      description: Paste the output of `hydra --version`.
+      placeholder: hydra 0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installation method
+      options:
+        - Homebrew
+        - GitHub release archive
+        - Cargo from source
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, architecture, filesystem, and Git version when relevant.
+      placeholder: macOS 15 arm64, APFS, Git 2.x
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Use a disposable repository if the steps modify Git or filesystem state.
+      placeholder: List the commands and starting state in order.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior and state
+      description: Include sanitized output and the final branch, worktree, or file state.
+    validations:
+      required: true
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Add sanitized logs or screenshots only when they materially help.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety checks
+      options:
+        - label: I removed credentials, private source code, and unnecessary personal paths.
+          required: true
+        - label: This report does not contain a privately disclosed security vulnerability.
+          required: true

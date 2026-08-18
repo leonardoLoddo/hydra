@@ -4,10 +4,12 @@ Questa guida descrive come usare Hydra e come personalizzarne il comportamento.
 È mantenuta insieme al codice: comandi e opzioni presentati come disponibili
 devono esistere nel binario corrente.
 
-Hydra è ancora in sviluppo e la prima release pubblica non è stata ancora
-completata. Le sezioni
-marcate **Pianificato — non ancora disponibile** descrivono il flusso previsto,
-ma non costituiscono istruzioni eseguibili.
+Hydra è ancora una preview iniziale, ma la release pubblica `v0.1.0` è
+disponibile tramite Homebrew e
+[GitHub Releases](https://github.com/leonardoLoddo/hydra/releases/tag/v0.1.0).
+Le sezioni marcate
+**Pianificato — non ancora disponibile** descrivono evoluzioni future e non
+costituiscono istruzioni eseguibili.
 
 ---
 
@@ -105,13 +107,44 @@ configurazione.
 
 ---
 
-## 3. Installazione durante lo sviluppo
+## 3. Installazione e aggiornamento
 
-Finché Hydra non dispone di un pacchetto distribuito, puoi installare il
-binario dalla root del repository sorgente:
+Su macOS installa la preview dal tap Homebrew dedicato:
 
 ```bash
-cargo install --path crates/hydra-cli --force
+brew install leonardoLoddo/tap/hydra-heads
+```
+
+La Formula si chiama `hydra-heads` per non entrare in conflitto con un altro
+pacchetto Homebrew chiamato `hydra`, ma il comando installato rimane `hydra`.
+Al termine Homebrew mostra l'artwork Hydra, `hydra --help` come punto di
+ingresso e il comando opzionale `hydra skill install codex`. La skill non viene
+mai installata automaticamente.
+
+Per aggiornare binario e skill gestita separatamente:
+
+```bash
+brew update
+brew upgrade leonardoLoddo/tap/hydra-heads
+hydra skill status codex
+hydra skill update codex
+```
+
+Per rimuovere il binario e, soltanto se lo desideri, la skill:
+
+```bash
+hydra skill remove codex
+brew uninstall leonardoLoddo/tap/hydra-heads
+```
+
+La disinstallazione Homebrew non rimuove una skill posseduta o modificata
+dall'utente.
+
+In alternativa, durante lo sviluppo puoi installare il binario dalla root del
+repository sorgente con il toolchain Rust fissato dal progetto:
+
+```bash
+cargo install --path crates/hydra-cli --locked --force
 ```
 
 Verifica quale binario viene eseguito:
@@ -121,8 +154,9 @@ hydra --version
 command -v hydra
 ```
 
-La guida non definisce ancora un processo di aggiornamento o distribuzione
-stabile.
+Homebrew e Cargo possono installare due binari distinti senza cancellarsi a
+vicenda. Se sono presenti entrambi, l'ordine del `PATH` determina quale viene
+eseguito; `which -a hydra` mostra tutte le copie raggiungibili.
 
 ### 3.1 Installa la skill per agenti AI
 
@@ -1394,18 +1428,8 @@ risolva interamente dentro la root.
 
 Le evoluzioni pianificate comprendono:
 
-- prime release di anteprima dal repository pubblico
-  `leonardoLoddo/hydra`, destinate a un gruppo ristretto di colleghi;
-- distribuzione tramite la Formula `hydra-heads` di un tap Homebrew dedicato,
-  con aggiornamenti derivati da release GitHub immutabili e non da branch in
-  movimento;
-- distribuzione della skill come artefatto Agent Skills portabile, facilmente
-  scaricabile, installabile, aggiornabile e pubblicabile sui provider
-  compatibili, con adapter specifici senza copie divergenti delle istruzioni;
-- artwork Hydra completo mantenuto in `hydra-art.txt`, incluso il wordmark
-  `HYDRA`, mostrato nei caveat alla fine dell'installazione Homebrew; subito
-  sotto appariranno prima `hydra --help` come punto di ingresso generale e poi
-  il comando opzionale `hydra skill install codex`;
+- distribuzione multiprovider della skill Agent Skills oltre all'adapter Codex
+  attualmente disponibile, senza copie divergenti delle istruzioni;
 - pubblicazione dello schema ufficiale della configurazione tramite
   SchemaStore, seguita dalla reintroduzione sicura degli aiuti per editor;
 - installazione automatica del completamento tramite futuri pacchetti o

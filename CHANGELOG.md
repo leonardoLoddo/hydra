@@ -7,6 +7,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## 0.1.0 (2026-08-17)
 
+Hydra's first public preview introduces isolated Git-native Heads for parallel
+human and AI work. It includes protected Head creation, inspection, opening,
+integration, removal and repair; copy-on-write materialization with a safe
+full-copy fallback; shell completions; and an optional managed Codex skill.
+
+Install the macOS preview with:
+
+```bash
+brew install leonardoLoddo/tap/hydra-heads
+```
+
+Native release archives are also available for macOS and glibc-based Linux on
+ARM64 and x86-64. WSL and native Windows are not verified preview platforms,
+and the real Homebrew upgrade path requires a second released version before
+it can be exercised end to end.
+
 
 ### ⚠ BREAKING CHANGES
 
