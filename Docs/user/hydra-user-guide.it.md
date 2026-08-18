@@ -109,7 +109,7 @@ configurazione.
 
 ## 3. Installazione e aggiornamento
 
-Su macOS installa la preview dal tap Homebrew dedicato:
+Su macOS, Linux nativo o WSL 2 installa la preview dal tap Homebrew dedicato:
 
 ```bash
 brew install leonardoLoddo/tap/hydra-heads
@@ -120,6 +120,12 @@ pacchetto Homebrew chiamato `hydra`, ma il comando installato rimane `hydra`.
 Al termine Homebrew mostra l'artwork Hydra, `hydra --help` come punto di
 ingresso e il comando opzionale `hydra skill install codex`. La skill non viene
 mai installata automaticamente.
+
+Su WSL verifica da PowerShell che la distribuzione usi WSL 2 con `wsl -l -v` e
+configura Homebrew nel prefisso Linux predefinito prima dell'installazione.
+WSL 1 e Windows nativo non sono supportati. La Formula `v0.1.0` già pubblicata
+precede il supporto degli URL Linux: l'installazione Homebrew su Linux e WSL 2
+richiede la patch successiva che aggiornerà il tap.
 
 Per aggiornare binario e skill gestita separatamente:
 

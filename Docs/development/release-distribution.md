@@ -14,6 +14,10 @@ release workflow exist.
 Public preview `v0.1.0` is available from GitHub Releases and the
 `leonardoLoddo/homebrew-tap` tap. Its release workflow passed all four native
 builders and clean Homebrew smoke tests on both supported macOS architectures.
+The published `v0.1.0` Formula predates Linux URL metadata and cannot be loaded
+by Homebrew on Linux. Current release tooling corrects that defect; Linux and
+WSL 2 installation becomes public only after the next patch release regenerates
+and publishes the Formula.
 The intended audience remains a small group of colleagues who can exercise
 preview releases and report platform, installation, upgrade, and workflow
 defects before broader promotion.
@@ -206,9 +210,11 @@ stable-release default.
 The release matrix builds native archives for macOS Apple Silicon, macOS Intel,
 Linux ARM64, and Linux x86-64. The preview baseline is macOS 11 or newer and
 glibc 2.35 or newer, built on native macOS 15 and Ubuntu 22.04 runners.
-Homebrew targets and smoke-tests the two macOS architectures; Linux users
-consume release archives directly during the preview. WSL and native Windows
-are not claimed as verified platforms.
+Generated Homebrew metadata selects the matching immutable archive on all four
+targets. Before updating the tap, release automation performs Formula audit,
+installation, caveat verification, skill lifecycle, and uninstall on both
+architectures of macOS and Linux. WSL 2 consumes the Linux Formula but still
+requires direct preview evidence; WSL 1 and native Windows are not supported.
 
 ## Publication Transaction
 
@@ -253,6 +259,8 @@ verify at least:
 
 - installation on a clean supported macOS machine without a preinstalled Rust
   toolchain;
+- installation on clean supported native Linux runners without a preinstalled
+  Rust toolchain;
 - `hydra --version` reports the tagged version;
 - Git dependency discovery and a disposable `hydra init` workflow succeed;
 - accepting the Codex prompt installs the exact packaged skill;
@@ -276,5 +284,6 @@ supported merely because a binary can start there.
 The following external evidence is still required before broader promotion:
 
 - verify a clean colleague installation without Rust;
-- exercise WSL before describing it as supported;
+- exercise the complete Homebrew workflow directly on WSL 2 before promoting
+  it beyond preview support;
 - verify the real Homebrew upgrade path when a second preview version exists.

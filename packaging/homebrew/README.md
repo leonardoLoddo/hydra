@@ -6,6 +6,9 @@ for isolated development Heads.
 
 ## Install
 
+The generated Formula supports macOS, native Linux, and WSL 2 on ARM64 and
+x86-64. WSL 1 and native Windows are not supported.
+
 ```bash
 brew install leonardoLoddo/tap/hydra-heads
 ```

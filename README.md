@@ -16,7 +16,8 @@ agents can work in parallel without sharing uncommitted files.
 
 ## Install
 
-Install the current Homebrew preview from the dedicated tap:
+Install the Homebrew preview from the dedicated tap on macOS, native Linux, or
+WSL 2:
 
 ```bash
 brew install leonardoLoddo/tap/hydra-heads
@@ -125,11 +126,14 @@ Release automation builds native archives for:
 - Linux ARM64 (`aarch64-unknown-linux-gnu`);
 - Linux x86-64 (`x86_64-unknown-linux-gnu`).
 
-Homebrew installation is verified by release automation on both macOS
-architectures. Linux users can download the native archives from GitHub
-Releases. WSL is expected to use the Linux build, but is not yet claimed as
-verified until the complete workflow is exercised on WSL. Native Windows is
-not part of this preview.
+Release automation is configured to verify Homebrew installation on both
+macOS and Linux architectures before updating the tap. WSL 2 uses the Linux
+Formula and remains preview evidence to exercise directly with a colleague;
+WSL 1 and native Windows are not supported.
+
+The published `v0.1.0` Formula predates Linux URL metadata. Homebrew support on
+Linux and WSL 2 therefore becomes available when the next patch release
+regenerates the tap Formula.
 
 The preview build baseline is macOS 11 or newer and Linux distributions with
 glibc 2.35 or newer (including Ubuntu 22.04 or newer).

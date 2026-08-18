@@ -1431,7 +1431,9 @@ interattivo non implicano consenso.
 La prima distribuzione di anteprima è destinata a un gruppo ristretto di
 colleghi tramite release versionate del repository pubblico
 `leonardoLoddo/hydra` e una Formula Homebrew distinta chiamata
-`hydra-heads`. Homebrew rimane non interattivo: installa gli artefatti
+`hydra-heads`. La Formula seleziona gli archivi nativi su macOS e Linux per
+ARM64 e x86-64; WSL 2 usa la variante Linux, mentre WSL 1 e Windows nativo non
+sono supportati. Homebrew rimane non interattivo: installa gli artefatti
 versionati e al termine mostra nei caveat l'intero `hydra-art.txt`, incluso il
 wordmark `HYDRA`. Subito sotto l'artwork mostra prima `hydra --help` come punto
 di ingresso generale e poi il comando opzionale `hydra skill install codex`,

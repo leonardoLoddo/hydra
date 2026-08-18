@@ -54,6 +54,26 @@ repository_bound_steps.each do |step_name|
 end
 
 homebrew_steps = workflow.fetch("jobs").fetch("homebrew-smoke").fetch("steps")
+homebrew_matrix = workflow.fetch("jobs").fetch("homebrew-smoke").fetch("strategy").fetch("matrix").fetch("include")
+expected_homebrew_matrix = [
+  { "runner" => "macos-15", "platform" => "macos", "architecture" => "arm64" },
+  { "runner" => "macos-15-intel", "platform" => "macos", "architecture" => "x86_64" },
+  { "runner" => "ubuntu-22.04", "platform" => "linux", "architecture" => "x86_64" },
+  { "runner" => "ubuntu-22.04-arm", "platform" => "linux", "architecture" => "arm64" },
+]
+unless homebrew_matrix == expected_homebrew_matrix
+  abort "error: Homebrew smoke-test matrix must cover macOS and Linux on both release architectures"
+end
+
+setup_homebrew = homebrew_steps.find { |candidate| candidate["name"] == "Set up Homebrew on Linux" }
+abort "error: missing Linux Homebrew setup step" unless setup_homebrew
+unless setup_homebrew["if"] == "runner.os == 'Linux'"
+  abort "error: Homebrew setup must run only on Linux"
+end
+unless setup_homebrew["uses"] == "Homebrew/actions/setup-homebrew@8f3d1ec8a696b3b9d9a6c3696b6c73033cab69e4"
+  abort "error: Homebrew setup action must be pinned to the reviewed commit"
+end
+
 smoke_step = homebrew_steps.find do |candidate|
   candidate["name"] == "Audit and smoke-test the Formula from a temporary tap"
 end
@@ -103,6 +123,12 @@ tar -xOf "$archive" ./README.md | grep -F -x '# Hydra release archive' >/dev/nul
 cp \
   "$archive.sha256" \
   "$assets/hydra-$version-x86_64-apple-darwin.tar.gz.sha256"
+cp \
+  "$archive.sha256" \
+  "$assets/hydra-$version-aarch64-unknown-linux-gnu.tar.gz.sha256"
+cp \
+  "$archive.sha256" \
+  "$assets/hydra-$version-x86_64-unknown-linux-gnu.tar.gz.sha256"
 formula="$test_root/Formula/hydra-heads.rb"
 scripts/render-homebrew-formula.sh "$version" "$assets" "$formula"
 if grep -Eq '^[[:space:]]+version "' "$formula"; then
@@ -111,6 +137,8 @@ if grep -Eq '^[[:space:]]+version "' "$formula"; then
 fi
 grep -F "/releases/download/v$version/hydra-$version-aarch64-apple-darwin.tar.gz" "$formula" >/dev/null
 grep -F "/releases/download/v$version/hydra-$version-x86_64-apple-darwin.tar.gz" "$formula" >/dev/null
+grep -F "/releases/download/v$version/hydra-$version-aarch64-unknown-linux-gnu.tar.gz" "$formula" >/dev/null
+grep -F "/releases/download/v$version/hydra-$version-x86_64-unknown-linux-gnu.tar.gz" "$formula" >/dev/null
 ruby -c "$formula"
 brew style "$formula"
 

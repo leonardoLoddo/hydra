@@ -159,7 +159,7 @@ jobs:
           if-no-files-found: error
 
   homebrew-smoke:
-    name: Homebrew smoke test (${{ matrix.architecture }})
+    name: Homebrew smoke test (${{ matrix.platform }}-${{ matrix.architecture }})
     needs:
       - publish
       - formula
@@ -168,15 +168,26 @@ jobs:
       matrix:
         include:
           - runner: macos-15
+            platform: macos
             architecture: arm64
           - runner: macos-15-intel
+            platform: macos
             architecture: x86_64
+          - runner: ubuntu-22.04
+            platform: linux
+            architecture: x86_64
+          - runner: ubuntu-22.04-arm
+            platform: linux
+            architecture: arm64
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Check out release source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
+      - name: Set up Homebrew on Linux
+        if: runner.os == 'Linux'
+        uses: Homebrew/actions/setup-homebrew@8f3d1ec8a696b3b9d9a6c3696b6c73033cab69e4
       - name: Download Formula
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:

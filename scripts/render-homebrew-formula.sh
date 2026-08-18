@@ -34,6 +34,8 @@ checksum() {
 
 macos_arm=$(checksum aarch64-apple-darwin)
 macos_intel=$(checksum x86_64-apple-darwin)
+linux_arm=$(checksum aarch64-unknown-linux-gnu)
+linux_intel=$(checksum x86_64-unknown-linux-gnu)
 mkdir -p "$(dirname "$output_formula")"
 
 cat > "$output_formula" <<FORMULA
@@ -56,6 +58,17 @@ class HydraHeads < Formula
     on_intel do
       url "https://github.com/leonardoLoddo/hydra/releases/download/v$version/hydra-$version-x86_64-apple-darwin.tar.gz"
       sha256 "$macos_intel"
+    end
+  end
+
+  on_linux do
+    on_arm do
+      url "https://github.com/leonardoLoddo/hydra/releases/download/v$version/hydra-$version-aarch64-unknown-linux-gnu.tar.gz"
+      sha256 "$linux_arm"
+    end
+    on_intel do
+      url "https://github.com/leonardoLoddo/hydra/releases/download/v$version/hydra-$version-x86_64-unknown-linux-gnu.tar.gz"
+      sha256 "$linux_intel"
     end
   end
 
