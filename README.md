@@ -70,6 +70,10 @@ Hydra ships an optional Agent Skill that teaches Codex the safe Head workflow.
 Homebrew never installs it silently. Install it explicitly and confirm the
 default-negative prompt:
 
+<p align="center">
+  <img src="assets/hydra-codex-skill.png" alt="Codex prompt using the Hydra skill to create an isolated workflow for a payment feature">
+</p>
+
 ```bash
 hydra skill install codex
 ```
