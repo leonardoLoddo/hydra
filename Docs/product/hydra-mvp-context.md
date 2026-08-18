@@ -457,9 +457,8 @@ progetto.
 
 Hydra implementa soltanto la versione 2 della configurazione strutturata. La
 versione 1 sperimentale non è compatibile e viene rifiutata esplicitamente:
-poiché Hydra non è ancora stata distribuita, mantenere un parser o una
-migrazione per quel formato aggiungerebbe complessità senza proteggere utenti
-reali.
+poiché Hydra non è mai stata distribuita con quel formato, mantenere un parser
+o una migrazione aggiungerebbe complessità senza proteggere utenti reali.
 
 La configurazione rimane JSON standard, non accetta commenti e rifiuta tutti i
 campi sconosciuti. Hydra non pubblica ancora uno schema per editor e non
@@ -1097,7 +1096,8 @@ di schema, senza PID o identità di agenti. Dopo un crash, `repair` può rimuove
 quel marker soltanto se ne riconosce la versione e riesce a riacquisire il
 guard; i lock attivi vengono preservati, mentre formati malformati o versioni
 diverse da quella corrente falliscono la validazione senza mutazioni. Non
-vengono migrati formati precedenti perché Hydra non è ancora stata rilasciata.
+vengono migrati i precedenti formati sperimentali perché non sono mai stati
+distribuiti.
 
 L'inventario fisico vive in `<heads-directory>/.hydra/heads.json`:
 
@@ -1350,7 +1350,7 @@ Per l’MVP, file JSON e scritture atomiche sono sufficienti. SQLite e dipendenz
 | Chiusura con merge o comando configurabile | MVP |
 | Completamento shell statico e dinamico delle Head | MVP |
 | Repair e riconciliazione | MVP |
-| Guida utente italiana mantenuta | MVP |
+| Documentazione utente inglese granulare e guida italiana mantenute | MVP |
 | Skill operativa installabile per agenti AI | MVP |
 | Materiali per contributor e tester pubblici (`CONTRIBUTING.md`, `SECURITY.md`, template issue e note curate di `v0.1.0`) | Prima preview pubblica |
 | Distribuzione pubblicabile e multiprovider della skill | Successivo |
@@ -1400,10 +1400,11 @@ La skill deve guidare almeno questi comportamenti:
 - fermarsi e riportare lo stato quando ownership, policy, working tree o
   integrazione non consentono un’azione sicura.
 
-La guida utente italiana rimane la sorgente operativa leggibile dalle persone.
-La skill deve derivarne comandi, vincoli e procedure senza creare una seconda
-specifica divergente. Ogni modifica a un workflow rilevante aggiorna nello
-stesso intervento codice, help, test, guida e skill.
+La documentazione inglese granulare e la guida italiana rimangono le sorgenti
+operative leggibili dalle persone. La skill deve derivarne comandi, vincoli e
+procedure senza creare una specifica divergente. Ogni modifica a un workflow
+rilevante aggiorna nello stesso intervento codice, help, test, documentazione
+utente in entrambe le lingue e skill.
 
 La prima skill è distribuita in `skills/hydra/` nel formato installabile da
 Codex. Le istruzioni operative restano indipendenti dal vendor, così da poter
@@ -1520,12 +1521,12 @@ Hydra v0.1 è conclusa quando:
     protetta;
 28. supera test di integrazione eseguiti su repository temporanei reali,
     includendo sia il backend CoW sia il fallback di copia;
-29. mantiene una guida utente italiana che distingue comportamento disponibile
-    e pianificato e documenta flusso base, configurazione, customizzazioni,
-    sicurezza e troubleshooting;
+29. mantiene documentazione utente inglese granulare e una guida italiana
+    allineata, dedicate al comportamento disponibile e complete di flusso base,
+    configurazione, customizzazioni, sicurezza e troubleshooting;
 30. distribuisce almeno una skill installabile per agenti AI, allineata alla
-    guida utente e verificata su un repository temporaneo, che usa Hydra senza
-    aggirarne le protezioni.
+    documentazione utente e verificata su un repository temporaneo, che usa
+    Hydra senza aggirarne le protezioni.
 
 ## 16. Ipotesi da validare
 

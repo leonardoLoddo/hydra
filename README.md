@@ -61,8 +61,27 @@ hydra head close payment
 ```
 
 Use `hydra --help` and `hydra <command> --help` for the complete installed
-syntax. The maintained [Italian user guide](Docs/user/hydra-user-guide.it.md)
-contains the detailed workflows and safety constraints.
+syntax.
+
+## Documentation
+
+The complete [English user guide](Docs/user/hydra-user-guide.md) explains the
+concepts, installation, Head lifecycle, configuration, storage and overlays,
+Codex skill, recovery, troubleshooting, and current CLI.
+
+Focused pages:
+
+- [Installation and updates](Docs/user/installation.md)
+- [Core concepts](Docs/user/concepts.md)
+- [Head workflows](Docs/user/head-workflows.md)
+- [Configuration](Docs/user/configuration.md)
+- [Storage and overlays](Docs/user/storage-and-overlays.md)
+- [Codex skill](Docs/user/codex-skill.md)
+- [Recovery and troubleshooting](Docs/user/recovery-and-troubleshooting.md)
+- [CLI reference](Docs/user/cli-reference.md)
+
+The complete [Italian user guide](Docs/user/hydra-user-guide.it.md) is
+maintained alongside the English documentation.
 
 ## Optional Codex skill
 
@@ -135,9 +154,9 @@ macOS and Linux architectures before updating the tap. WSL 2 uses the Linux
 Formula and remains preview evidence to exercise directly with a colleague;
 WSL 1 and native Windows are not supported.
 
-The published `v0.1.0` Formula predates Linux URL metadata. Homebrew support on
-Linux and WSL 2 therefore becomes available when the next patch release
-regenerates the tap Formula.
+The current `v0.1.1` Formula includes native archive metadata for Linux. WSL 2
+uses that Linux Formula, while direct end-to-end WSL evidence remains part of
+the preview validation.
 
 The preview build baseline is macOS 11 or newer and Linux distributions with
 glibc 2.35 or newer (including Ubuntu 22.04 or newer).

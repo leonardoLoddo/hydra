@@ -39,7 +39,8 @@ hydra skill remove codex
 ```
 
 Full installation instructions, platform status, workflows, and safety
-guidance are maintained at <https://github.com/leonardoLoddo/hydra>.
+guidance are maintained in the
+[English user guide](https://github.com/leonardoLoddo/hydra/blob/main/Docs/user/hydra-user-guide.md).
 
 ## License
 

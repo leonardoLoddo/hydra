@@ -11,13 +11,11 @@ release workflow exist.
 
 ## Current Status
 
-Public preview `v0.1.0` is available from GitHub Releases and the
-`leonardoLoddo/homebrew-tap` tap. Its release workflow passed all four native
-builders and clean Homebrew smoke tests on both supported macOS architectures.
-The published `v0.1.0` Formula predates Linux URL metadata and cannot be loaded
-by Homebrew on Linux. Current release tooling corrects that defect; Linux and
-WSL 2 installation becomes public only after the next patch release regenerates
-and publishes the Formula.
+Public preview `v0.1.1` is available from GitHub Releases and the
+`leonardoLoddo/homebrew-tap` tap. The current Formula contains immutable native
+archive URLs for both macOS and Linux on ARM64 and x86-64. WSL 2 consumes the
+Linux Formula, while direct end-to-end WSL evidence remains part of preview
+validation.
 The intended audience remains a small group of colleagues who can exercise
 preview releases and report platform, installation, upgrade, and workflow
 defects before broader promotion.
@@ -275,8 +273,8 @@ verify at least:
   content;
 - the complete packaged artwork appears at the end of Homebrew installation,
   before both command suggestions, without corrupting logs;
-- install, update, and removal instructions in the README and Italian user
-  guide match the released artifacts.
+- install, update, and removal instructions in the README and maintained
+  English and Italian user documentation match the released artifacts.
 
 Preview limitations must be stated in the GitHub Release and README. WSL or a
 platform not directly exercised by the release matrix is not described as
@@ -289,4 +287,5 @@ The following external evidence is still required before broader promotion:
 - verify a clean colleague installation without Rust;
 - exercise the complete Homebrew workflow directly on WSL 2 before promoting
   it beyond preview support;
-- verify the real Homebrew upgrade path when a second preview version exists.
+- verify the real Homebrew upgrade path from `v0.1.0` to `v0.1.1` on a clean
+  preview machine.

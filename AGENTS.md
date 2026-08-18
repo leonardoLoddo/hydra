@@ -432,14 +432,18 @@ Update the owning leaf document, its router, and every affected ancestor router 
 
 For every user-visible CLI, configuration, workflow, validation, output, or
 recovery change, agents MUST also follow the User documentation route selected
-by the macro-router and update the maintained Italian user documentation in the
-same task.
+by the macro-router and update both the granular English documentation rooted
+at [`Docs/user/hydra-user-guide.md`](Docs/user/hydra-user-guide.md) and the
+maintained Italian guide in the same task.
 
 User documentation MUST:
 
 - describe implemented behavior as available only when code, help, and tests
   support it;
-- label future behavior explicitly as planned or unavailable;
+- keep the English index and affected focused pages complete, navigable, and
+  aligned with the Italian guide;
+- exclude roadmap items, speculative syntax, planned commands, and future
+  capabilities; keep those in routed product documentation instead;
 - keep command examples copyable and aligned with the current CLI;
 - explain advanced customization together with its safety constraints and
   current operational limitations;
@@ -452,7 +456,7 @@ command, option, default, output, configuration field, installation step,
 safety rule, troubleshooting action, or recovery procedure that an agent can
 use MUST update the skill in the same task. A task is incomplete when the
 skill, CLI help, implemented behavior, canonical product documentation, and
-Italian user guide disagree.
+English or Italian user documentation disagree.
 
 The skill is an operational projection of Hydra's canonical product and user
 documentation, not an independent source of product behavior. Follow the
@@ -496,7 +500,7 @@ A task is not complete when any applicable item is missing:
 - [ ] Focused tests and complete Cargo quality gates passed
 - [ ] Destructive behavior tested only in disposable environments
 - [ ] Documentation impact assessed
-- [ ] Italian user documentation updated for user-visible changes
+- [ ] English and Italian user documentation updated for user-visible changes
 - [ ] Hydra AI-agent skill impact assessed and the skill updated when required
 - [ ] Routers updated for documentation topology changes
 - [ ] Commit convention followed when a commit was created or proposed

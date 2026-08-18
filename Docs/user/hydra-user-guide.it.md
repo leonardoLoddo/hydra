@@ -4,12 +4,12 @@ Questa guida descrive come usare Hydra e come personalizzarne il comportamento.
 È mantenuta insieme al codice: comandi e opzioni presentati come disponibili
 devono esistere nel binario corrente.
 
-Hydra è ancora una preview iniziale, ma la release pubblica `v0.1.0` è
+Hydra è ancora una preview iniziale, ma la release pubblica `v0.1.1` è
 disponibile tramite Homebrew e
-[GitHub Releases](https://github.com/leonardoLoddo/hydra/releases/tag/v0.1.0).
-Le sezioni marcate
-**Pianificato — non ancora disponibile** descrivono evoluzioni future e non
-costituiscono istruzioni eseguibili.
+[GitHub Releases](https://github.com/leonardoLoddo/hydra/releases/tag/v0.1.1).
+
+La [documentazione utente inglese](hydra-user-guide.md) offre lo stesso
+perimetro in pagine tematiche navigabili.
 
 ---
 
@@ -123,9 +123,8 @@ mai installata automaticamente.
 
 Su WSL verifica da PowerShell che la distribuzione usi WSL 2 con `wsl -l -v` e
 configura Homebrew nel prefisso Linux predefinito prima dell'installazione.
-WSL 1 e Windows nativo non sono supportati. La Formula `v0.1.0` già pubblicata
-precede il supporto degli URL Linux: l'installazione Homebrew su Linux e WSL 2
-richiede la patch successiva che aggiornerà il tap.
+WSL 1 e Windows nativo non sono supportati. La Formula `v0.1.1` include gli URL
+nativi Linux e WSL 2 la usa con supporto di qualità preview.
 
 Per aggiornare binario e skill gestita separatamente:
 
@@ -817,9 +816,10 @@ certezza base, target, backend e intenzione originaria.
 
 `repair` non elimina lock attivi; un lock vuoto o malformato e una versione
 diversa da quella corrente falliscono invece la validazione senza essere
-modificati. Hydra non migra formati lock precedenti perché non è ancora stata
-rilasciata. Il comando non corregge ownership o locator e non reloca l'intera
-directory delle Head. Un inventario malformato viene rifiutato e conservato,
+modificati. Hydra non migra i precedenti formati lock sperimentali perché non
+sono mai stati distribuiti. Il comando non corregge ownership o locator e non
+reloca l'intera directory delle Head. Un inventario malformato viene rifiutato
+e conservato,
 non sostituito con i manifest.
 
 ### 4.10 Stato attuale del ciclo di vita
@@ -874,7 +874,7 @@ hydra head create experiment \
 ```
 
 Hydra non esegue il merge durante la creazione: `targetRef` registra la
-destinazione prevista per la futura chiusura.
+destinazione prevista per la successiva chiusura.
 
 ---
 
@@ -1278,10 +1278,9 @@ Versiona `.hydra.json`, ma non inserire percorsi assoluti o informazioni
 specifiche della macchina.
 
 Il file resta JSON standard, quindi non inserire commenti `//` o `/* ... */`.
-Hydra non pubblica ancora uno schema per editor: `$schema` non viene generato
-e viene rifiutato come qualunque altro campo sconosciuto. Validazione,
-completamento e descrizioni automatiche saranno ripristinati soltanto dopo la
-futura pubblicazione dello schema ufficiale tramite SchemaStore.
+Hydra non fornisce uno schema per editor: `$schema` non viene generato
+e viene rifiutato come qualunque altro campo sconosciuto. La validazione
+autorevole avviene durante la lettura della configurazione da parte di Hydra.
 
 Le esclusioni guidate per symlink non sicuri vengono aggiunte come regole
 negative `!/<percorso>` in fondo a `overlay.copy`. La posizione finale è
@@ -1346,8 +1345,8 @@ errore. Non cancellarlo per forzare il recupero: preservalo per la diagnosi.
 
 ### “configuration version 1 is not supported”
 
-Il formato v1 era sperimentale e non viene migrato. Poiché Hydra non è ancora
-distribuito, ricrea il progetto o fixture di sviluppo e inizializzalo con il
+Il formato v1 era sperimentale e non viene migrato perché non è mai stato
+distribuito. Ricrea il progetto o la fixture di sviluppo e inizializzalo con il
 binario corrente.
 
 ### “unknown field `$schema`”
@@ -1430,24 +1429,7 @@ risolva interamente dentro la root.
 
 ---
 
-## 13. Pianificato — non ancora disponibile
-
-Le evoluzioni pianificate comprendono:
-
-- distribuzione multiprovider della skill Agent Skills oltre all'adapter Codex
-  attualmente disponibile, senza copie divergenti delle istruzioni;
-- pubblicazione dello schema ufficiale della configurazione tramite
-  SchemaStore, seguita dalla reintroduzione sicura degli aiuti per editor;
-- installazione automatica del completamento tramite futuri pacchetti o
-  installer, senza modificare silenziosamente i file personali della shell;
-- output JSON per automazioni;
-
-La sintassi definitiva verrà aggiunta a questa guida soltanto insieme
-all’implementazione e all’help del binario.
-
----
-
-## 14. Regola di manutenzione
+## 13. Regola di manutenzione
 
 Questa guida deve cambiare nello stesso intervento che modifica:
 
@@ -1455,11 +1437,15 @@ Questa guida deve cambiare nello stesso intervento che modifica:
 - schema e validazione della configurazione;
 - flusso base o avanzato;
 - comportamento Git, filesystem, overlay o storage visibile all’utente;
-- messaggi di errore che richiedono un’azione diversa;
-- disponibilità di una funzionalità precedentemente pianificata.
+- messaggi di errore che richiedono un’azione diversa.
 
-Una funzionalità passa da **Pianificato** a **Disponibile** soltanto quando il
-codice, l’help e i test ne dimostrano il comportamento.
+Le pagine inglesi instradate da
+[`hydra-user-guide.md`](hydra-user-guide.md) devono cambiare nello stesso
+intervento e rimanere allineate a questa guida.
+
+Le guide utente documentano soltanto comportamento dimostrato da codice, help
+e test. Roadmap e funzionalità non implementate restano nella documentazione di
+prodotto.
 
 Per intenti di prodotto e dettagli tecnici:
 

@@ -69,8 +69,8 @@ have been verified on that host. Keep unavailable channels explicitly planned.
 Derive the skill from the normal Hydra source-of-truth order. In particular:
 
 1. routed product documentation defines scope and safety invariants;
-2. the maintained Italian user guide defines supported user workflows and
-   separates available behavior from planned behavior;
+2. the maintained granular English guide and Italian guide define supported
+   workflows available to users;
 3. current CLI help, code, and tests prove which syntax and behavior are
    implemented;
 4. the skill converts those contracts into agent actions and stop conditions.
@@ -144,8 +144,8 @@ For every skill change:
 3. run `git diff --check` and verify every changed documentation link;
 4. compare every documented command and option with the installed or newly
    built `hydra --help` hierarchy;
-5. confirm that the Italian user guide and product documentation express the
-   same available-versus-planned boundary.
+5. confirm that the English and Italian user documentation describe only
+   currently supported workflows and agree with product documentation.
 
 When operating workflow or safety guidance changes, also exercise the affected
 path in a newly created temporary Git repository. Verify both the intended
