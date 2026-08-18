@@ -11,11 +11,12 @@ release workflow exist.
 
 ## Current Status
 
-Release tooling and onboarding are implemented, but public distribution remains
-**not yet available** until the tap, scoped credentials, first tag, GitHub
-Release, and clean installation evidence exist. The first intended audience is
-a small group of colleagues who can exercise preview releases and report
-platform, installation, upgrade, and workflow defects before broader promotion.
+Public preview `v0.1.0` is available from GitHub Releases and the
+`leonardoLoddo/homebrew-tap` tap. Its release workflow passed all four native
+builders and clean Homebrew smoke tests on both supported macOS architectures.
+The intended audience remains a small group of colleagues who can exercise
+preview releases and report platform, installation, upgrade, and workflow
+defects before broader promotion.
 
 The source repository remains `leonardoLoddo/hydra`. The executable remains
 named `hydra`.
@@ -48,8 +49,8 @@ The source repository and the Homebrew tap have separate responsibilities:
 
 - `leonardoLoddo/hydra` owns source, documentation, release tags,
   checksums, and GitHub release artifacts;
-- a dedicated tap repository, preferably `leonardoLoddo/homebrew-tap`, owns
-  generated Formula metadata;
+- the dedicated `leonardoLoddo/homebrew-tap` repository owns generated Formula
+  metadata;
 - the Formula is named `hydra-heads` and installs the `hydra` executable,
   because `homebrew/core` already owns an unrelated `hydra` Formula.
 
@@ -269,16 +270,10 @@ Preview limitations must be stated in the GitHub Release and README. WSL or a
 platform not directly exercised by the release matrix is not described as
 supported merely because a binary can start there.
 
-## Release Readiness Gaps
+## Remaining Preview Evidence
 
-The following external evidence is still required before the first preview
-release:
+The following external evidence is still required before broader promotion:
 
-- create `leonardoLoddo/homebrew-tap` with a default branch and README;
-- configure `RELEASE_PLEASE_TOKEN` for the source repository and a
-  repository-scoped `HOMEBREW_TAP_TOKEN` that can update only the tap;
-- run the release matrix successfully on all four native builders and both
-  Homebrew smoke-test runners;
 - verify a clean colleague installation without Rust;
 - exercise WSL before describing it as supported;
 - verify the real Homebrew upgrade path when a second preview version exists.
