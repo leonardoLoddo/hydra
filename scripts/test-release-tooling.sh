@@ -61,6 +61,16 @@ abort "error: missing Homebrew smoke-test step" unless smoke_step
 unless smoke_step.fetch("run").include?('brew audit --strict "$tap_name/hydra-heads"')
   abort "error: Homebrew audit must use the tap-qualified Formula name"
 end
+
+["formula", "homebrew-smoke"].each do |job_name|
+  checkout = workflow.fetch("jobs").fetch(job_name).fetch("steps").find do |candidate|
+    candidate["name"] == "Check out release source"
+  end
+  abort "error: missing release tooling checkout: #{job_name}" unless checkout
+  unless checkout.fetch("with", {})["ref"] == "${{ github.sha }}"
+    abort "error: manual release recovery does not use the selected workflow revision: #{job_name}"
+  end
+end
 RUBY
 
 cargo build --locked -p hydra-cli
@@ -95,6 +105,12 @@ cp \
   "$assets/hydra-$version-x86_64-apple-darwin.tar.gz.sha256"
 formula="$test_root/Formula/hydra-heads.rb"
 scripts/render-homebrew-formula.sh "$version" "$assets" "$formula"
+if grep -Eq '^[[:space:]]+version "' "$formula"; then
+  echo "error: Homebrew Formula contains a redundant explicit version" >&2
+  exit 1
+fi
+grep -F "/releases/download/v$version/hydra-$version-aarch64-apple-darwin.tar.gz" "$formula" >/dev/null
+grep -F "/releases/download/v$version/hydra-$version-x86_64-apple-darwin.tar.gz" "$formula" >/dev/null
 ruby -c "$formula"
 brew style "$formula"
 

@@ -44,7 +44,6 @@ cat > "$output_formula" <<FORMULA
 class HydraHeads < Formula
   desc "Git-native workspace manager for isolated development Heads"
   homepage "https://github.com/leonardoLoddo/hydra"
-  version "$version"
   license any_of: ["MIT", "Apache-2.0"]
 
   depends_on "git"

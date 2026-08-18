@@ -238,6 +238,13 @@ Homebrew smoke tests register the generated Formula in a temporary tap and
 audit it by its tap-qualified name. They must not pass a Formula path to
 `brew audit`, because supported Homebrew versions require a Formula name.
 
+The Formula derives its version from the immutable release URLs and must not
+repeat it with an explicit `version` declaration. Release archives are always
+built from the requested tag. Formula generation and smoke testing use the
+selected workflow revision: on a tag-triggered run this is the tag commit,
+while a manual recovery run may use corrected tooling from the selected branch
+without moving the tag or changing the tagged release sources.
+
 ## Preview Acceptance
 
 Before inviting colleagues, a preview release must verify at least:
