@@ -5,6 +5,14 @@ All notable changes to Hydra will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1](https://github.com/leonardoLoddo/hydra/compare/v0.1.0...v0.1.1) (2026-08-18)
+
+
+### Bug Fixes
+
+* support Homebrew installation on Linux ([99cba3e](https://github.com/leonardoLoddo/hydra/commit/99cba3e58ec9cdf138b1a6ed84634c1b1f6e8308))
+* validate versions after the initial release ([cad292d](https://github.com/leonardoLoddo/hydra/commit/cad292dce1d510f79a58503419c749db47520b45))
+
 ## 0.1.0 (2026-08-17)
 
 Hydra's first public preview introduces isolated Git-native Heads for parallel
