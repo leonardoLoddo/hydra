@@ -203,9 +203,12 @@ plugin cannot parse inherited package versions. Targeted TOML updaters change
 release pull request. The checked-in `version.txt` is only the coordinator's
 required release marker; release-tooling validation requires it to equal the
 version reported for every workspace package by locked Cargo metadata. The
-configured initial release version must equal that marker so a repository with
-no prior tag starts at the intended preview version rather than the strategy's
-stable-release default.
+configured initial release version is a bootstrap floor: it must equal the
+marker before the first release so a repository with no prior tag starts at the
+intended preview version rather than the strategy's stable-release default.
+After that release it remains unchanged while `version.txt` advances, and
+release-tooling validation rejects only an invalid value or one newer than the
+current marker.
 
 The release matrix builds native archives for macOS Apple Silicon, macOS Intel,
 Linux ARM64, and Linux x86-64. The preview baseline is macOS 11 or newer and
