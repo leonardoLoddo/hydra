@@ -52,6 +52,15 @@ repository_bound_steps.each do |step_name|
     abort "error: release publication step does not identify the repository: #{step_name}"
   end
 end
+
+homebrew_steps = workflow.fetch("jobs").fetch("homebrew-smoke").fetch("steps")
+smoke_step = homebrew_steps.find do |candidate|
+  candidate["name"] == "Audit and smoke-test the Formula from a temporary tap"
+end
+abort "error: missing Homebrew smoke-test step" unless smoke_step
+unless smoke_step.fetch("run").include?('brew audit --strict "$tap_name/hydra-heads"')
+  abort "error: Homebrew audit must use the tap-qualified Formula name"
+end
 RUBY
 
 cargo build --locked -p hydra-cli

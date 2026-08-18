@@ -201,7 +201,7 @@ jobs:
           trap cleanup EXIT
 
           brew style "$formula"
-          brew audit --strict "$formula"
+          brew audit --strict "$tap_name/hydra-heads"
           brew install "$tap_name/hydra-heads" 2>&1 | tee homebrew-install.log
           scripts/verify-homebrew-caveats.sh homebrew-install.log hydra-art.txt
           brew test "$tap_name/hydra-heads"

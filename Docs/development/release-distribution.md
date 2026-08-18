@@ -234,6 +234,10 @@ identify `leonardoLoddo/hydra` explicitly when invoking GitHub CLI. Publication
 must not depend on discovering repository identity from the runner's current
 directory.
 
+Homebrew smoke tests register the generated Formula in a temporary tap and
+audit it by its tap-qualified name. They must not pass a Formula path to
+`brew audit`, because supported Homebrew versions require a Formula name.
+
 ## Preview Acceptance
 
 Before inviting colleagues, a preview release must verify at least:
