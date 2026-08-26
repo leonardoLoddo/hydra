@@ -95,6 +95,12 @@ Read [Head workflows](head-workflows.md) before closing divergent work or
 using forced removal. A conflict, dirty target, or active Git operation blocks
 native close without deleting the Head.
 
+On WSL 2, installing through Homebrew does not imply that the current volume
+supports reflinks. Run `hydra doctor storage`; the default ext4 root commonly
+uses full copy. For a supported XFS-backed setup, follow
+[WSL copy-on-write storage](storage-and-overlays.md#wsl-2-copy-on-write) before
+initializing a fresh clone.
+
 ## Safety model
 
 Keep these rules in mind:

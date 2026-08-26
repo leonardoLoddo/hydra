@@ -4,6 +4,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[cfg(target_os = "linux")]
+use std::{ffi::OsString, os::unix::ffi::OsStringExt};
+
 use uuid::Uuid;
 
 use crate::{
@@ -15,14 +18,31 @@ use crate::{
 pub enum NativeStoragePrimitive {
     ApfsClone,
     LinuxReflink,
+    WindowsBlockClone,
     NativeClone,
     Unavailable,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StorageEnvironment {
+    Native,
+    WindowsSubsystemForLinux,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum NativePlatform {
+    MacOs,
+    Linux,
+    Windows,
+    Other,
 }
 
 #[derive(Debug)]
 pub struct StorageDiagnostics {
     pub storage_backend: StorageBackend,
     pub native_primitive: NativeStoragePrimitive,
+    pub environment: StorageEnvironment,
+    pub filesystem: Option<String>,
     pub full_copy_fallback_verified: bool,
     pub mutable_hard_links_enabled: bool,
     pub isolation_supported: bool,
@@ -88,6 +108,8 @@ fn run_probes(destination: &Path) -> Result<StorageDiagnostics, InitError> {
     Ok(StorageDiagnostics {
         storage_backend,
         native_primitive: native_primitive(storage_backend),
+        environment: storage_environment(),
+        filesystem: filesystem_for_path(destination),
         full_copy_fallback_verified: true,
         mutable_hard_links_enabled: false,
         isolation_supported: true,
@@ -95,15 +117,118 @@ fn run_probes(destination: &Path) -> Result<StorageDiagnostics, InitError> {
 }
 
 fn native_primitive(backend: StorageBackend) -> NativeStoragePrimitive {
-    if backend == StorageBackend::FullCopy {
+    native_primitive_for(backend, current_platform())
+}
+
+const fn native_primitive_for(
+    backend: StorageBackend,
+    platform: NativePlatform,
+) -> NativeStoragePrimitive {
+    if matches!(backend, StorageBackend::FullCopy) {
         NativeStoragePrimitive::Unavailable
-    } else if cfg!(target_os = "macos") {
-        NativeStoragePrimitive::ApfsClone
-    } else if cfg!(target_os = "linux") {
-        NativeStoragePrimitive::LinuxReflink
     } else {
-        NativeStoragePrimitive::NativeClone
+        match platform {
+            NativePlatform::MacOs => NativeStoragePrimitive::ApfsClone,
+            NativePlatform::Linux => NativeStoragePrimitive::LinuxReflink,
+            NativePlatform::Windows => NativeStoragePrimitive::WindowsBlockClone,
+            NativePlatform::Other => NativeStoragePrimitive::NativeClone,
+        }
     }
+}
+
+const fn current_platform() -> NativePlatform {
+    if cfg!(target_os = "macos") {
+        NativePlatform::MacOs
+    } else if cfg!(target_os = "linux") {
+        NativePlatform::Linux
+    } else if cfg!(target_os = "windows") {
+        NativePlatform::Windows
+    } else {
+        NativePlatform::Other
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn storage_environment() -> StorageEnvironment {
+    fs::read_to_string("/proc/sys/kernel/osrelease").map_or(StorageEnvironment::Native, |release| {
+        storage_environment_from_release(&release)
+    })
+}
+
+#[cfg(not(target_os = "linux"))]
+const fn storage_environment() -> StorageEnvironment {
+    StorageEnvironment::Native
+}
+
+fn storage_environment_from_release(release: &str) -> StorageEnvironment {
+    let release = release.to_ascii_lowercase();
+    if release.contains("microsoft") || release.contains("wsl") {
+        StorageEnvironment::WindowsSubsystemForLinux
+    } else {
+        StorageEnvironment::Native
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn filesystem_for_path(path: &Path) -> Option<String> {
+    let mountinfo = fs::read_to_string("/proc/self/mountinfo").ok()?;
+    filesystem_for_path_from_mountinfo(path, &mountinfo)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn filesystem_for_path(_path: &Path) -> Option<String> {
+    None
+}
+
+#[cfg(target_os = "linux")]
+fn filesystem_for_path_from_mountinfo(path: &Path, mountinfo: &str) -> Option<String> {
+    let mut selected: Option<(usize, String)> = None;
+    for line in mountinfo.lines() {
+        let Some((mount, filesystem)) = mountinfo_entry(line) else {
+            continue;
+        };
+        if path.starts_with(&mount)
+            && selected
+                .as_ref()
+                .is_none_or(|(length, _)| mount.as_os_str().len() > *length)
+        {
+            selected = Some((mount.as_os_str().len(), filesystem));
+        }
+    }
+    selected.map(|(_, filesystem)| filesystem)
+}
+
+#[cfg(target_os = "linux")]
+fn mountinfo_entry(line: &str) -> Option<(PathBuf, String)> {
+    let (mount_fields, filesystem_fields) = line.split_once(" - ")?;
+    let mount = mount_fields.split_whitespace().nth(4)?;
+    let filesystem = filesystem_fields.split_whitespace().next()?.to_owned();
+    Some((decode_mountinfo_path(mount), filesystem))
+}
+
+#[cfg(target_os = "linux")]
+fn decode_mountinfo_path(value: &str) -> PathBuf {
+    let bytes = value.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'\\'
+            && index + 3 < bytes.len()
+            && bytes[index + 1..=index + 3]
+                .iter()
+                .all(|byte| matches!(byte, b'0'..=b'7'))
+        {
+            let value = (bytes[index + 1] - b'0') * 64
+                + (bytes[index + 2] - b'0') * 8
+                + (bytes[index + 3] - b'0');
+            decoded.push(value);
+            index += 4;
+        } else {
+            decoded.push(bytes[index]);
+            index += 1;
+        }
+    }
+    PathBuf::from(OsString::from_vec(decoded))
 }
 
 impl fmt::Display for DoctorError {
@@ -137,5 +262,82 @@ impl Error for DoctorError {
             Self::FileSystem { source, .. } => Some(source),
             Self::ProbeCleanupFailed { probe, .. } => Some(probe.as_ref()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::{
+        NativePlatform, NativeStoragePrimitive, StorageBackend, StorageEnvironment,
+        native_primitive_for, storage_environment_from_release,
+    };
+
+    #[cfg(target_os = "linux")]
+    use super::filesystem_for_path_from_mountinfo;
+
+    #[test]
+    fn wsl_kernel_releases_are_distinguished_from_native_linux() {
+        assert_eq!(
+            storage_environment_from_release("6.6.87.2-microsoft-standard-WSL2"),
+            StorageEnvironment::WindowsSubsystemForLinux
+        );
+        assert_eq!(
+            storage_environment_from_release("4.4.0-19041-Microsoft"),
+            StorageEnvironment::WindowsSubsystemForLinux
+        );
+        assert_eq!(
+            storage_environment_from_release("6.8.0-52-generic"),
+            StorageEnvironment::Native
+        );
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn filesystem_detection_uses_the_most_specific_mount_and_decodes_paths() {
+        let mountinfo = concat!(
+            "malformed entry that must be ignored\n",
+            "24 1 8:1 / / rw,relatime - ext4 /dev/sda rw\n",
+            "25 24 0:44 / /mnt/c rw,noatime - 9p C:\\ rw\n",
+            "26 24 0:45 / /mnt/c/Dev\\040Drive rw,noatime - virtiofs dev-drive rw\n",
+        );
+
+        assert_eq!(
+            filesystem_for_path_from_mountinfo(Path::new("/mnt/c/project"), mountinfo),
+            Some("9p".to_owned())
+        );
+        assert_eq!(
+            filesystem_for_path_from_mountinfo(Path::new("/mnt/c/Dev Drive/project"), mountinfo),
+            Some("virtiofs".to_owned())
+        );
+        assert_eq!(
+            filesystem_for_path_from_mountinfo(Path::new("/tmp/project"), mountinfo),
+            Some("ext4".to_owned())
+        );
+    }
+
+    #[test]
+    fn native_primitive_names_every_supported_platform_adapter() {
+        assert_eq!(
+            native_primitive_for(StorageBackend::CopyOnWrite, NativePlatform::MacOs),
+            NativeStoragePrimitive::ApfsClone
+        );
+        assert_eq!(
+            native_primitive_for(StorageBackend::CopyOnWrite, NativePlatform::Linux),
+            NativeStoragePrimitive::LinuxReflink
+        );
+        assert_eq!(
+            native_primitive_for(StorageBackend::CopyOnWrite, NativePlatform::Windows),
+            NativeStoragePrimitive::WindowsBlockClone
+        );
+        assert_eq!(
+            native_primitive_for(StorageBackend::CopyOnWrite, NativePlatform::Other),
+            NativeStoragePrimitive::NativeClone
+        );
+        assert_eq!(
+            native_primitive_for(StorageBackend::FullCopy, NativePlatform::Windows),
+            NativeStoragePrimitive::Unavailable
+        );
     }
 }

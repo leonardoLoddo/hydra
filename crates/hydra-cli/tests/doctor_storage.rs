@@ -44,9 +44,18 @@ fn doctor_storage_runs_a_real_probe_and_cleans_every_artifact() {
             || stdout.contains("Storage backend: full copy\n")
     );
     assert!(stdout.contains("Native primitive: "));
+    assert!(stdout.contains("Environment: "));
+    assert!(stdout.contains("Filesystem: "));
     assert!(stdout.contains("Fallback: full copy (verified)\n"));
     assert!(stdout.contains("Mutable hard links: disabled\n"));
     assert!(stdout.contains("Isolation: supported\n"));
+    if stdout.contains("Environment: Windows Subsystem for Linux\n")
+        && stdout.contains("Storage backend: full copy\n")
+    {
+        assert!(stdout.contains(
+            "Copy-on-write guidance: use a reflink-capable Linux filesystem for both the project and Heads directory (for example XFS when available)\n"
+        ));
+    }
     assert_eq!(directory_entries(&heads), entries_before);
     assert!(!head_state_lock_path(&repository).exists());
 }

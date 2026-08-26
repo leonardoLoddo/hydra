@@ -51,8 +51,17 @@ succeeded:
 
 - `APFS clone` on macOS;
 - `Linux reflink` on Linux;
+- `Windows block clone` when the Windows adapter succeeds on a compatible
+  ReFS or Dev Drive volume;
 - `native clone` on another supported target;
 - `unavailable` when the verified backend is full copy.
+
+On Linux, diagnostics also resolve the filesystem that owns the probe path
+from `/proc/self/mountinfo`, choosing the most specific enclosing mount and
+decoding kernel path escapes. Malformed unrelated entries do not suppress a
+valid match. The kernel release identifies Windows Subsystem for Linux without
+changing the capability decision: WSL still receives `copy-on-write` only when
+the real `FICLONE` probe succeeds.
 
 Hydra does not use mutable hard links as a storage fallback. Isolation is
 reported as supported only after either copy-on-write plus fallback
@@ -67,13 +76,20 @@ A successful report contains:
 ```text
 Storage backend: copy-on-write
 Native primitive: APFS clone
+Environment: native
+Filesystem: unknown
 Fallback: full copy (verified)
 Mutable hard links: disabled
 Isolation: supported
 ```
 
 `Storage backend: full copy` and `Native primitive: unavailable` are used when
-the native attempt fails safely.
+the native attempt fails safely. Linux reports its resolved filesystem;
+non-Linux platforms currently report `unknown`. A full-copy result under WSL
+adds guidance to place both the project and its sibling Heads directory on a
+reflink-capable Linux filesystem, for example XFS when the running WSL kernel
+provides it. The guidance is informational and never substitutes an unverified
+backend.
 
 ---
 
@@ -95,6 +111,11 @@ content.
 CLI integration tests on the actual test volume prove:
 
 - all required diagnostic lines are emitted after a successful real probe;
+- WSL kernel releases and native Linux releases are classified independently;
+- Linux mount resolution uses the most specific valid mount and preserves
+  escaped mount paths;
+- every platform adapter has a distinct reported primitive, including Windows
+  block cloning;
 - the Heads directory contains exactly the same entries before and after;
 - no Hydra mutation lock is created;
 - an uninitialized Git repository is rejected without Hydra artifacts;

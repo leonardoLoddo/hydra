@@ -59,7 +59,10 @@ remain report-only; deterministic mutations require confirmation.
 ### `hydra doctor storage`
 
 Runs a real copy-on-write and full-copy isolation probe on the managed Heads
-volume. Requires an initialized, internally consistent project.
+volume. Reports the native primitive, execution environment, and filesystem
+when Linux exposes it. A WSL full-copy result includes guidance toward a
+reflink-capable Linux volume. Requires an initialized, internally consistent
+project.
 
 ### `hydra completions <SHELL>`
 

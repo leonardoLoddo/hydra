@@ -15,6 +15,12 @@ Hydra requires Git and currently targets:
 WSL 1 and native Windows are not supported. WSL 2 uses the Linux artifact and
 is supported at preview quality.
 
+Installation support and storage capability are separate. The default WSL 2
+root filesystem is commonly ext4 and may require Hydra's safe full-copy
+fallback. For physical copy-on-write, place a new project and its sibling Heads
+directory on the same reflink-capable Linux volume before `hydra init`; see
+[WSL copy-on-write storage](storage-and-overlays.md#wsl-2-copy-on-write).
+
 Release archives are native binaries. Installing a published archive or the
 Homebrew Formula does not require a Rust toolchain.
 

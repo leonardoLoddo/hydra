@@ -4,7 +4,9 @@ mod doctor;
 mod head;
 mod init;
 
-pub use doctor::{DoctorError, NativeStoragePrimitive, StorageDiagnostics, diagnose_storage};
+pub use doctor::{
+    DoctorError, NativeStoragePrimitive, StorageDiagnostics, StorageEnvironment, diagnose_storage,
+};
 pub use head::{
     ChangeCounts, CloseOutcome, ClosedHead, CreateHeadOptions, CreatedHead, HeadCreationProgress,
     HeadError, HeadInspection, HeadSummary, IntegrationResult, IntegrationStrategy,

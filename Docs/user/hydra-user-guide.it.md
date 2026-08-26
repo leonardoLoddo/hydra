@@ -1113,7 +1113,8 @@ la normale conferma esplicita prima di duplicare i byte.
 Hydra verifica il volume che ospita le Head:
 
 - su APFS tenta il clone nativo;
-- su filesystem Linux compatibili tenta il reflink;
+- su filesystem Linux compatibili, incluso un volume compatibile montato in
+  WSL 2, tenta il reflink `FICLONE`;
 - quando il copy-on-write non è disponibile usa una copia completa isolata.
 
 Per eseguire una diagnostica esplicita sul volume realmente gestito:
@@ -1129,6 +1130,8 @@ il fallback a copia completa. Un risultato tipico su APFS è:
 ```text
 Storage backend: copy-on-write
 Native primitive: APFS clone
+Environment: native
+Filesystem: unknown
 Fallback: full copy (verified)
 Mutable hard links: disabled
 Isolation: supported
@@ -1139,6 +1142,30 @@ copy` e `Native primitive: unavailable`. Gli hard link mutabili non vengono
 mai usati come fallback. Il comando richiede un progetto Hydra inizializzato,
 non acquisisce il lock dell’inventario e rimuove tutti gli artefatti della
 prova; un fallimento di cleanup viene segnalato con il percorso rimasto.
+
+Su Linux il report identifica anche il filesystem che contiene la directory
+delle Head. Su WSL 2 Hydra usa lo stesso adapter Linux della Formula Homebrew:
+il root ext4 predefinito e i drive Windows esposti tramite DrvFs/9p possono
+rifiutare `FICLONE`, quindi Hydra usa correttamente `full copy`. Per ottenere
+copy-on-write, prepara esplicitamente un volume Linux reflink-capable, per
+esempio XFS quando disponibile nel kernel WSL, e colloca sullo stesso volume
+sia un nuovo clone del progetto sia la futura directory sorella delle Head
+prima di eseguire `hydra init`.
+
+Verifica prima la disponibilità del filesystem e poi il volume concreto:
+
+```bash
+grep -w xfs /proc/filesystems
+cd /mnt/wsl/hydra-data/Shop
+hydra init
+hydra doctor storage
+```
+
+Considera attivo il CoW soltanto se il report mostra `Storage backend:
+copy-on-write` e `Native primitive: Linux reflink`. Hydra non crea, formatta o
+monta il VHD. Non modificare il locator per spostare un progetto già
+inizializzato: crea invece un clone revisionato sul nuovo volume e inizializza
+quello, poiché la relocation assistita non è ancora disponibile.
 
 Per i file tracciati, quando il workspace coincide con il commit scelto Hydra
 può riusare direttamente quei file come sorgenti copy-on-write. In presenza di

@@ -151,7 +151,7 @@ enum CompletionCommand {
 enum DoctorCommand {
     /// Run a real storage probe on the Heads volume
     #[command(
-        long_about = "Run a real storage probe on the Heads volume.\n\nHydra verifies the native copy-on-write primitive and the isolated full-copy fallback with temporary files.",
+        long_about = "Run a real storage probe on the Heads volume.\n\nHydra verifies the native copy-on-write primitive and the isolated full-copy fallback with temporary files, then reports the execution environment and filesystem when available.",
         after_help = "Examples:\n  hydra doctor storage"
     )]
     Storage,
@@ -377,10 +377,29 @@ fn doctor_storage() -> ExitCode {
             let primitive = match diagnostics.native_primitive {
                 hydra_core::NativeStoragePrimitive::ApfsClone => "APFS clone",
                 hydra_core::NativeStoragePrimitive::LinuxReflink => "Linux reflink",
+                hydra_core::NativeStoragePrimitive::WindowsBlockClone => "Windows block clone",
                 hydra_core::NativeStoragePrimitive::NativeClone => "native clone",
                 hydra_core::NativeStoragePrimitive::Unavailable => "unavailable",
             };
             println!("Native primitive: {primitive}");
+            let environment = match diagnostics.environment {
+                hydra_core::StorageEnvironment::Native => "native",
+                hydra_core::StorageEnvironment::WindowsSubsystemForLinux => {
+                    "Windows Subsystem for Linux"
+                }
+            };
+            println!("Environment: {environment}");
+            println!(
+                "Filesystem: {}",
+                diagnostics.filesystem.as_deref().unwrap_or("unknown")
+            );
+            if diagnostics.environment == hydra_core::StorageEnvironment::WindowsSubsystemForLinux
+                && diagnostics.storage_backend == hydra_core::StorageBackend::FullCopy
+            {
+                println!(
+                    "Copy-on-write guidance: use a reflink-capable Linux filesystem for both the project and Heads directory (for example XFS when available)"
+                );
+            }
             if diagnostics.full_copy_fallback_verified {
                 println!("Fallback: full copy (verified)");
             }

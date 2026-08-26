@@ -194,8 +194,14 @@ that are not integrated, and its output must be reported.
   preserve active locks; treat malformed or unsupported locks as validation
   errors, not formats to migrate.
 - Use `hydra doctor storage` when the active backend or fallback behavior needs
-  diagnosis. Report its result and any temporary path that Hydra could not
-  clean up; do not remove such a path blindly.
+  diagnosis. Report its backend, native primitive, environment, and filesystem,
+  plus any temporary path that Hydra could not clean up; do not remove such a
+  path blindly. Treat WSL full-copy guidance as setup information, not as proof
+  of CoW. Never create, format, mount, or relocate a volume without explicit
+  user authorization. For a new WSL setup, keep the project and sibling Heads
+  directory on the same reflink-capable Linux volume and accept CoW only after
+  the real probe reports `Linux reflink`; do not edit Hydra's locator to move an
+  existing installation.
 - Run `hydra repair` first to collect its plan and decline each proposed
   mutation. Report the exact deterministic repairs and unresolved
   inconsistencies, then rerun and confirm only the changes the user explicitly

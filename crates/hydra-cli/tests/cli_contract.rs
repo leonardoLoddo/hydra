@@ -247,5 +247,7 @@ fn doctor_storage_help_documents_the_real_volume_probe() {
     assert!(stdout.contains("Usage: hydra doctor storage"));
     assert!(stdout.contains("real"));
     assert!(stdout.contains("Heads volume"));
+    assert!(stdout.contains("environment"));
+    assert!(stdout.contains("filesystem"));
     assert!(stdout.contains("hydra doctor storage"));
 }

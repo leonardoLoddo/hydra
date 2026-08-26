@@ -345,9 +345,14 @@ They must not leak platform conditions into CLI parsing or general Head
 lifecycle rules.
 
 The current storage boundary uses the safe `reflink-copy` API to reach APFS
-clone and Linux reflink primitives. Hydra verifies the resulting bytes and
-always verifies a full-copy fallback when cloning is unavailable. Native
-results from one platform do not establish support on another.
+clone, Linux `FICLONE`, and Windows block-clone primitives. Hydra verifies the
+resulting bytes and always verifies a full-copy fallback when cloning is
+unavailable. Linux diagnostics identify WSL and the filesystem owning the
+actual Heads volume, but neither label can override the real clone probe.
+Native results from one platform or volume do not establish support on
+another. Native Windows remains outside the currently distributed product
+targets even though the storage adapter and diagnostic vocabulary preserve its
+block-clone boundary.
 
 ---
 

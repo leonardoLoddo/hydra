@@ -9,7 +9,8 @@ on the real destination volume.
 With `storage.mode: "auto"`, Hydra attempts:
 
 - APFS clone on compatible macOS volumes;
-- reflink on compatible Linux volumes;
+- `FICLONE` reflink on compatible Linux volumes, including compatible volumes
+  mounted in WSL 2;
 - isolated full copy when native cloning is unavailable.
 
 Hydra verifies output bytes and never uses mutable hard links as a fallback.
@@ -40,18 +41,68 @@ cleans up the exact probe files. A successful APFS result looks like:
 ```text
 Storage backend: copy-on-write
 Native primitive: APFS clone
+Environment: native
+Filesystem: unknown
 Fallback: full copy (verified)
 Mutable hard links: disabled
 Isolation: supported
 ```
 
 When native cloning is unavailable, the report uses `Storage backend: full
-copy` and `Native primitive: unavailable`.
+copy` and `Native primitive: unavailable`. Linux also reports the filesystem
+that owns the Heads directory. A native Windows storage adapter reports
+`Windows block clone` only after a real compatible ReFS or Dev Drive probe,
+although native Windows is not yet a supported Hydra distribution target.
 
 The command is read-only with respect to Hydra inventory, refs, and worktrees;
 it does not take the Head mutation lock. A probe or cleanup failure is still a
 failed command and reports any remaining exact path. Do not recursively delete
 an unfamiliar leftover path without inspecting it.
+
+## WSL 2 copy-on-write
+
+Hydra installed through Linux Homebrew on WSL 2 uses the Linux `FICLONE`
+adapter. WSL itself does not emulate reflinks for every filesystem:
+
+- the distribution's default ext4 root can return `Operation not supported`;
+- Windows drives exposed below `/mnt/<drive>` use an interop filesystem such
+  as DrvFs/9p and are not a Linux reflink volume;
+- an XFS or other reflink-capable Linux filesystem attached to WSL can provide
+  copy-on-write when the real Hydra probe succeeds.
+
+Check which filesystems the running WSL kernel can mount:
+
+```bash
+grep -w xfs /proc/filesystems
+```
+
+Microsoft documents attaching physical disks and VHD files in
+[Mount a Linux disk in WSL 2](https://learn.microsoft.com/windows/wsl/wsl2-mount-disk).
+Creating, formatting, mounting, and backing up that volume remain explicit
+administrator operations outside Hydra.
+
+For the default sibling policy, place both a fresh project clone and its future
+Heads directory on the mounted volume before initialization:
+
+```text
+/mnt/wsl/hydra-data/Shop
+/mnt/wsl/hydra-data/Shop.heads
+```
+
+Then initialize and verify the exact destination:
+
+```bash
+cd /mnt/wsl/hydra-data/Shop
+hydra init
+hydra doctor storage
+```
+
+Proceed as copy-on-write only when the report says `Storage backend:
+copy-on-write`, `Native primitive: Linux reflink`, and identifies the expected
+filesystem. Do not edit Hydra's locator to move an existing installation. If a
+project was already initialized on ext4 or a Windows mount, make a reviewed
+fresh clone on the reflink-capable volume and initialize that clone instead;
+assisted relocation is not currently available.
 
 ## Force full-copy mode
 

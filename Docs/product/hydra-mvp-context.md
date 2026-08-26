@@ -256,10 +256,18 @@ Backend iniziali:
 | Piattaforma/filesystem | Primitiva preferita |
 |---|---|
 | macOS su APFS | clone file nativo |
-| Linux su Btrfs/XFS e volumi compatibili | reflink (`FICLONE`) |
+| Linux, incluso WSL 2, su Btrfs/XFS e volumi compatibili | reflink (`FICLONE`) |
+| Windows nativo futuro su ReFS o Dev Drive compatibili | block clone (`FSCTL_DUPLICATE_EXTENTS_TO_FILE`) |
 | Altri volumi | copia completa |
 
 Il supporto va rilevato sul volume effettivo che conterrà le Head, non soltanto in base al sistema operativo. Una primitiva disponibile sulla piattaforma può fallire tra volumi diversi o su un filesystem che non la implementa.
+
+WSL 2 usa il normale backend Linux. Il filesystem `ext4` del VHD root
+predefinito e i mount Windows DrvFs/9p possono rifiutare `FICLONE`; in quel caso
+Hydra deve dichiarare e usare la copia completa. Il supporto CoW su WSL richiede
+che progetto e directory sorella delle Head risiedano su un volume Linux che
+supera la prova reale, per esempio un VHD XFS con reflink abilitato. Hydra non
+crea, formatta o monta volumi e non presenta una copia normale come CoW.
 
 ### Sorgenti basate sul contenuto
 
@@ -980,12 +988,14 @@ Il comando verifica il volume sul quale saranno create le Head e mostra almeno:
 ```text
 Storage backend: copy-on-write
 Native primitive: APFS clone
+Environment: native
+Filesystem: unknown
 Fallback: full copy
 Mutable hard links: disabled
 Isolation: supported
 ```
 
-La diagnostica deve eseguire una prova reale e sicura in una directory temporanea sul volume di destinazione: la sola rilevazione del sistema operativo non è sufficiente.
+La diagnostica deve eseguire una prova reale e sicura in una directory temporanea sul volume di destinazione: la sola rilevazione del sistema operativo non è sufficiente. Su Linux deve inoltre indicare il filesystem effettivo; su WSL deve identificare l'ambiente e, quando il clone fallisce, fornire una guida verso un volume Linux reflink-capable senza automatizzare formattazione o mount.
 
 ---
 
