@@ -257,7 +257,7 @@ Backend iniziali:
 |---|---|
 | macOS su APFS | clone file nativo |
 | Linux, incluso WSL 2, su Btrfs/XFS e volumi compatibili | reflink (`FICLONE`) |
-| Windows nativo futuro su ReFS o Dev Drive compatibili | block clone (`FSCTL_DUPLICATE_EXTENTS_TO_FILE`) |
+| Windows su ReFS, inclusi Dev Drive compatibili | block clone (`FSCTL_DUPLICATE_EXTENTS_TO_FILE`) |
 | Altri volumi | copia completa |
 
 Il supporto va rilevato sul volume effettivo che conterrà le Head, non soltanto in base al sistema operativo. Una primitiva disponibile sulla piattaforma può fallire tra volumi diversi o su un filesystem che non la implementa.
@@ -1278,9 +1278,12 @@ La chiusura richiede una transazione distinta:
 Target iniziali:
 
 - macOS;
-- Linux.
+- Linux;
+- Windows x86-64 nativo, tramite Git for Windows e Git Bash.
 
-Il design deve evitare assunzioni che impediscano un successivo supporto a Windows.
+Su Windows il copy-on-write richiede un volume ReFS compatibile; NTFS e gli
+altri volumi usano la copia completa isolata. La materializzazione di symlink
+tracciati o selezionati dagli overlay rimane non supportata su Windows.
 
 ### Prestazioni
 
@@ -1443,8 +1446,9 @@ La prima distribuzione di anteprima è destinata a un gruppo ristretto di
 colleghi tramite release versionate del repository pubblico
 `leonardoLoddo/hydra` e una Formula Homebrew distinta chiamata
 `hydra-heads`. La Formula seleziona gli archivi nativi su macOS e Linux per
-ARM64 e x86-64; WSL 2 usa la variante Linux, mentre WSL 1 e Windows nativo non
-sono supportati. Homebrew rimane non interattivo: installa gli artefatti
+ARM64 e x86-64; WSL 2 usa la variante Linux. Windows x86-64 nativo usa
+l'archivio ZIP con `hydra.exe` da GitHub Releases e Git Bash come shell
+operativa; WSL 1 non è supportato. Homebrew rimane non interattivo: installa gli artefatti
 versionati e al termine mostra nei caveat l'intero `hydra-art.txt`, incluso il
 wordmark `HYDRA`. Subito sotto l'artwork mostra prima `hydra --help` come punto
 di ingresso generale e poi il comando opzionale `hydra skill install codex`,
@@ -1522,7 +1526,7 @@ Hydra v0.1 è conclusa quando:
 21. rimuove una Head senza danneggiare le altre;
 22. ricostruisce lo stato dopo la perdita dei metadati Hydra;
 23. rimane compatibile con l’uso diretto dei normali comandi Git;
-24. completa i flussi principali su macOS e Linux;
+24. completa i flussi principali su macOS, Linux e Windows x86-64 nativo;
 25. completa tramite Tab i nomi delle Head nei comandi che richiedono una Head
     esistente;
 26. chiude una Head integrandola nel `targetRef` e la rimuove soltanto dopo

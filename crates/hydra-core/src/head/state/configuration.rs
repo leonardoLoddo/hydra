@@ -1,8 +1,11 @@
 use std::{
-    fs::{self, File, OpenOptions},
+    fs::{self, OpenOptions},
     io::Write,
     path::{Component, Path, PathBuf},
 };
+
+#[cfg(unix)]
+use std::fs::File;
 
 use serde::{Deserialize, Serialize, de::Error as _};
 use uuid::Uuid;
@@ -348,6 +351,7 @@ fn sync_configuration_parent(path: &Path) -> Result<(), HeadError> {
 }
 
 #[cfg(not(unix))]
+#[allow(clippy::unnecessary_wraps)]
 fn sync_configuration_parent(_path: &Path) -> Result<(), HeadError> {
     Ok(())
 }

@@ -215,7 +215,6 @@ fn run_hash_batch(repository_root: &Path, paths: &[PathBuf]) -> Result<Vec<Strin
 #[cfg(test)]
 mod tests {
     use std::{
-        fs,
         path::PathBuf,
         sync::{
             Arc,
@@ -225,7 +224,12 @@ mod tests {
         time::Duration,
     };
 
-    use super::{hash_paths, hash_paths_parallel_with, hash_paths_with};
+    #[cfg(unix)]
+    use std::fs;
+
+    #[cfg(unix)]
+    use super::hash_paths;
+    use super::{hash_paths_parallel_with, hash_paths_with};
 
     #[test]
     fn hashing_many_paths_uses_bounded_batches_and_preserves_order() {

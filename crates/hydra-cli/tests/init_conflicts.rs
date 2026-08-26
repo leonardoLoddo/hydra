@@ -58,7 +58,7 @@ fn init_from_a_head_reports_the_canonical_parent_as_already_initialized() {
         .expect("Hydra CLI should start");
 
     assert!(!output.status.success());
-    let parent_configuration = fs::canonicalize(&repository)
+    let parent_configuration = common::canonical_path(&repository)
         .expect("parent repository should resolve")
         .join(".hydra.json");
     assert_eq!(

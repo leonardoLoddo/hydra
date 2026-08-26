@@ -18,7 +18,7 @@ fn relocate_heads_directory(
     }
     fs::rename(&original, destination).expect("Heads directory should be relocated");
     let destination =
-        fs::canonicalize(destination).expect("relocated Heads directory should resolve");
+        common::canonical_path(destination).expect("relocated Heads directory should resolve");
 
     let configuration_path = repository.join(".hydra.json");
     let mut configuration: serde_json::Value = serde_json::from_slice(
@@ -114,11 +114,13 @@ fn assert_status_uses_parent(head: &Path, repository: &Path) {
         "status from a Head should use the parent configuration, stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    let parent = fs::canonicalize(repository).expect("repository should resolve");
+    let parent = common::canonical_path(repository).expect("repository should resolve");
     assert!(
         String::from_utf8_lossy(&output.stdout)
             .starts_with(&format!("Project: {}\n", parent.display())),
-        "status should identify the canonical parent project"
+        "status should identify the canonical parent project; expected {}, got {}",
+        parent.display(),
+        String::from_utf8_lossy(&output.stdout)
     );
 }
 
@@ -148,7 +150,7 @@ fn assert_auth_uses_parent_context(repository: &Path, auth: &Path, parent_commit
 fn head_create_builds_an_isolated_worktree_and_records_its_metadata() {
     let directory = TestDirectory::new("head-create-success");
     let repository = create_initialized_project(&directory);
-    let head_path = fs::canonicalize(directory.path().join("SampleProject.heads"))
+    let head_path = common::canonical_path(directory.path().join("SampleProject.heads"))
         .expect("Heads directory should resolve")
         .join("payment");
 

@@ -1,7 +1,7 @@
-use std::{ffi::OsString, path::PathBuf};
+use std::path::PathBuf;
 
 #[cfg(unix)]
-use std::os::unix::ffi::OsStringExt;
+use std::{ffi::OsString, os::unix::ffi::OsStringExt};
 
 use super::{RegisteredWorktree, WorktreeChanges};
 use crate::head::HeadError;
@@ -86,6 +86,8 @@ pub(super) fn bytes_to_path(value: &[u8]) -> Result<PathBuf, HeadError> {
 #[cfg(not(unix))]
 pub(super) fn bytes_to_path(value: &[u8]) -> Result<PathBuf, HeadError> {
     let value = std::str::from_utf8(value).map_err(|_| HeadError::InvalidGitOutput("Git path"))?;
+    #[cfg(windows)]
+    let value = value.replace('/', "\\");
     Ok(PathBuf::from(value))
 }
 

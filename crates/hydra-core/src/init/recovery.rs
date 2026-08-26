@@ -245,7 +245,7 @@ fn validate_local_metadata_version(kind: &'static str, version: u32) -> Result<(
 }
 
 fn canonicalize_existing_path(path: &Path) -> Result<PathBuf, InitError> {
-    fs::canonicalize(path).map_err(|source| InitError::FileSystem {
+    crate::path::canonicalize(path).map_err(|source| InitError::FileSystem {
         action: "resolve existing Hydra path",
         path: path.to_path_buf(),
         source,

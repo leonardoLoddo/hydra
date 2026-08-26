@@ -10,10 +10,12 @@ Hydra requires Git and currently targets:
 - macOS 11 or newer on Apple Silicon or Intel;
 - native Linux on ARM64 or x86-64 with glibc 2.35 or newer, including Ubuntu
   22.04 or newer;
-- WSL 2 through the Linux Homebrew Formula.
+- WSL 2 through the Linux Homebrew Formula;
+- native Windows 11 x86-64 with Git for Windows, operated from Git Bash.
 
-WSL 1 and native Windows are not supported. WSL 2 uses the Linux artifact and
-is supported at preview quality.
+WSL 1 is not supported. WSL 2 uses the Linux artifact. Native Windows uses
+`hydra.exe`; PowerShell and Command Prompt are useful for installation, but the
+documented Hydra workflow and shell completions use Git Bash.
 
 Installation support and storage capability are separate. The default WSL 2
 root filesystem is commonly ext4 and may require Hydra's safe full-copy
@@ -98,6 +100,20 @@ artwork, and canonical Agent Skill. Place the executable in a directory on
 your `PATH`; do not copy the skill into personal state manually. After the
 binary is reachable, use `hydra skill install codex` for the protected optional
 installation flow.
+
+On native Windows, download `hydra-<version>-x86_64-pc-windows-msvc.zip`,
+verify its `.sha256` file, and extract it to a stable directory. Add that
+directory to the Windows user `PATH`, restart Git Bash, and verify:
+
+```bash
+hydra.exe --version
+command -v hydra
+hydra --help
+```
+
+Git Bash resolves `hydra` to `hydra.exe`, so all normal examples continue to
+use the extensionless command. Git for Windows must remain reachable on
+`PATH`, because Hydra invokes `git` directly.
 
 ## Update Hydra
 

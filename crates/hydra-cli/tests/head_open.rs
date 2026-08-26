@@ -175,8 +175,9 @@ fn head_open_starts_the_adapter_from_the_head_directory() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    let git_head = head.display().to_string().replace('\\', "/");
     assert!(
-        stdout.starts_with(&format!("{}\n", head.display())),
+        stdout.starts_with(&format!("{git_head}\n")),
         "adapter should observe the Head as its working directory, got: {stdout:?}"
     );
 }

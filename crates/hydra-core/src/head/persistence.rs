@@ -348,6 +348,7 @@ fn sync_parent_directory(path: &Path) -> Result<(), HeadError> {
 }
 
 #[cfg(not(unix))]
+#[allow(clippy::unnecessary_wraps)]
 fn sync_parent_directory(_path: &Path) -> Result<(), HeadError> {
     Ok(())
 }

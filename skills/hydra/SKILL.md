@@ -8,6 +8,13 @@ description: Use Hydra's Git-native CLI to create and operate isolated developme
 Use Hydra as the workspace boundary for one task. Keep Git as the source of
 truth and use only documented Hydra commands for Head lifecycle operations.
 
+On native Windows, operate the native `hydra.exe` through Git Bash with Git for
+Windows on `PATH`. Treat copy-on-write as volume-dependent: compatible ReFS
+volumes may use block cloning, while NTFS and unsupported volumes use isolated
+full copies. Run `hydra doctor storage` before making storage-cost assumptions.
+Do not create a Head containing tracked or selected overlay symlinks on Windows;
+that materialization remains unsupported.
+
 ## Establish the starting state
 
 1. Run `hydra --version` and `hydra --help`. Never assume an installed build

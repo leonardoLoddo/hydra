@@ -1,3 +1,4 @@
+#[cfg(unix)]
 mod common;
 
 #[cfg(unix)]
@@ -6,6 +7,7 @@ use std::{fs, os::unix::fs::PermissionsExt};
 #[cfg(target_os = "linux")]
 use std::{ffi::OsString, os::unix::ffi::OsStringExt, process::Command};
 
+#[cfg(unix)]
 use common::{TestDirectory, hydra_command};
 
 #[cfg(target_os = "linux")]

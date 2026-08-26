@@ -58,7 +58,7 @@ pub fn initialize(path: &Path) -> Result<InitializedProject, InitError> {
         .ok_or_else(|| InitError::UnsupportedRepositoryPath(repository.root.clone()))?;
     let repository_name = repository_name_as_str(repository_name)?;
     let repository_root =
-        fs::canonicalize(&repository.root).map_err(|source| InitError::FileSystem {
+        crate::path::canonicalize(&repository.root).map_err(|source| InitError::FileSystem {
             action: "resolve repository root",
             path: repository.root.clone(),
             source,
@@ -150,8 +150,8 @@ fn canonical_parent_repository(repository: Repository) -> Repository {
         return repository;
     };
     if let (Ok(source_common), Ok(project_common)) = (
-        fs::canonicalize(&repository.git_common_directory),
-        fs::canonicalize(&project_repository.git_common_directory),
+        crate::path::canonicalize(&repository.git_common_directory),
+        crate::path::canonicalize(&project_repository.git_common_directory),
     ) && source_common == project_common
     {
         return project_repository;

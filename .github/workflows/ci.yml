@@ -18,6 +18,7 @@ jobs:
         os:
           - ubuntu-latest
           - macos-latest
+          - windows-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -28,7 +29,20 @@ jobs:
       - name: Lint all targets
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Test workspace
+        if: runner.os != 'Windows'
         run: cargo test --workspace
+      - name: Test workspace on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:PATH += ';C:\Program Files\Git\usr\bin'
+          cargo test --workspace
+      - name: Smoke-test the native executable through Git Bash
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:PATH += ';C:\Program Files\Git\usr\bin'
+          scripts/test-windows-git-bash.ps1
 
   release-tooling:
     name: Release tooling
@@ -38,3 +52,13 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Validate packaging and Formula generation
         run: scripts/test-release-tooling.sh
+
+  windows-release-tooling:
+    name: Windows release tooling
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate Windows packaging
+        shell: pwsh
+        run: scripts/test-windows-release-tooling.ps1

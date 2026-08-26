@@ -1,10 +1,15 @@
 mod common;
 
-use std::{fs, io::Write, process::Stdio};
+use std::{fs, process::Stdio};
 
+#[cfg(unix)]
+use std::io::Write;
+
+#[cfg(unix)]
+use common::heads_directory;
 use common::{
-    TestDirectory, assert_no_head_creation_artifacts, create_initialized_project, heads_directory,
-    hydra_command, overlay_copy_on_write_is_supported, run_git,
+    TestDirectory, assert_no_head_creation_artifacts, create_initialized_project, hydra_command,
+    overlay_copy_on_write_is_supported, run_git,
 };
 
 #[test]

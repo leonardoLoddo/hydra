@@ -38,10 +38,12 @@ pub(super) fn materialize_tracked_files(
     let mut backend = StorageBackend::CopyOnWrite;
     let reusable_source_root = if reuse_tracked_sources {
         Some(
-            fs::canonicalize(&repository.root).map_err(|source| HeadError::FileSystem {
-                action: "resolve reusable tracked source root",
-                path: repository.root.clone(),
-                source,
+            crate::path::canonicalize(&repository.root).map_err(|source| {
+                HeadError::FileSystem {
+                    action: "resolve reusable tracked source root",
+                    path: repository.root.clone(),
+                    source,
+                }
             })?,
         )
     } else {
@@ -164,7 +166,7 @@ fn try_reuse_tracked_source(
     if !metadata.is_file() || metadata.file_type().is_symlink() {
         return Ok(false);
     }
-    let canonical_source = match fs::canonicalize(&source) {
+    let canonical_source = match crate::path::canonicalize(&source) {
         Ok(canonical_source) => canonical_source,
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(false),
         Err(source_error) => {
@@ -346,6 +348,7 @@ fn set_executable(path: &Path, executable: bool) -> Result<(), HeadError> {
 }
 
 #[cfg(not(unix))]
+#[allow(clippy::unnecessary_wraps)]
 fn set_executable(_path: &Path, _executable: bool) -> Result<(), HeadError> {
     Ok(())
 }

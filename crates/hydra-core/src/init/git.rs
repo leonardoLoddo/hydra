@@ -65,6 +65,7 @@ pub(super) fn repository_name_as_str(repository_name: &OsStr) -> Result<&str, In
 
 #[cfg(test)]
 mod tests {
+    #[cfg(unix)]
     use super::{InitError, repository_name_as_str};
 
     #[cfg(unix)]

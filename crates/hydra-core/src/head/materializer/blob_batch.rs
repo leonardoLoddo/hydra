@@ -84,7 +84,7 @@ impl GitBlobBatch {
         })
     }
 
-    #[cfg(unix)]
+    #[cfg(any(unix, test))]
     pub(super) fn read_blob(&mut self, object: &str) -> Result<Vec<u8>, HeadError> {
         let size = self.begin_blob(object)?;
         let capacity = usize::try_from(size)

@@ -48,6 +48,33 @@ package_versions = metadata.fetch("packages").map { |package| package.fetch("ver
 abort "error: version.txt and Cargo package versions disagree" unless package_versions == [release_version]
 
 workflow = YAML.safe_load(File.read(".github/workflows/release.yml"), aliases: true)
+build_job = workflow.fetch("jobs").fetch("build")
+build_matrix = build_job.fetch("strategy").fetch("matrix").fetch("include")
+expected_build_matrix = [
+  { "runner" => "macos-15", "target" => "aarch64-apple-darwin" },
+  { "runner" => "macos-15-intel", "target" => "x86_64-apple-darwin" },
+  { "runner" => "ubuntu-22.04", "target" => "x86_64-unknown-linux-gnu" },
+  { "runner" => "ubuntu-22.04-arm", "target" => "aarch64-unknown-linux-gnu" },
+  { "runner" => "windows-2025", "target" => "x86_64-pc-windows-msvc" },
+]
+unless build_matrix == expected_build_matrix
+  abort "error: release build matrix must cover the supported native targets"
+end
+windows_package = build_job.fetch("steps").find do |candidate|
+  candidate["name"] == "Package Windows release archive"
+end
+abort "error: missing Windows release packaging step" unless windows_package
+unless windows_package["if"] == "runner.os == 'Windows'"
+  abort "error: Windows release packaging must run only on Windows"
+end
+windows_build = build_job.fetch("steps").find do |candidate|
+  candidate["name"] == "Build Windows release binary"
+end
+abort "error: missing Windows release build step" unless windows_build
+unless windows_build["if"] == "runner.os == 'Windows'" && windows_build["shell"] == "pwsh"
+  abort "error: Windows release build must use PowerShell only on Windows"
+end
+
 publish_steps = workflow.fetch("jobs").fetch("publish").fetch("steps")
 repository_bound_steps = [
   "Upload assets to the draft release",

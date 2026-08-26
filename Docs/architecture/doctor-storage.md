@@ -51,7 +51,7 @@ succeeded:
 
 - `APFS clone` on macOS;
 - `Linux reflink` on Linux;
-- `Windows block clone` when the Windows adapter succeeds on a compatible
+- `Windows ReFS block clone` when the Windows adapter succeeds on a compatible
   ReFS or Dev Drive volume;
 - `native clone` on another supported target;
 - `unavailable` when the verified backend is full copy.

@@ -3,6 +3,7 @@
 mod doctor;
 mod head;
 mod init;
+mod path;
 
 pub use doctor::{
     DoctorError, NativeStoragePrimitive, StorageDiagnostics, StorageEnvironment, diagnose_storage,

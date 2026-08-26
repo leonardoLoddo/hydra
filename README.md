@@ -26,6 +26,10 @@ brew install leonardoLoddo/tap/hydra-heads
 The Formula is named `hydra-heads` because Homebrew already distributes an
 unrelated package named `hydra`. The installed executable is still `hydra`.
 
+On native Windows x86-64, download the checksummed `.zip` from GitHub Releases,
+extract `hydra.exe` into a directory on the Windows `PATH`, and use it from Git
+Bash. Homebrew remains the installation channel for macOS, Linux, and WSL 2.
+
 To work from the repository instead, build from source with the pinned Rust
 toolchain:
 
@@ -147,19 +151,23 @@ Release automation builds native archives for:
 - macOS on Apple Silicon (`aarch64-apple-darwin`);
 - macOS on Intel (`x86_64-apple-darwin`);
 - Linux ARM64 (`aarch64-unknown-linux-gnu`);
-- Linux x86-64 (`x86_64-unknown-linux-gnu`).
+- Linux x86-64 (`x86_64-unknown-linux-gnu`);
+- Windows x86-64 (`x86_64-pc-windows-msvc`).
 
 Release automation is configured to verify Homebrew installation on both
 macOS and Linux architectures before updating the tap. WSL 2 uses the Linux
 Formula and remains preview evidence to exercise directly with a colleague;
-WSL 1 and native Windows are not supported.
+native Windows is tested with Git for Windows and Git Bash and is distributed
+as a separate ZIP. WSL 1 is not supported.
 
 The current `v0.1.1` Formula includes native archive metadata for Linux. WSL 2
 uses that Linux Formula, while direct end-to-end WSL evidence remains part of
 the preview validation.
 
-The preview build baseline is macOS 11 or newer and Linux distributions with
-glibc 2.35 or newer (including Ubuntu 22.04 or newer).
+The preview build baseline is macOS 11 or newer, Linux distributions with
+glibc 2.35 or newer (including Ubuntu 22.04 or newer), and Windows 11 x86-64.
+On Windows, ReFS can provide block-clone COW while unsupported volumes safely
+fall back to full copies; tracked and overlay symlinks remain unsupported.
 
 ## Development
 

@@ -18,7 +18,7 @@ use crate::{
 pub enum NativeStoragePrimitive {
     ApfsClone,
     LinuxReflink,
-    WindowsBlockClone,
+    WindowsReFsBlockClone,
     NativeClone,
     Unavailable,
 }
@@ -130,7 +130,7 @@ const fn native_primitive_for(
         match platform {
             NativePlatform::MacOs => NativeStoragePrimitive::ApfsClone,
             NativePlatform::Linux => NativeStoragePrimitive::LinuxReflink,
-            NativePlatform::Windows => NativeStoragePrimitive::WindowsBlockClone,
+            NativePlatform::Windows => NativeStoragePrimitive::WindowsReFsBlockClone,
             NativePlatform::Other => NativeStoragePrimitive::NativeClone,
         }
     }
@@ -329,7 +329,7 @@ mod tests {
         );
         assert_eq!(
             native_primitive_for(StorageBackend::CopyOnWrite, NativePlatform::Windows),
-            NativeStoragePrimitive::WindowsBlockClone
+            NativeStoragePrimitive::WindowsReFsBlockClone
         );
         assert_eq!(
             native_primitive_for(StorageBackend::CopyOnWrite, NativePlatform::Other),
@@ -338,6 +338,15 @@ mod tests {
         assert_eq!(
             native_primitive_for(StorageBackend::FullCopy, NativePlatform::Windows),
             NativeStoragePrimitive::Unavailable
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_copy_on_write_reports_the_refs_block_clone_primitive() {
+        assert_eq!(
+            super::native_primitive(super::StorageBackend::CopyOnWrite),
+            super::NativeStoragePrimitive::WindowsReFsBlockClone
         );
     }
 }

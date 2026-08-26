@@ -123,8 +123,24 @@ mai installata automaticamente.
 
 Su WSL verifica da PowerShell che la distribuzione usi WSL 2 con `wsl -l -v` e
 configura Homebrew nel prefisso Linux predefinito prima dell'installazione.
-WSL 1 e Windows nativo non sono supportati. La Formula `v0.1.1` include gli URL
-nativi Linux e WSL 2 la usa con supporto di qualità preview.
+WSL 1 non è supportato. La Formula `v0.1.1` include gli URL nativi Linux e WSL
+2 la usa con supporto di qualità preview.
+
+Su Windows 11 x86-64 nativo scarica da GitHub Releases l'archivio
+`hydra-<version>-x86_64-pc-windows-msvc.zip` e il relativo `.sha256`. Verifica
+il checksum, estrai `hydra.exe` in una directory stabile del `PATH` utente di
+Windows, riavvia Git Bash e verifica:
+
+```bash
+hydra.exe --version
+command -v hydra
+hydra --help
+```
+
+Git Bash risolve automaticamente `hydra` in `hydra.exe`, quindi gli esempi
+restano invariati. Git for Windows deve essere installato e raggiungibile nel
+`PATH`. PowerShell può essere usato per installare il binario, ma il flusso
+operativo e i completamenti documentati usano Git Bash.
 
 Per aggiornare binario e skill gestita separatamente:
 
@@ -992,8 +1008,9 @@ del progetto. Il link viene ricreato nella Head con lo stesso target relativo e
 deve risolvere dentro la Head anche dopo la materializzazione. Directory di
 dipendenze come `node_modules` e `vendor` possono quindi mantenere i launcher
 presenti in `node_modules/.bin` o `vendor/bin` senza riferimenti al workspace
-sorgente. Gli overlay con symlink non sono attualmente supportati sulle altre
-piattaforme.
+sorgente. Su Windows i symlink tracciati e quelli selezionati dagli overlay
+restano non supportati; i repository senza tali entry usano il normale flusso
+Windows.
 
 Directory di dipendenze con migliaia di file vengono pianificate in batch:
 Hydra non avvia un processo Git separato per ogni file e distribuisce i batch
@@ -1115,6 +1132,8 @@ Hydra verifica il volume che ospita le Head:
 - su APFS tenta il clone nativo;
 - su filesystem Linux compatibili, incluso un volume compatibile montato in
   WSL 2, tenta il reflink `FICLONE`;
+- su volumi Windows ReFS compatibili, inclusi Dev Drive compatibili, tenta il
+  block clone;
 - quando il copy-on-write non è disponibile usa una copia completa isolata.
 
 Per eseguire una diagnostica esplicita sul volume realmente gestito:
@@ -1166,6 +1185,11 @@ copy-on-write` e `Native primitive: Linux reflink`. Hydra non crea, formatta o
 monta il VHD. Non modificare il locator per spostare un progetto già
 inizializzato: crea invece un clone revisionato sul nuovo volume e inizializza
 quello, poiché la relocation assistita non è ancora disponibile.
+
+Su un volume Windows ReFS compatibile la riga nativa è `Native primitive:
+Windows ReFS block clone`. Su NTFS il risultato normale è il fallback verificato
+a copia completa. La capacità dipende dal volume reale delle Head, non dalla
+lettera dell'unità o dal solo sistema operativo.
 
 Per i file tracciati, quando il workspace coincide con il commit scelto Hydra
 può riusare direttamente quei file come sorgenti copy-on-write. In presenza di

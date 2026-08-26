@@ -71,7 +71,7 @@ pub(super) fn discover_project_repository(source_path: &Path) -> Result<Reposito
 }
 
 fn canonicalize_git_directory(path: &Path) -> Result<PathBuf, HeadError> {
-    fs::canonicalize(path).map_err(|source| HeadError::FileSystem {
+    crate::path::canonicalize(path).map_err(|source| HeadError::FileSystem {
         action: "resolve Git common directory",
         path: path.to_path_buf(),
         source,
@@ -91,6 +91,24 @@ pub(super) fn inventory_location(
     configuration: &ProjectConfiguration,
     repository: &Repository,
 ) -> Result<PathBuf, HeadError> {
+    inventory_location_with_repair_lock_tolerance(configuration, repository, false)
+}
+
+pub(super) fn inventory_location_for_repair(
+    configuration: &ProjectConfiguration,
+    repository: &Repository,
+) -> Result<PathBuf, HeadError> {
+    inventory_location_with_repair_lock_tolerance(configuration, repository, true)
+}
+
+fn inventory_location_with_repair_lock_tolerance(
+    configuration: &ProjectConfiguration,
+    repository: &Repository,
+    tolerate_active_windows_lock: bool,
+) -> Result<PathBuf, HeadError> {
+    #[cfg(not(windows))]
+    let _ = tolerate_active_windows_lock;
+
     let locator_path = repository
         .git_common_directory
         .join("hydra")
@@ -111,11 +129,35 @@ pub(super) fn inventory_location(
     validate_real_directory(&metadata_directory)?;
     let marker_path = metadata_directory.join(DIRECTORY_MARKER_FILE_NAME);
     validate_regular_file(&marker_path)?;
-    let marker: DirectoryMarker = read_local_metadata(
+    let marker = read_local_metadata(
         &marker_path,
         "directory ownership marker",
         "read directory ownership marker",
-    )?;
+    );
+    #[cfg(windows)]
+    let marker: DirectoryMarker = match marker {
+        Ok(marker) => marker,
+        Err(HeadError::FileSystem { source, .. })
+            if tolerate_active_windows_lock && source.raw_os_error() == Some(33) =>
+        {
+            let state_path = metadata_directory.join(STATE_FILE_NAME);
+            match super::super::persistence::inspect_state_lock(&state_path)? {
+                super::super::persistence::StateLockInspection::Active(_) => {
+                    return Ok(state_path);
+                }
+                _ => {
+                    return Err(HeadError::FileSystem {
+                        action: "read directory ownership marker",
+                        path: marker_path,
+                        source,
+                    });
+                }
+            }
+        }
+        Err(error) => return Err(error),
+    };
+    #[cfg(not(windows))]
+    let marker: DirectoryMarker = marker?;
     validate_local_metadata_version("directory ownership marker", marker.version)?;
     if marker.project_id != locator.project_id || marker.installation_id != locator.installation_id
     {
@@ -138,26 +180,28 @@ fn validate_heads_directory(
     validate_real_directory(&locator.project_root)?;
     validate_real_directory(&locator.heads_directory)?;
 
-    let project_root =
-        fs::canonicalize(&locator.project_root).map_err(|source| HeadError::FileSystem {
+    let project_root = crate::path::canonicalize(&locator.project_root).map_err(|source| {
+        HeadError::FileSystem {
             action: "resolve local project root",
             path: locator.project_root.clone(),
             source,
-        })?;
-    let heads =
-        fs::canonicalize(&locator.heads_directory).map_err(|source| HeadError::FileSystem {
+        }
+    })?;
+    let heads = crate::path::canonicalize(&locator.heads_directory).map_err(|source| {
+        HeadError::FileSystem {
             action: "resolve Heads directory",
             path: locator.heads_directory.clone(),
             source,
-        })?;
+        }
+    })?;
     let repository_root =
-        fs::canonicalize(&repository.root).map_err(|source| HeadError::FileSystem {
+        crate::path::canonicalize(&repository.root).map_err(|source| HeadError::FileSystem {
             action: "resolve repository root",
             path: repository.root.clone(),
             source,
         })?;
     let expected = configuration.resolve_heads_directory(&project_root, &heads)?;
-    let expected = match fs::canonicalize(&expected) {
+    let expected = match crate::path::canonicalize(&expected) {
         Ok(expected) => expected,
         Err(source) if source.kind() == std::io::ErrorKind::NotFound => {
             return Err(HeadError::DirectoryPolicyMismatch(heads));
@@ -178,7 +222,7 @@ fn validate_heads_directory(
         return Err(HeadError::UnsafeHeadsDirectory(heads));
     }
     for worktree in git::worktree_paths(repository)? {
-        match fs::canonicalize(&worktree) {
+        match crate::path::canonicalize(&worktree) {
             Ok(worktree) if heads.starts_with(&worktree) => {
                 return Err(HeadError::UnsafeHeadsDirectory(heads));
             }

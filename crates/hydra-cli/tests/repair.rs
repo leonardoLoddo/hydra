@@ -393,9 +393,11 @@ fn repair_requires_confirmation_before_removing_an_abandoned_current_state_lock(
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    let displayed_lock =
+        common::canonical_parent_path(&lock_path).expect("lock parent should be resolvable");
     assert!(stdout.contains(&format!(
         "Abandoned Hydra state lock: {}",
-        lock_path.display()
+        displayed_lock.display()
     )));
     assert!(stdout.contains("Remove the abandoned Hydra state lock? [y/N] "));
     assert!(stdout.ends_with("No repairs applied.\n"));
@@ -463,9 +465,18 @@ fn repair_preserves_an_active_current_state_lock() {
     guard
         .unlock()
         .expect("fixture should release the state guard");
-    assert!(output.status.success());
+    assert!(
+        output.status.success(),
+        "repair should preserve an active lock, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
-    assert!(stdout.contains(&format!("Active Hydra state lock: {}", lock_path.display())));
+    let displayed_lock =
+        common::canonical_parent_path(&lock_path).expect("lock parent should be resolvable");
+    assert!(stdout.contains(&format!(
+        "Active Hydra state lock: {}",
+        displayed_lock.display()
+    )));
     assert!(stdout.ends_with("No automatic repairs available; manual recovery required.\n"));
     assert!(lock_path.is_file(), "active lock must remain untouched");
     assert!(heads_directory(&repository).join("payment").is_dir());
@@ -498,10 +509,13 @@ fn state_lock_recovery_rechecks_process_ownership_after_planning() {
         .unlock()
         .expect("fixture should release the state guard");
 
-    assert!(matches!(
-        recovery,
-        Err(hydra_core::HeadError::StateLockExists(path)) if path == lock_path
-    ));
+    assert!(
+        matches!(
+            &recovery,
+            Err(hydra_core::HeadError::StateLockExists(path)) if path.as_path() == lock_path
+        ),
+        "active lock recovery should be rejected, got: {recovery:?}"
+    );
     assert!(
         lock_path.is_file(),
         "a newly active lock must remain untouched"
@@ -569,9 +583,11 @@ fn repair_requires_confirmation_before_rebuilding_a_missing_inventory() {
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    let displayed_state =
+        common::canonical_parent_path(&state_path).expect("inventory parent should be resolvable");
     assert!(stdout.contains(&format!(
         "Missing Hydra inventory: {}",
-        state_path.display()
+        displayed_state.display()
     )));
     assert!(stdout.contains("Recoverable Head: payment"));
     assert!(stdout.contains("Rebuild the missing inventory with 1 recovered Head? [y/N] "));
@@ -808,9 +824,10 @@ fn repair_reports_an_untracked_hydra_worktree_without_guessing_metadata() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    let registered_head = common::canonical_path(&head).expect("Head path should be resolvable");
     assert!(stdout.contains(&format!(
         "Untracked Hydra worktree: payment at {}",
-        head.display()
+        registered_head.display()
     )));
     assert!(stdout.contains("manual recovery required"));
     assert_eq!(
@@ -846,7 +863,7 @@ fn repair_reports_a_moved_worktree_without_relocating_it_silently() {
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
     let registered_moved =
-        fs::canonicalize(&moved).expect("moved worktree path should be resolvable");
+        common::canonical_path(&moved).expect("moved worktree path should be resolvable");
     assert!(
         stdout.contains(&format!(
             "Moved Head worktree: payment is registered at {}",

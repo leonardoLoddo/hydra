@@ -133,6 +133,7 @@ the native copy-on-write primitive of the actual Heads volume:
 
 - APFS clone on compatible macOS volumes;
 - reflink on compatible Linux volumes;
+- ReFS block clone on compatible Windows volumes;
 - isolated full copy when native cloning is unavailable.
 
 Copy-on-write shares physical blocks initially, but each path behaves as an

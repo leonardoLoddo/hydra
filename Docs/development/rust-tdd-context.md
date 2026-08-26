@@ -246,7 +246,10 @@ Also run:
 If a required gate cannot run, the task is not silently complete. Report the exact limitation and the strongest safe evidence available.
 
 The repository CI mirrors the four mandatory workspace gates on GitHub-hosted
-macOS and Linux runners for pushes, pull requests, and manual dispatches. CI is
+macOS, Linux, and Windows runners for pushes, pull requests, and manual
+dispatches. Windows CI exposes Git for Windows' Unix tools because integration
+tests and the supported user workflow exercise the native executable through
+Git Bash. CI is
 regression evidence in addition to, not a replacement for, the focused Red and
 Green runs and the local completion gates required before a commit.
 

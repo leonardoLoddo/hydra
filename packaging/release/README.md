@@ -1,12 +1,12 @@
 # Hydra release archive
 
 Hydra is a Git-native workspace manager for isolated development Heads.
-This archive contains a prebuilt `hydra` executable for the target named in
-the archive filename; Rust is not required to run it.
+This archive contains a prebuilt `hydra` executable (`hydra.exe` on Windows)
+for the target named in the archive filename; Rust is not required to run it.
 
 ## Contents
 
-- `hydra`: the command-line executable;
+- `hydra` or `hydra.exe`: the command-line executable;
 - `hydra-art.txt`: terminal artwork shown by the Homebrew Formula;
 - `skills/hydra/`: the canonical portable Hydra Agent Skill;
 - `LICENSE`, `LICENSE-MIT`, and `LICENSE-APACHE`: license terms;
@@ -21,6 +21,10 @@ chmod +x hydra
 ./hydra --version
 ./hydra --help
 ```
+
+On Windows, extract the ZIP to a stable directory on the Windows user `PATH`,
+restart Git Bash, and run `hydra.exe --version` followed by `hydra --help`.
+Git for Windows must also be installed and reachable from Git Bash.
 
 The optional Codex skill is installed explicitly after the executable is on
 your `PATH`:

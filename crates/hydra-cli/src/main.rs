@@ -4,6 +4,9 @@ use std::{
     process::ExitCode,
 };
 
+#[cfg(windows)]
+use std::fs;
+
 use clap::{CommandFactory as _, Parser, Subcommand, ValueEnum};
 use clap_complete::{
     CompleteEnv,
@@ -20,6 +23,7 @@ mod skill;
 #[derive(Parser)]
 #[command(
     name = "hydra",
+    bin_name = "hydra",
     version,
     about = "Git-native workspace manager for isolated development Heads",
     long_about = "Git-native workspace manager for isolated development Heads.\n\nHydra creates independent working directories while preserving familiar Git refs, branches, and repository workflows.",
@@ -377,7 +381,9 @@ fn doctor_storage() -> ExitCode {
             let primitive = match diagnostics.native_primitive {
                 hydra_core::NativeStoragePrimitive::ApfsClone => "APFS clone",
                 hydra_core::NativeStoragePrimitive::LinuxReflink => "Linux reflink",
-                hydra_core::NativeStoragePrimitive::WindowsBlockClone => "Windows block clone",
+                hydra_core::NativeStoragePrimitive::WindowsReFsBlockClone => {
+                    "Windows ReFS block clone"
+                }
                 hydra_core::NativeStoragePrimitive::NativeClone => "native clone",
                 hydra_core::NativeStoragePrimitive::Unavailable => "unavailable",
             };
@@ -442,6 +448,10 @@ fn open_head(name: &str) -> ExitCode {
 }
 
 fn close_head(name: &str) -> ExitCode {
+    if let Err(error) = leave_head_worktree_before_removal(name) {
+        eprintln!("error: {error}");
+        return ExitCode::FAILURE;
+    }
     match hydra_core::close_head(Path::new("."), name) {
         Ok(closed) => {
             match closed.outcome {
@@ -493,6 +503,10 @@ fn close_head(name: &str) -> ExitCode {
 }
 
 fn remove_head(name: &str, force: bool) -> ExitCode {
+    if let Err(error) = leave_head_worktree_before_removal(name) {
+        eprintln!("error: {error}");
+        return ExitCode::FAILURE;
+    }
     match hydra_core::remove_head(
         Path::new("."),
         hydra_core::RemoveHeadOptions {
@@ -512,6 +526,37 @@ fn remove_head(name: &str, force: bool) -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+#[cfg(windows)]
+fn leave_head_worktree_before_removal(name: &str) -> Result<(), String> {
+    let source = Path::new(".");
+    let head = hydra_core::head_path(source, name).map_err(|error| error.to_string())?;
+    let project = hydra_core::inspect_project(source).map_err(|error| error.to_string())?;
+    let current = std::env::current_dir()
+        .and_then(fs::canonicalize)
+        .map_err(|error| format!("could not resolve the current directory: {error}"))?;
+    let head = fs::canonicalize(&head).map_err(|error| {
+        format!(
+            "could not resolve the Head worktree {}: {error}",
+            head.display()
+        )
+    })?;
+    if current.starts_with(head) {
+        std::env::set_current_dir(&project.repository_root).map_err(|error| {
+            format!(
+                "could not leave the Head worktree before removal for {}: {error}",
+                project.repository_root.display()
+            )
+        })?;
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
+#[allow(clippy::unnecessary_wraps)]
+fn leave_head_worktree_before_removal(_name: &str) -> Result<(), String> {
+    Ok(())
 }
 
 fn safe_path_label(path: &Path) -> String {

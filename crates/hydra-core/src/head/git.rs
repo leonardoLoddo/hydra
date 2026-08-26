@@ -1,5 +1,4 @@
 use std::{
-    fs,
     path::{Path, PathBuf},
     process::{Command, Output},
 };
@@ -50,8 +49,23 @@ impl WorktreeChanges {
 
 impl Repository {
     pub(super) fn discover(path: &Path) -> Result<Self, HeadError> {
-        let root = git_path(path, "--show-toplevel", "repository root")?;
-        let git_common_directory = git_path(&root, "--git-common-dir", "Git common directory")?;
+        let discovered_root = git_path(path, "--show-toplevel", "repository root")?;
+        let root = crate::path::canonicalize(&discovered_root).map_err(|source| {
+            HeadError::FileSystem {
+                action: "resolve repository root",
+                path: discovered_root,
+                source,
+            }
+        })?;
+        let discovered_common = git_path(&root, "--git-common-dir", "Git common directory")?;
+        let git_common_directory =
+            crate::path::canonicalize(&discovered_common).map_err(|source| {
+                HeadError::FileSystem {
+                    action: "resolve Git common directory",
+                    path: discovered_common,
+                    source,
+                }
+            })?;
         Ok(Self {
             root,
             git_common_directory,
@@ -90,12 +104,12 @@ pub(super) fn worktree_private_file(
     let parent = candidate
         .parent()
         .ok_or_else(|| HeadError::UnsafeProjectFile(candidate.clone()))?;
-    let parent = fs::canonicalize(parent).map_err(|source| HeadError::FileSystem {
+    let parent = crate::path::canonicalize(parent).map_err(|source| HeadError::FileSystem {
         action: "resolve private Head metadata directory",
         path: parent.to_path_buf(),
         source,
     })?;
-    let common = fs::canonicalize(&repository.git_common_directory).map_err(|source| {
+    let common = crate::path::canonicalize(&repository.git_common_directory).map_err(|source| {
         HeadError::FileSystem {
             action: "resolve Git common directory",
             path: repository.git_common_directory.clone(),

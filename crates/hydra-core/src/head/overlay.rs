@@ -139,7 +139,7 @@ pub(super) fn plan_overlays(
     force_full_copy: bool,
 ) -> Result<OverlayPlan, HeadError> {
     let canonical_source_root =
-        fs::canonicalize(source_root).map_err(|source| HeadError::FileSystem {
+        crate::path::canonicalize(source_root).map_err(|source| HeadError::FileSystem {
             action: "resolve overlay source root",
             path: source_root.to_path_buf(),
             source,
@@ -374,7 +374,7 @@ fn plan_overlay_symlink(
     #[cfg(not(unix))]
     {
         let _ = canonical_repository_root;
-        return Err(HeadError::UnsafeOverlayPath(source.to_path_buf()));
+        Err(HeadError::UnsafeOverlayPath(source.to_path_buf()))
     }
 
     #[cfg(unix)]
@@ -398,8 +398,8 @@ fn validate_symlink_resolution(
         return Err(HeadError::UnsafeOverlayPath(source.to_path_buf()));
     }
 
-    let canonical_target =
-        fs::canonicalize(source).map_err(|_| HeadError::UnsafeOverlayPath(source.to_path_buf()))?;
+    let canonical_target = crate::path::canonicalize(source)
+        .map_err(|_| HeadError::UnsafeOverlayPath(source.to_path_buf()))?;
     let target_metadata =
         fs::metadata(source).map_err(|_| HeadError::UnsafeOverlayPath(source.to_path_buf()))?;
     if !canonical_target.starts_with(canonical_repository_root)

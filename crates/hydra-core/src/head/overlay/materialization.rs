@@ -23,7 +23,7 @@ pub(in crate::head) fn materialize_overlays(
 ) -> Result<StorageBackend, HeadError> {
     let mut backend = StorageBackend::CopyOnWrite;
     let canonical_repository_root =
-        fs::canonicalize(&repository.root).map_err(|source| HeadError::FileSystem {
+        crate::path::canonicalize(&repository.root).map_err(|source| HeadError::FileSystem {
             action: "resolve overlay source root",
             path: repository.root.clone(),
             source,
@@ -218,12 +218,12 @@ fn validate_materialized_symlink(
         return Err(HeadError::OverlayChanged(destination.to_path_buf()));
     }
     let canonical_head =
-        fs::canonicalize(head_root).map_err(|source_error| HeadError::FileSystem {
+        crate::path::canonicalize(head_root).map_err(|source_error| HeadError::FileSystem {
             action: "resolve materialized Head root",
             path: head_root.to_path_buf(),
             source: source_error,
         })?;
-    let canonical_target = fs::canonicalize(destination)
+    let canonical_target = crate::path::canonicalize(destination)
         .map_err(|_| HeadError::UnsafeOverlayPath(destination.to_path_buf()))?;
     if canonical_target.starts_with(canonical_head) {
         Ok(())
@@ -245,7 +245,7 @@ fn validate_regular_overlay_source(
         return Err(HeadError::UnsafeOverlayPath(source.to_path_buf()));
     }
     let canonical_source =
-        fs::canonicalize(source).map_err(|source_error| HeadError::FileSystem {
+        crate::path::canonicalize(source).map_err(|source_error| HeadError::FileSystem {
             action: "resolve overlay source",
             path: source.to_path_buf(),
             source: source_error,

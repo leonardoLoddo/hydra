@@ -175,7 +175,7 @@ impl StateSnapshot {
         repository: &Repository,
     ) -> Result<RepairStateSnapshot, HeadError> {
         let configuration = ProjectConfiguration::load(&repository.root)?;
-        let state_path = installation::inventory_location(&configuration, repository)?;
+        let state_path = installation::inventory_location_for_repair(&configuration, repository)?;
         match fs::symlink_metadata(&state_path) {
             Ok(metadata) if metadata.is_file() => {
                 let state = read_local_state(&state_path)?;

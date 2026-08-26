@@ -66,7 +66,7 @@ fn init_creates_project_configuration_heads_directory_and_local_state() {
         "project ID should contain the repository slug and the complete UUID entropy"
     );
 
-    let heads_directory = fs::canonicalize(directory.path().join("SampleProject.heads"))
+    let heads_directory = common::canonical_path(directory.path().join("SampleProject.heads"))
         .expect("default sibling Heads directory should resolve");
     assert!(
         heads_directory.is_dir(),
@@ -82,7 +82,7 @@ fn init_creates_project_configuration_heads_directory_and_local_state() {
     assert_eq!(locator["projectId"], config["projectId"]);
     assert_eq!(
         locator["projectRoot"],
-        fs::canonicalize(&repository)
+        common::canonical_path(&repository)
             .expect("repository should resolve")
             .display()
             .to_string()

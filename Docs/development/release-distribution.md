@@ -14,8 +14,9 @@ release workflow exist.
 Public preview `v0.1.1` is available from GitHub Releases and the
 `leonardoLoddo/homebrew-tap` tap. The current Formula contains immutable native
 archive URLs for both macOS and Linux on ARM64 and x86-64. WSL 2 consumes the
-Linux Formula, while direct end-to-end WSL evidence remains part of preview
-validation.
+Linux Formula. Native Windows x86-64 is distributed separately as a checksummed
+ZIP containing `hydra.exe` and is exercised with Git for Windows and Git Bash.
+Direct end-to-end WSL evidence remains part of preview validation.
 The intended audience remains a small group of colleagues who can exercise
 preview releases and report platform, installation, upgrade, and workflow
 defects before broader promotion.
@@ -209,13 +210,16 @@ release-tooling validation rejects only an invalid value or one newer than the
 current marker.
 
 The release matrix builds native archives for macOS Apple Silicon, macOS Intel,
-Linux ARM64, and Linux x86-64. The preview baseline is macOS 11 or newer and
-glibc 2.35 or newer, built on native macOS 15 and Ubuntu 22.04 runners.
+Linux ARM64, Linux x86-64, and native Windows x86-64. Unix targets use
+`.tar.gz`; Windows uses a `.zip` containing `hydra.exe`. The preview baseline
+is macOS 11 or newer, glibc 2.35 or newer, and Windows 11 with Git for Windows,
+built on native macOS 15, Ubuntu 22.04, and Windows 2025 runners.
 Generated Homebrew metadata selects the matching immutable archive on all four
 targets. Before updating the tap, release automation performs Formula audit,
 installation, caveat verification, skill lifecycle, and uninstall on both
 architectures of macOS and Linux. WSL 2 consumes the Linux Formula but still
-requires direct preview evidence; WSL 1 and native Windows are not supported.
+requires direct preview evidence. Native Windows uses its release ZIP rather
+than Homebrew; WSL 1 is not supported.
 
 ## Publication Transaction
 
@@ -262,6 +266,8 @@ verify at least:
   toolchain;
 - installation on clean supported native Linux runners without a preinstalled
   Rust toolchain;
+- extraction and execution of the native Windows ZIP through Git Bash without
+  a preinstalled Rust toolchain;
 - `hydra --version` reports the tagged version;
 - Git dependency discovery and a disposable `hydra init` workflow succeed;
 - accepting the Codex prompt installs the exact packaged skill;

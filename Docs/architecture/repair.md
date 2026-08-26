@@ -60,6 +60,14 @@ and unsupported versions are invalid local metadata: planning fails and leaves
 the file untouched. Repair never uses PID inference, migrates another lock
 format, or edits the ownership marker.
 
+Windows byte-range locks are mandatory and can temporarily prevent reading the
+locked `directory.json`, unlike advisory Unix locks. Repair may defer that one
+marker-content read only after the locator and directory boundary are valid, a
+current-version `heads.json.lock` is readable, and the operating-system guard
+is demonstrably active. This exception is read-only: every recovery that may
+mutate state revalidates ownership normally and reacquires the guard, or fails
+with the active-lock error.
+
 ### Missing inventory
 
 Every newly created Head stores the same versioned recovery record centrally

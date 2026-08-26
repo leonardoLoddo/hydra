@@ -114,10 +114,10 @@ fn project_status_and_head_list_report_local_heads_in_name_order_without_mutatio
         String::from_utf8(status.stdout).expect("status output should be UTF-8"),
         format!(
             "Project: {}\nHeads directory: {}\nHeads: 2\n  auth  clean\n  payment  clean\n",
-            fs::canonicalize(&repository)
+            common::canonical_path(&repository)
                 .expect("repository should resolve")
                 .display(),
-            fs::canonicalize(heads_directory(&repository))
+            common::canonical_path(heads_directory(&repository))
                 .expect("Heads directory should resolve")
                 .display()
         )
@@ -177,7 +177,7 @@ fn head_status_reports_metadata_git_changes_and_ahead_behind() {
         String::from_utf8(output.stdout).expect("status output should be UTF-8"),
         format!(
             "Head: payment\nPath: {}\nBranch: refs/heads/hydra/payment\nCommit: {head_commit}\nBase: refs/heads/main ({base_commit})\nTarget: refs/heads/main\nChanges: 1 modified, 1 added, 1 deleted, 1 untracked\nAhead/behind: 1/1\nWorktree: present\nConsistency: ok\n",
-            fs::canonicalize(&head_path)
+            common::canonical_path(&head_path)
                 .expect("Head path should resolve")
                 .display()
         )
@@ -278,7 +278,7 @@ fn head_path_prints_only_the_recorded_absolute_path() {
     let directory = TestDirectory::new("head-path");
     let repository = create_initialized_project(&directory);
     create_head(&repository, "payment");
-    let head_path = fs::canonicalize(heads_directory(&repository).join("payment"))
+    let head_path = common::canonical_path(heads_directory(&repository).join("payment"))
         .expect("Head should resolve");
 
     let output = hydra_command()
@@ -295,6 +295,7 @@ fn head_path_prints_only_the_recorded_absolute_path() {
     assert!(output.stderr.is_empty());
 }
 
+#[cfg(unix)]
 #[test]
 fn human_status_escapes_control_characters_in_paths() {
     let directory = TestDirectory::new("head-\u{1b}unsafe-path");

@@ -11,6 +11,8 @@ With `storage.mode: "auto"`, Hydra attempts:
 - APFS clone on compatible macOS volumes;
 - `FICLONE` reflink on compatible Linux volumes, including compatible volumes
   mounted in WSL 2;
+- ReFS block clone on compatible Windows volumes, including compatible Dev
+  Drives;
 - isolated full copy when native cloning is unavailable.
 
 Hydra verifies output bytes and never uses mutable hard links as a fallback.
@@ -50,9 +52,12 @@ Isolation: supported
 
 When native cloning is unavailable, the report uses `Storage backend: full
 copy` and `Native primitive: unavailable`. Linux also reports the filesystem
-that owns the Heads directory. A native Windows storage adapter reports
-`Windows block clone` only after a real compatible ReFS or Dev Drive probe,
-although native Windows is not yet a supported Hydra distribution target.
+that owns the Heads directory.
+
+On a compatible Windows ReFS destination, the native line is `Native
+primitive: Windows ReFS block clone`. NTFS normally reports the verified full
+copy fallback. Capability is decided by the real Heads volume, not by the
+drive letter or operating-system name.
 
 The command is read-only with respect to Hydra inventory, refs, and worktrees;
 it does not take the Head mutation lock. A probe or cleanup failure is still a
@@ -223,7 +228,9 @@ Hydra recreates the link rather than dereferencing it. This supports ignored
 dependency trees containing launchers such as `node_modules/.bin` or
 `vendor/bin` without linking the Head back to the source workspace.
 
-Tracked and overlay symlinks are currently unsupported on non-Unix platforms.
+Tracked and overlay symlinks are currently unsupported on Windows. Repositories
+without such entries, including repositories where Git stores ordinary files
+instead of symlinks, use the normal Windows workflow.
 
 ## Unsafe symlink prompt
 

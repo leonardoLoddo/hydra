@@ -13,7 +13,11 @@ fn create_head(repository: &Path, name: &str) {
         .current_dir(repository)
         .output()
         .expect("Hydra CLI should start");
-    assert!(output.status.success());
+    assert!(
+        output.status.success(),
+        "Head creation should succeed, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 fn commit_all(repository: &Path, message: &str) {
@@ -42,6 +46,12 @@ fn revision(repository: &Path, reference: &str) -> String {
         .expect("revision should be UTF-8")
         .trim()
         .to_owned()
+}
+
+fn display_path_for_git(path: &Path) -> String {
+    let canonical =
+        common::canonical_path(path).expect("repository path should be canonicalizable");
+    canonical.display().to_string()
 }
 
 fn park_primary_worktree(repository: &Path) {
@@ -460,8 +470,7 @@ fn head_close_fast_forwards_a_clean_checked_out_target_worktree() {
     fs::write(head.join("feature.txt"), b"feature\n").expect("feature should be written");
     commit_all(&head, "feature");
     let expected = revision(&head, "HEAD");
-    let canonical_repository =
-        fs::canonicalize(&repository).expect("repository path should be canonicalizable");
+    let canonical_repository = display_path_for_git(&repository);
 
     let output = hydra_command()
         .args(["head", "close", "payment"])
@@ -477,10 +486,9 @@ fn head_close_fast_forwards_a_clean_checked_out_target_worktree() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
         stdout.contains(&format!(
-            "Integration strategy: target worktree {}",
-            canonical_repository.display()
+            "Integration strategy: target worktree {canonical_repository}"
         )),
-        "stdout: {stdout}"
+        "expected target path {canonical_repository:?}, stdout: {stdout}"
     );
     assert!(
         stdout.contains("Integration result: fast-forward"),
@@ -710,8 +718,7 @@ fn head_close_merges_into_a_clean_checked_out_target_worktree() {
     commit_all(&repository, "Target progress");
     configure_git_identity(&repository);
     let target_commit = revision(&repository, "main");
-    let canonical_repository =
-        fs::canonicalize(&repository).expect("repository path should be canonicalizable");
+    let canonical_repository = display_path_for_git(&repository);
 
     let output = hydra_command()
         .args(["head", "close", "payment"])
@@ -727,10 +734,9 @@ fn head_close_merges_into_a_clean_checked_out_target_worktree() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
         stdout.contains(&format!(
-            "Integration strategy: target worktree {}",
-            canonical_repository.display()
+            "Integration strategy: target worktree {canonical_repository}"
         )),
-        "stdout: {stdout}"
+        "expected target path {canonical_repository:?}, stdout: {stdout}"
     );
     assert!(
         stdout.contains("Integration result: merge commit"),

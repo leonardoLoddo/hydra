@@ -261,6 +261,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn created_head_path_uses_an_osc_8_file_link_when_enabled() {
         let mut output = Vec::new();
 
@@ -295,6 +296,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn created_head_path_encodes_control_characters_in_uri_and_visible_text() {
         let mut output = Vec::new();
 

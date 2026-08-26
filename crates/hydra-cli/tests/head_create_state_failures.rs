@@ -267,7 +267,7 @@ fn head_create_rejects_a_heads_directory_nested_inside_another_worktree() {
     let mut locator: serde_json::Value =
         serde_json::from_slice(&fs::read(&locator_path).expect("locator should be readable"))
             .expect("locator should be valid JSON");
-    locator["headsDirectory"] = fs::canonicalize(&nested_heads)
+    locator["headsDirectory"] = common::canonical_path(&nested_heads)
         .expect("nested directory should resolve")
         .display()
         .to_string()

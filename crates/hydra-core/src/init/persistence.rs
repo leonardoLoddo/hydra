@@ -1,8 +1,11 @@
 use std::{
-    fs::{self, File, OpenOptions},
+    fs::{self, OpenOptions},
     io::{self, Write},
     path::Path,
 };
+
+#[cfg(unix)]
+use std::fs::File;
 
 use uuid::Uuid;
 
@@ -244,6 +247,7 @@ fn sync_parent_directory(path: &Path) -> io::Result<()> {
 }
 
 #[cfg(not(unix))]
+#[allow(clippy::unnecessary_wraps)]
 fn sync_parent_directory(_path: &Path) -> io::Result<()> {
     Ok(())
 }

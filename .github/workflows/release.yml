@@ -31,6 +31,8 @@ jobs:
             target: x86_64-unknown-linux-gnu
           - runner: ubuntu-22.04-arm
             target: aarch64-unknown-linux-gnu
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Resolve release tag
@@ -61,15 +63,28 @@ jobs:
           actual=$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[] | select(.name == "hydra-cli") | .version')
           [[ "$actual" == "$EXPECTED_VERSION" ]]
       - name: Test workspace
+        if: runner.os != 'Windows'
         run: cargo test --workspace --locked
+      - name: Test workspace on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:PATH += ';C:\Program Files\Git\usr\bin'
+          cargo test --workspace --locked
       - name: Build release binary
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == "macOS" ]]; then
             export MACOSX_DEPLOYMENT_TARGET=11.0
           fi
           cargo build --release --locked --target "${{ matrix.target }}" -p hydra-cli
+      - name: Build Windows release binary
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: cargo build --release --locked --target "${{ matrix.target }}" -p hydra-cli
       - name: Package release archive
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           scripts/package-release.sh \
@@ -77,6 +92,15 @@ jobs:
             "${{ matrix.target }}" \
             "target/${{ matrix.target }}/release/hydra" \
             release-assets
+      - name: Package Windows release archive
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          scripts/package-release.ps1 `
+            -Version "${{ steps.release.outputs.version }}" `
+            -Target "${{ matrix.target }}" `
+            -Binary "target/${{ matrix.target }}/release/hydra.exe" `
+            -OutputDirectory release-assets
       - name: Upload release archive
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -116,7 +140,9 @@ jobs:
       - name: Attest release archives
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
         with:
-          subject-path: release-assets/*.tar.gz
+          subject-path: |
+            release-assets/*.tar.gz
+            release-assets/*.zip
       - name: Upload assets to the draft release
         env:
           GH_TOKEN: ${{ github.token }}

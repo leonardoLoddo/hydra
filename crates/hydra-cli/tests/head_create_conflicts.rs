@@ -131,7 +131,11 @@ fn head_create_rejects_a_duplicate_without_altering_the_existing_head() {
         .current_dir(&repository)
         .output()
         .expect("Hydra CLI should start");
-    assert!(first.status.success());
+    assert!(
+        first.status.success(),
+        "first creation should succeed, stderr: {}",
+        String::from_utf8_lossy(&first.stderr)
+    );
 
     let second = hydra_command()
         .args(["head", "create", "payment"])

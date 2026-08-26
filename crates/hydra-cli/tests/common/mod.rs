@@ -27,6 +27,46 @@ pub fn hydra_command() -> Command {
 }
 
 #[allow(dead_code)]
+pub fn canonical_path(path: impl AsRef<Path>) -> std::io::Result<PathBuf> {
+    let path = fs::canonicalize(path)?;
+    #[cfg(windows)]
+    {
+        use std::path::{Component, Prefix};
+
+        let mut components = path.components();
+        let Some(Component::Prefix(prefix)) = components.next() else {
+            return Ok(path);
+        };
+        let mut simplified = match prefix.kind() {
+            Prefix::VerbatimDisk(drive) => PathBuf::from(format!("{}:", char::from(drive))),
+            Prefix::VerbatimUNC(server, share) => {
+                let mut root = PathBuf::from(r"\\");
+                root.push(server);
+                root.push(share);
+                root
+            }
+            _ => return Ok(path),
+        };
+        simplified.extend(components);
+        Ok(simplified)
+    }
+    #[cfg(not(windows))]
+    Ok(path)
+}
+
+#[allow(dead_code)]
+pub fn canonical_parent_path(path: impl AsRef<Path>) -> std::io::Result<PathBuf> {
+    let path = path.as_ref();
+    let parent = path.parent().ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, "path has no parent")
+    })?;
+    let file_name = path.file_name().ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, "path has no file name")
+    })?;
+    canonical_path(parent).map(|parent| parent.join(file_name))
+}
+
+#[allow(dead_code)]
 pub fn run_git(repository: &Path, arguments: &[&str]) -> Output {
     Command::new("git")
         .arg("-C")
@@ -46,6 +86,9 @@ pub fn create_initialized_project(directory: &TestDirectory) -> PathBuf {
         .arg(&repository)
         .output()
         .expect("Git should start");
+    assert!(output.status.success());
+
+    let output = run_git(&repository, &["config", "core.autocrlf", "false"]);
     assert!(output.status.success());
 
     fs::create_dir(repository.join("src")).expect("source directory should be created");
