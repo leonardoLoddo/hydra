@@ -14,7 +14,7 @@ const MAX_CAPTURED_STDERR_BYTES: usize = 64 * 1024;
 pub(super) struct GitBlobBatch {
     child: Option<Child>,
     input: Option<BufWriter<ChildStdin>>,
-    output: BufReader<ChildStdout>,
+    output: Option<BufReader<ChildStdout>>,
     stderr_drain: Option<JoinHandle<std::io::Result<Vec<u8>>>>,
     stream_buffer: Box<[u8]>,
 }
@@ -60,7 +60,7 @@ impl GitBlobBatch {
         Ok(Self {
             child: Some(child),
             input: Some(BufWriter::new(input)),
-            output: BufReader::new(output),
+            output: Some(BufReader::new(output)),
             stderr_drain: Some(stderr_drain),
             stream_buffer: vec![0_u8; STREAM_BUFFER_BYTES].into_boxed_slice(),
         })
@@ -136,7 +136,11 @@ impl GitBlobBatch {
             .and_then(|()| input.write_all(b"\n"))
             .and_then(|()| input.flush())
             .map_err(|source| git_io_failure("requesting a tracked Git blob", &source))?;
-        let header = read_bounded_header(&mut self.output)?;
+        let output = self
+            .output
+            .as_mut()
+            .ok_or(HeadError::InvalidGitOutput("tracked blob batch output"))?;
+        let header = read_bounded_header(output)?;
         parse_blob_header(&header, object)
     }
 
@@ -145,18 +149,22 @@ impl GitBlobBatch {
         size: u64,
         mut consume: impl FnMut(&[u8]) -> Result<(), HeadError>,
     ) -> Result<(), HeadError> {
+        let output = self
+            .output
+            .as_mut()
+            .ok_or(HeadError::InvalidGitOutput("tracked blob batch output"))?;
         let mut remaining = size;
         while remaining > 0 {
             let length = usize::try_from(remaining.min(self.stream_buffer.len() as u64))
                 .map_err(|_| HeadError::InvalidGitOutput("tracked blob batch size"))?;
-            self.output
+            output
                 .read_exact(&mut self.stream_buffer[..length])
                 .map_err(|source| git_io_failure("reading a tracked Git blob", &source))?;
             consume(&self.stream_buffer[..length])?;
             remaining -= length as u64;
         }
         let mut terminator = [0_u8; 1];
-        self.output
+        output
             .read_exact(&mut terminator)
             .map_err(|source| git_io_failure("reading tracked Git blob framing", &source))?;
         if terminator != *b"\n" {
@@ -181,6 +189,7 @@ impl GitBlobBatch {
 impl Drop for GitBlobBatch {
     fn drop(&mut self) {
         drop(self.input.take());
+        drop(self.output.take());
         if let Some(mut child) = self.child.take() {
             terminate_child(&mut child);
         }
