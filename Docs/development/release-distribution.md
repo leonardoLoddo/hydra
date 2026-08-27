@@ -297,6 +297,18 @@ supported merely because a binary can start there.
 The following external evidence is still required before broader promotion:
 
 - verify a clean colleague installation without Rust;
+- publish the first shared release after `v0.1.1` with the immutable archives
+  for every supported macOS, Linux, and Windows target plus the checksummed
+  `hydra-windows-x86_64.zip` stable alias. The Windows executable must remain a
+  GitHub Release asset produced by the verified release matrix, never a binary
+  committed to the source tree or an expiring CI artifact;
+- install that published stable Windows ZIP on a clean Windows 11 x86-64
+  machine without Rust, verify its SHA-256 checksum and user `PATH`, and run the
+  native executable through Git for Windows and Git Bash. The real end-to-end
+  exercise must use disposable repositories in a dedicated directory and
+  cover initialization, Head creation and inspection, storage diagnostics,
+  working-tree isolation, integration or protected removal, and final Git and
+  filesystem state;
 - exercise the complete Homebrew workflow directly on WSL 2 before promoting
   it beyond preview support;
 - verify the real Homebrew upgrade path from `v0.1.0` to `v0.1.1` on a clean
