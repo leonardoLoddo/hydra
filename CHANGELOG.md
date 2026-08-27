@@ -5,6 +5,20 @@ All notable changes to Hydra will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/leonardoLoddo/hydra/compare/v0.1.1...v0.2.0) (2026-08-27)
+
+
+### Features
+
+* **doctor:** report WSL storage capabilities ([7fe04db](https://github.com/leonardoLoddo/hydra/commit/7fe04db755e7bd30a893d3e28e449cd210b45697))
+* **release:** enhance Windows support and documentation for native packaging ([12479c9](https://github.com/leonardoLoddo/hydra/commit/12479c9b02e6295f314c1069e4dbcd39cdbdb38b))
+* **storage:** support native Windows workflows ([2dbd451](https://github.com/leonardoLoddo/hydra/commit/2dbd451186079d05147324ab97aa98f6cdaf9583))
+
+
+### Bug Fixes
+
+* **materializer:** prevent Windows blob shutdown deadlock ([ca51c09](https://github.com/leonardoLoddo/hydra/commit/ca51c0982fe01c87a4366350c04af05ffee60aec))
+
 ## [0.1.1](https://github.com/leonardoLoddo/hydra/compare/v0.1.0...v0.1.1) (2026-08-18)
 
 
