@@ -14,8 +14,10 @@ release workflow exist.
 Public preview `v0.1.1` is available from GitHub Releases and the
 `leonardoLoddo/homebrew-tap` tap. The current Formula contains immutable native
 archive URLs for both macOS and Linux on ARM64 and x86-64. WSL 2 consumes the
-Linux Formula. Native Windows x86-64 is distributed separately as a checksummed
-ZIP containing `hydra.exe` and is exercised with Git for Windows and Git Bash.
+Linux Formula. Public `v0.1.1` predates the native Windows artifacts. Current
+release automation adds native Windows x86-64 to the same release transaction
+as a checksummed ZIP containing `hydra.exe`; that channel becomes public with
+the first subsequent release and is exercised with Git for Windows and Git Bash.
 Direct end-to-end WSL evidence remains part of preview validation.
 The intended audience remains a small group of colleagues who can exercise
 preview releases and report platform, installation, upgrade, and workflow
@@ -211,7 +213,11 @@ current marker.
 
 The release matrix builds native archives for macOS Apple Silicon, macOS Intel,
 Linux ARM64, Linux x86-64, and native Windows x86-64. Unix targets use
-`.tar.gz`; Windows uses a `.zip` containing `hydra.exe`. The preview baseline
+`.tar.gz`; Windows publishes both the immutable versioned ZIP and a byte-for-byte
+identical `hydra-windows-x86_64.zip` alias containing `hydra.exe`. The stable
+alias and its checksum make the README's latest-release link independent of the
+version number, while the versioned archive remains available for reproducible
+downloads. The preview baseline
 is macOS 11 or newer, glibc 2.35 or newer, and Windows 11 with Git for Windows,
 built on native macOS 15, Ubuntu 22.04, and Windows 2025 runners.
 Generated Homebrew metadata selects the matching immutable archive on all four

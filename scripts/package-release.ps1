@@ -43,6 +43,15 @@ try {
     Compress-Archive -Path (Join-Path $packageRoot "*") -DestinationPath $archivePath
     $digest = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
     Set-Content -LiteralPath "$archivePath.sha256" -Value "$digest  $archiveName" -Encoding ascii
+
+    $architecture = $Target.Split('-')[0]
+    $latestArchiveName = "hydra-windows-$architecture.zip"
+    $latestArchivePath = Join-Path $resolvedOutput $latestArchiveName
+    Copy-Item -LiteralPath $archivePath -Destination $latestArchivePath -Force
+    Set-Content `
+        -LiteralPath "$latestArchivePath.sha256" `
+        -Value "$digest  $latestArchiveName" `
+        -Encoding ascii
 }
 finally {
     if (Test-Path -LiteralPath $stagingRoot) {

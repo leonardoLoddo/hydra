@@ -17,6 +17,29 @@ try {
         -OutputDirectory $assets
 
     $archive = Join-Path $assets "hydra-$version-x86_64-pc-windows-msvc.zip"
+    $latestArchiveName = "hydra-windows-x86_64.zip"
+    $latestArchive = Join-Path $assets $latestArchiveName
+    if (-not (Test-Path -LiteralPath $latestArchive -PathType Leaf)) {
+        throw "release assets are missing the stable Windows download"
+    }
+    if (-not (Test-Path -LiteralPath "$latestArchive.sha256" -PathType Leaf)) {
+        throw "stable Windows download checksum is missing"
+    }
+    $canonicalDigest = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+    $latestDigest = (Get-FileHash -LiteralPath $latestArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($latestDigest -ne $canonicalDigest) {
+        throw "stable Windows download does not match the versioned archive"
+    }
+    $expectedLatestChecksum = "$latestDigest  $latestArchiveName"
+    $actualLatestChecksum = (Get-Content -LiteralPath "$latestArchive.sha256" -Raw).Trim()
+    if ($actualLatestChecksum -ne $expectedLatestChecksum) {
+        throw "stable Windows download checksum does not name the downloadable asset"
+    }
+    $readme = Get-Content -LiteralPath (Join-Path $repositoryRoot "README.md") -Raw
+    $latestDownloadUrl = "https://github.com/leonardoLoddo/hydra/releases/latest/download/$latestArchiveName"
+    if (-not $readme.Contains($latestDownloadUrl)) {
+        throw "repository README does not link to the stable Windows download"
+    }
     $expanded = Join-Path $testRoot "expanded"
     Expand-Archive -LiteralPath $archive -DestinationPath $expanded
     $expected = @(

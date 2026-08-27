@@ -26,9 +26,18 @@ brew install leonardoLoddo/tap/hydra-heads
 The Formula is named `hydra-heads` because Homebrew already distributes an
 unrelated package named `hydra`. The installed executable is still `hydra`.
 
-On native Windows x86-64, download the checksummed `.zip` from GitHub Releases,
-extract `hydra.exe` into a directory on the Windows `PATH`, and use it from Git
-Bash. Homebrew remains the installation channel for macOS, Linux, and WSL 2.
+On native Windows x86-64, use the stable release links:
+
+[Download Hydra for Windows](https://github.com/leonardoLoddo/hydra/releases/latest/download/hydra-windows-x86_64.zip)
+· [SHA-256 checksum](https://github.com/leonardoLoddo/hydra/releases/latest/download/hydra-windows-x86_64.zip.sha256)
+
+Extract `hydra.exe` into a directory on the Windows `PATH`, then use it from
+Git Bash. The stable links always resolve through the latest GitHub Release;
+the same release also contains the versioned Windows archive and all macOS and
+Linux artifacts. Public `v0.1.1` predates native Windows packaging, so these
+links become downloadable with the first subsequent release. Until then, use
+the source installation below. Homebrew remains the installation channel for
+macOS, Linux, and WSL 2.
 
 To work from the repository instead, build from source with the pinned Rust
 toolchain:
@@ -157,8 +166,10 @@ Release automation builds native archives for:
 Release automation is configured to verify Homebrew installation on both
 macOS and Linux architectures before updating the tap. WSL 2 uses the Linux
 Formula and remains preview evidence to exercise directly with a colleague;
-native Windows is tested with Git for Windows and Git Bash and is distributed
-as a separate ZIP. WSL 1 is not supported.
+native Windows is tested with Git for Windows and Git Bash. Starting with the
+first release after `v0.1.1`, it is published in that same release as both a
+versioned ZIP and the stable `hydra-windows-x86_64.zip` download. WSL 1 is not
+supported.
 
 The current `v0.1.1` Formula includes native archive metadata for Linux. WSL 2
 uses that Linux Formula, while direct end-to-end WSL evidence remains part of

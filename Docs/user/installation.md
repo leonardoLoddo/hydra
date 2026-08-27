@@ -101,9 +101,14 @@ your `PATH`; do not copy the skill into personal state manually. After the
 binary is reachable, use `hydra skill install codex` for the protected optional
 installation flow.
 
-On native Windows, download `hydra-<version>-x86_64-pc-windows-msvc.zip`,
-verify its `.sha256` file, and extract it to a stable directory. Add that
-directory to the Windows user `PATH`, restart Git Bash, and verify:
+On native Windows, download the stable
+[`hydra-windows-x86_64.zip`](https://github.com/leonardoLoddo/hydra/releases/latest/download/hydra-windows-x86_64.zip)
+and its
+[`SHA-256 checksum`](https://github.com/leonardoLoddo/hydra/releases/latest/download/hydra-windows-x86_64.zip.sha256).
+The same release also retains the immutable
+`hydra-<version>-x86_64-pc-windows-msvc.zip` archive. Verify the checksum and
+extract the ZIP to a stable directory. Add that directory to the Windows user
+`PATH`, restart Git Bash, and verify:
 
 ```bash
 hydra.exe --version
@@ -114,6 +119,10 @@ hydra --help
 Git Bash resolves `hydra` to `hydra.exe`, so all normal examples continue to
 use the extensionless command. Git for Windows must remain reachable on
 `PATH`, because Hydra invokes `git` directly.
+
+Public `v0.1.1` predates native Windows packaging. The stable download becomes
+available with the first subsequent release; install from source until that
+release is published.
 
 ## Update Hydra
 

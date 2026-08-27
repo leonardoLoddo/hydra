@@ -15,6 +15,13 @@ full copies. Run `hydra doctor storage` before making storage-cost assumptions.
 Do not create a Head containing tracked or selected overlay symlinks on Windows;
 that materialization remains unsupported.
 
+When the user asks to install Hydra on native Windows, use the checksummed
+stable Windows ZIP linked from the repository README only after it resolves to
+a published GitHub Release. Do not use expiring CI artifacts or binaries
+committed to the source tree. If no Windows release asset exists yet, report
+that boundary and use a source build only when the user accepts the Rust
+toolchain requirement.
+
 ## Establish the starting state
 
 1. Run `hydra --version` and `hydra --help`. Never assume an installed build

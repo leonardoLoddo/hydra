@@ -126,10 +126,14 @@ configura Homebrew nel prefisso Linux predefinito prima dell'installazione.
 WSL 1 non è supportato. La Formula `v0.1.1` include gli URL nativi Linux e WSL
 2 la usa con supporto di qualità preview.
 
-Su Windows 11 x86-64 nativo scarica da GitHub Releases l'archivio
-`hydra-<version>-x86_64-pc-windows-msvc.zip` e il relativo `.sha256`. Verifica
-il checksum, estrai `hydra.exe` in una directory stabile del `PATH` utente di
-Windows, riavvia Git Bash e verifica:
+Su Windows 11 x86-64 nativo scarica
+[`hydra-windows-x86_64.zip`](https://github.com/leonardoLoddo/hydra/releases/latest/download/hydra-windows-x86_64.zip)
+e il relativo
+[`checksum SHA-256`](https://github.com/leonardoLoddo/hydra/releases/latest/download/hydra-windows-x86_64.zip.sha256).
+La stessa release conserva anche l'archivio immutabile
+`hydra-<version>-x86_64-pc-windows-msvc.zip`. Verifica il checksum, estrai
+`hydra.exe` in una directory stabile del `PATH` utente di Windows, riavvia Git
+Bash e verifica:
 
 ```bash
 hydra.exe --version
@@ -141,6 +145,10 @@ Git Bash risolve automaticamente `hydra` in `hydra.exe`, quindi gli esempi
 restano invariati. Git for Windows deve essere installato e raggiungibile nel
 `PATH`. PowerShell può essere usato per installare il binario, ma il flusso
 operativo e i completamenti documentati usano Git Bash.
+
+La release pubblica `v0.1.1` precede il packaging Windows nativo. Il link
+stabile diventa scaricabile con la prima release successiva; fino alla sua
+pubblicazione usa l'installazione dal sorgente descritta sotto.
 
 Per aggiornare binario e skill gestita separatamente:
 

@@ -160,6 +160,7 @@ const fn storage_environment() -> StorageEnvironment {
     StorageEnvironment::Native
 }
 
+#[cfg(any(target_os = "linux", test))]
 fn storage_environment_from_release(release: &str) -> StorageEnvironment {
     let release = release.to_ascii_lowercase();
     if release.contains("microsoft") || release.contains("wsl") {
@@ -267,6 +268,7 @@ impl Error for DoctorError {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(target_os = "linux")]
     use std::path::Path;
 
     use super::{
