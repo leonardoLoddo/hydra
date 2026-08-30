@@ -136,7 +136,8 @@ Hydra currently manages:
 - deterministic repair proposals;
 - real storage diagnostics;
 - Bash, Zsh, and Fish completions;
-- an optional Agent Skill for Codex, Gemini CLI, and Antigravity CLI.
+- an optional Agent Skill for Codex, Gemini CLI, Antigravity CLI, and the
+  Antigravity app.
 
 ## Getting help
 

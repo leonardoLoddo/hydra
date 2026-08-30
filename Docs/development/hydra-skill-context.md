@@ -62,11 +62,12 @@ Do not claim a provider or installation channel as supported until its package,
 installation procedure, update path, and representative activation workflow
 have been verified on that host. Keep unavailable channels explicitly planned.
 
-Hydra currently provides lifecycle adapters for Codex, Gemini CLI, and
-Antigravity CLI. They install the same canonical artifact at
-`$HOME/.agents/skills/hydra`, `$HOME/.gemini/skills/hydra`, and
-`$HOME/.gemini/antigravity-cli/skills/hydra`, respectively. The destinations
-are independent; provider-specific manifests prevent one adapter from claiming
+Hydra currently provides lifecycle adapters for Codex, Gemini CLI,
+Antigravity CLI, and the Antigravity app. They install the same canonical
+artifact at `$HOME/.agents/skills/hydra`, `$HOME/.gemini/skills/hydra`,
+`$HOME/.gemini/antigravity-cli/skills/hydra`, and
+`$HOME/.gemini/config/skills/hydra`, respectively. The destinations are
+independent; provider-specific manifests prevent one adapter from claiming
 another copy.
 
 ---

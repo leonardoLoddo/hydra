@@ -122,10 +122,11 @@ and it preserves a private branch containing unintegrated commits.
 
 ## Skill commands
 
-Supported providers are `codex`, `gemini`, and `agy`. They install the same
-canonical skill into `$HOME/.agents/skills/hydra`,
-`$HOME/.gemini/skills/hydra`, and
-`$HOME/.gemini/antigravity-cli/skills/hydra`, respectively.
+Supported providers are `codex`, `gemini`, `agy`, and `antigravity`. They
+install the same canonical skill into `$HOME/.agents/skills/hydra`,
+`$HOME/.gemini/skills/hydra`,
+`$HOME/.gemini/antigravity-cli/skills/hydra`, and
+`$HOME/.gemini/config/skills/hydra`, respectively.
 
 ### `hydra skill install <PROVIDER>`
 

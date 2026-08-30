@@ -22,6 +22,10 @@ fn agy_skill_path(home: &Path) -> std::path::PathBuf {
     home.join(".gemini/antigravity-cli/skills/hydra")
 }
 
+fn antigravity_skill_path(home: &Path) -> std::path::PathBuf {
+    home.join(".gemini/config/skills/hydra")
+}
+
 fn install_skill(home: &Path) {
     let output = isolated_hydra(home)
         .args(["skill", "install", "codex", "--yes"])
@@ -54,7 +58,7 @@ fn skill_help_exposes_the_supported_provider_lifecycle() {
             "skill help should list {command:?}, got: {stdout:?}"
         );
     }
-    for provider in ["codex", "gemini", "agy"] {
+    for provider in ["codex", "gemini", "agy", "antigravity"] {
         assert!(
             stdout.contains(provider),
             "skill help should list {provider:?}, got: {stdout:?}"
@@ -214,6 +218,91 @@ fn agy_lifecycle_uses_its_destination_and_provider_provenance() {
 
     let remove = isolated_hydra(directory.path())
         .args(["skill", "remove", "agy", "--yes"])
+        .output()
+        .expect("Hydra CLI should start");
+    assert!(remove.status.success());
+    assert!(!destination.exists());
+}
+
+#[test]
+fn antigravity_lifecycle_uses_its_destination_and_provider_provenance() {
+    let directory = TestDirectory::new("antigravity-skill-install");
+    let output = isolated_hydra(directory.path())
+        .args(["skill", "install", "antigravity", "--yes"])
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(
+        output.status.success(),
+        "install should succeed, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let destination = antigravity_skill_path(directory.path());
+    assert_eq!(
+        fs::read(destination.join("SKILL.md")).expect("installed SKILL.md should exist"),
+        include_bytes!("../../../skills/hydra/SKILL.md")
+    );
+    assert_eq!(
+        fs::read(destination.join("agents/openai.yaml"))
+            .expect("installed OpenAI metadata should exist"),
+        include_bytes!("../../../skills/hydra/agents/openai.yaml")
+    );
+    let manifest: serde_json::Value = serde_json::from_slice(
+        &fs::read(destination.join(".hydra-skill.json")).expect("provenance manifest should exist"),
+    )
+    .expect("provenance manifest should be valid JSON");
+    assert_eq!(manifest["provider"], "antigravity");
+    assert!(String::from_utf8_lossy(&output.stdout).contains("Antigravity app"));
+
+    let manifest_path = destination.join(".hydra-skill.json");
+    let mut mismatched_manifest = manifest.clone();
+    mismatched_manifest["provider"] = serde_json::Value::String("gemini".to_owned());
+    fs::write(
+        &manifest_path,
+        serde_json::to_vec_pretty(&mismatched_manifest).expect("manifest should serialize"),
+    )
+    .expect("mismatched manifest should be written");
+    let mismatched_update = isolated_hydra(directory.path())
+        .args(["skill", "update", "antigravity", "--yes"])
+        .output()
+        .expect("Hydra CLI should start");
+    assert!(!mismatched_update.status.success());
+    assert!(
+        String::from_utf8_lossy(&mismatched_update.stderr)
+            .contains("not owned by the supported Antigravity app adapter")
+    );
+    assert_eq!(
+        fs::read(&manifest_path).expect("mismatched manifest should be preserved"),
+        serde_json::to_vec_pretty(&mismatched_manifest).expect("manifest should serialize")
+    );
+    fs::write(
+        &manifest_path,
+        serde_json::to_vec_pretty(&manifest).expect("manifest should serialize"),
+    )
+    .expect("managed manifest should be restored");
+
+    let status = isolated_hydra(directory.path())
+        .args(["skill", "status", "antigravity"])
+        .output()
+        .expect("Hydra CLI should start");
+    assert!(status.status.success());
+    assert!(String::from_utf8_lossy(&status.stdout).contains("current"));
+
+    let mut older_manifest = manifest;
+    older_manifest["hydraVersion"] = serde_json::Value::String("0.0.0".to_owned());
+    fs::write(
+        &manifest_path,
+        serde_json::to_vec_pretty(&older_manifest).expect("manifest should serialize"),
+    )
+    .expect("older manifest should be written");
+    let update = isolated_hydra(directory.path())
+        .args(["skill", "update", "antigravity", "--yes"])
+        .output()
+        .expect("Hydra CLI should start");
+    assert!(update.status.success());
+
+    let remove = isolated_hydra(directory.path())
+        .args(["skill", "remove", "antigravity", "--yes"])
         .output()
         .expect("Hydra CLI should start");
     assert!(remove.status.success());

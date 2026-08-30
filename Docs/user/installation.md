@@ -144,6 +144,8 @@ hydra skill status gemini
 hydra skill update gemini
 hydra skill status agy
 hydra skill update agy
+hydra skill status antigravity
+hydra skill update antigravity
 ```
 
 Hydra asks for confirmation with a default-negative choice before changing an
@@ -165,6 +167,7 @@ explicitly before or after uninstalling the Formula:
 hydra skill remove codex
 hydra skill remove gemini
 hydra skill remove agy
+hydra skill remove antigravity
 brew uninstall leonardoLoddo/tap/hydra-heads
 ```
 

@@ -19,6 +19,7 @@ pub enum Provider {
     Codex,
     Gemini,
     Agy,
+    Antigravity,
 }
 
 impl Provider {
@@ -27,6 +28,7 @@ impl Provider {
             Self::Codex => "codex",
             Self::Gemini => "gemini",
             Self::Agy => "agy",
+            Self::Antigravity => "antigravity",
         }
     }
 
@@ -35,6 +37,7 @@ impl Provider {
             Self::Codex => "Codex",
             Self::Gemini => "Gemini CLI",
             Self::Agy => "Antigravity CLI",
+            Self::Antigravity => "Antigravity app",
         }
     }
 
@@ -43,6 +46,7 @@ impl Provider {
             Self::Codex => home.join(".agents/skills/hydra"),
             Self::Gemini => home.join(".gemini/skills/hydra"),
             Self::Agy => home.join(".gemini/antigravity-cli/skills/hydra"),
+            Self::Antigravity => home.join(".gemini/config/skills/hydra"),
         }
     }
 
@@ -59,6 +63,9 @@ impl Provider {
             }
             (Self::Agy, _) => {
                 "Restart Antigravity CLI if needed, then use /skills to inspect loaded skills."
+            }
+            (Self::Antigravity, _) => {
+                "Restart Antigravity if needed, then check Settings > Customizations > Skills."
             }
         }
     }

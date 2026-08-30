@@ -1427,8 +1427,8 @@ workspace disponibile alla revisione e richiede un'autorizzazione esplicita
 prima delle operazioni che aggiornano il target o possono scartare file.
 
 La CLI rende ora la stessa sorgente canonica installabile, ispezionabile,
-aggiornabile e rimovibile per Codex, Gemini CLI e Antigravity CLI tramite
-`hydra skill`.
+aggiornabile e rimovibile per Codex, Gemini CLI, Antigravity CLI e l'app
+Antigravity tramite `hydra skill`.
 La distribuzione può essere estesa agli altri host che supportano lo standard
 aperto Agent Skills. Hydra non mantiene copie divergenti
 delle istruzioni per singolo vendor: plugin, marketplace, estensioni, archivi o
@@ -1441,9 +1441,10 @@ formato proprietario nella fonte del comportamento operativo.
 installare la skill, mostra la destinazione personale del provider e usa una
 scelta predefinita negativa. Codex usa `$HOME/.agents/skills/hydra`; Gemini CLI
 usa `$HOME/.gemini/skills/hydra`; Antigravity CLI usa
-`$HOME/.gemini/antigravity-cli/skills/hydra`. La Formula non aggiunge mai la
-skill insieme al binario. Le automazioni devono passare `--yes` o `--no`;
-presenza di un host o input non interattivo non implicano consenso.
+`$HOME/.gemini/antigravity-cli/skills/hydra`; l'app Antigravity usa
+`$HOME/.gemini/config/skills/hydra`. La Formula non aggiunge mai la skill
+insieme al binario. Le automazioni devono passare `--yes` o `--no`; presenza di
+un host o input non interattivo non implicano consenso.
 
 La prima distribuzione di anteprima è destinata a un gruppo ristretto di
 colleghi tramite release versionate del repository pubblico
@@ -1456,9 +1457,9 @@ versionati e al termine mostra nei caveat l'intero `hydra-art.txt`, incluso il
 wordmark `HYDRA`. Subito sotto l'artwork mostra prima `hydra --help` come punto
 di ingresso generale e poi il comando opzionale `hydra skill install codex`,
 senza eseguirlo automaticamente. Quest'ultimo mostra la destinazione risolta e
-chiede conferma prima di installare la skill. Codex, Gemini CLI e Antigravity
-CLI sono provider supportati e il rifiuto deve rimanere sempre disponibile e
-sicuro.
+chiede conferma prima di installare la skill. Codex, Gemini CLI, Antigravity
+CLI e l'app Antigravity sono provider supportati e il rifiuto deve rimanere
+sempre disponibile e sicuro.
 Versioni, artefatti e aggiornamento della Formula derivano da release
 immutabili create secondo le Conventional Commits; il contratto di
 distribuzione è mantenuto in

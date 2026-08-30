@@ -122,11 +122,12 @@ must:
 4. show and validate the destination before copying anything;
 5. report whether the skill was installed, skipped, or refused safely.
 
-Codex, Gemini CLI, and Antigravity CLI are supported providers. The provider
-remains explicit in the command so new adapters do not change the meaning of
-an existing invocation. Automation must have explicit non-interactive choices
-equivalent to installing the selected provider copy or skipping it. It must
-never infer consent from the presence of an agent application.
+Codex, Gemini CLI, Antigravity CLI, and the Antigravity app are supported
+providers. The provider remains explicit in the command so new adapters do not
+change the meaning of an existing invocation. Automation must have explicit
+non-interactive choices equivalent to installing the selected provider copy or
+skipping it. It must never infer consent from the presence of an agent
+application.
 
 ## Agent Skill Packaging
 
@@ -146,7 +147,11 @@ skill location. Gemini CLI discovers personal skills below
 session. Antigravity CLI discovers directory-based skills below
 `$HOME/.gemini/antigravity-cli/skills`, so the `agy` adapter installs Hydra at
 `$HOME/.gemini/antigravity-cli/skills/hydra`; `/skills` lists loaded skills and
-the host may need a restart after installation or update.
+the host may need a restart after installation or update. The Antigravity app
+discovers global custom skills below `$HOME/.gemini/config/skills`, so the
+`antigravity` adapter installs Hydra at `$HOME/.gemini/config/skills/hydra`;
+users can inspect discovery under **Settings > Customizations > Skills** and
+restart the app when a new or updated skill is not visible.
 
 Skill installation must:
 

@@ -109,6 +109,7 @@ personal skill directory you want Hydra to manage:
 hydra skill install codex
 hydra skill install gemini
 hydra skill install agy
+hydra skill install antigravity
 ```
 
 For unattended setup, make the choice explicit:
@@ -133,12 +134,17 @@ hydra skill remove gemini
 hydra skill status agy
 hydra skill update agy
 hydra skill remove agy
+
+hydra skill status antigravity
+hydra skill update antigravity
+hydra skill remove antigravity
 ```
 
 Hydra preserves an unknown or locally modified skill instead of overwriting or
 deleting it. Codex normally detects changes automatically. Gemini CLI can
 rescan its skill directories with `/skills reload`. In Antigravity CLI, restart
-the host if needed and use `/skills` to inspect discovery.
+the host if needed and use `/skills` to inspect discovery. In the Antigravity
+app, restart if needed and check **Settings > Customizations > Skills**.
 
 ## Update and uninstall
 
@@ -156,6 +162,8 @@ hydra skill status gemini
 hydra skill update gemini
 hydra skill status agy
 hydra skill update agy
+hydra skill status antigravity
+hydra skill update antigravity
 ```
 
 Remove the binary and, only if desired, the skill:
@@ -164,6 +172,7 @@ Remove the binary and, only if desired, the skill:
 hydra skill remove codex
 hydra skill remove gemini
 hydra skill remove agy
+hydra skill remove antigravity
 brew uninstall leonardoLoddo/tap/hydra-heads
 ```
 
