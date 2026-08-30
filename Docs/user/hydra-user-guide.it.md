@@ -203,7 +203,14 @@ directory personali documentate dai provider:
 | Antigravity CLI | `agy` | `$HOME/.gemini/antigravity-cli/skills/hydra` |
 | App Antigravity | `antigravity` | `$HOME/.gemini/config/skills/hydra` |
 
-Le destinazioni non sono intercambiabili. Installa ogni copia che vuoi usare:
+Hydra gestisce le destinazioni in modo indipendente. Gemini CLI riconosce anche
+`$HOME/.agents/skills`, quindi può usare la copia installata con `codex` senza
+una seconda installazione. Usa `gemini` se vuoi una copia separata nella sua
+directory personale nativa. AGY e l'app Antigravity richiedono invece le loro
+destinazioni globali dedicate. Il provider usato per `status`, `update` e
+`remove` deve sempre corrispondere a quello che ha installato la copia.
+
+Installa le copie indipendenti che vuoi usare:
 
 ```bash
 hydra skill install codex

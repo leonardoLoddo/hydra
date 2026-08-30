@@ -17,9 +17,20 @@ explicit command.
 | Antigravity CLI | `agy` | `$HOME/.gemini/antigravity-cli/skills/hydra` |
 | Antigravity app | `antigravity` | `$HOME/.gemini/config/skills/hydra` |
 
-The destinations are not aliases. Install every provider copy you intend to
-use. Each copy contains the same `SKILL.md`; provider-specific metadata may be
-ignored by hosts that do not use it.
+Hydra manages the destinations independently. Each copy contains the same
+`SKILL.md`; provider-specific metadata may be ignored by hosts that do not use
+it.
+
+Gemini CLI also discovers user skills below `$HOME/.agents/skills`, so it can
+use the copy installed by the `codex` adapter. A separate `gemini` installation
+is optional when that shared discovery is acceptable; use it when you want an
+independent Hydra-managed copy in Gemini's native personal directory. AGY and
+the Antigravity app do not use that global alias and need their own provider
+destinations.
+
+Discovery compatibility does not transfer Hydra ownership. Always run
+`status`, `update`, and `remove` with the provider value that originally
+installed that exact destination.
 
 ## Install
 

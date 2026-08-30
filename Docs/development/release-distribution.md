@@ -144,7 +144,9 @@ before changing the adapter; `CODEX_HOME/skills` is not the current personal
 skill location. Gemini CLI discovers personal skills below
 `$HOME/.gemini/skills`, so its adapter installs Hydra at
 `$HOME/.gemini/skills/hydra`; `/skills reload` refreshes discovery in a running
-session. Antigravity CLI discovers directory-based skills below
+session. Gemini CLI also recognizes `$HOME/.agents/skills`, allowing its host
+to discover a Codex-adapter copy while Hydra continues to manage that copy as
+`codex`. Antigravity CLI discovers directory-based skills below
 `$HOME/.gemini/antigravity-cli/skills`, so the `agy` adapter installs Hydra at
 `$HOME/.gemini/antigravity-cli/skills/hydra`; `/skills` lists loaded skills and
 the host may need a restart after installation or update. The Antigravity app
@@ -152,6 +154,13 @@ discovers global custom skills below `$HOME/.gemini/config/skills`, so the
 `antigravity` adapter installs Hydra at `$HOME/.gemini/config/skills/hydra`;
 users can inspect discovery under **Settings > Customizations > Skills** and
 restart the app when a new or updated skill is not visible.
+
+The Antigravity CLI reference currently describes flat Markdown files while
+Google's Antigravity Skills Codelab demonstrates folder-based `SKILL.md`
+packages in the same global root. Hydra follows the Codelab layout to preserve
+the canonical portable package. Release verification must test that layout
+with the supported `agy` build and report the result; documentation must not
+silently imply that local runtime evidence exists when it does not.
 
 Skill installation must:
 

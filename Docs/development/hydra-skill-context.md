@@ -70,6 +70,20 @@ artifact at `$HOME/.agents/skills/hydra`, `$HOME/.gemini/skills/hydra`,
 independent; provider-specific manifests prevent one adapter from claiming
 another copy.
 
+Host discovery can overlap without changing adapter ownership. Gemini CLI also
+recognizes `$HOME/.agents/skills`, so it may discover the Codex adapter's copy.
+This can eliminate the need for a second Gemini installation, but lifecycle
+commands must still select `codex` for that destination. AGY and the
+Antigravity app retain separate global discovery paths.
+
+Google's current Antigravity CLI references disagree on the global skill
+payload: the CLI reference describes flat Markdown files, while the official
+Antigravity Skills Codelab copies folder-based skills containing `SKILL.md`.
+The `agy` adapter follows the folder-based Codelab contract so Hydra can keep
+its portable resources together. Release qualification must exercise discovery
+with an installed `agy` binary before treating that packaging detail as
+runtime-verified.
+
 ---
 
 ## Authoritative Inputs

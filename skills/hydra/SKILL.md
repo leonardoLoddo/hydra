@@ -255,3 +255,8 @@ assuming the installed binary supports any one. Use
 the user confirms the resolved destination and action. Hydra preserves unknown,
 provider-mismatched, or locally modified skill content; do not bypass that
 refusal with a manual copy or recursive deletion.
+
+Gemini CLI may discover the Codex adapter's copy through its
+`$HOME/.agents/skills` alias. Discovery does not change ownership: manage that
+copy with `codex`, not `gemini`. Use `gemini` only for the independent
+`$HOME/.gemini/skills/hydra` destination.

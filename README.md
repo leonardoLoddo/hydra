@@ -146,6 +146,11 @@ rescan its skill directories with `/skills reload`. In Antigravity CLI, restart
 the host if needed and use `/skills` to inspect discovery. In the Antigravity
 app, restart if needed and check **Settings > Customizations > Skills**.
 
+Gemini CLI also recognizes `$HOME/.agents/skills`, so it may discover the copy
+installed for Codex without a second installation. Use `gemini` when you want
+an independently managed copy in Gemini's native personal directory. AGY and
+the Antigravity app use separate global locations.
+
 ## Update and uninstall
 
 ```bash
