@@ -14,6 +14,7 @@ explicit command.
 |---|---|---|
 | Codex | `codex` | `$HOME/.agents/skills/hydra` |
 | Gemini CLI | `gemini` | `$HOME/.gemini/skills/hydra` |
+| Antigravity CLI | `agy` | `$HOME/.gemini/antigravity-cli/skills/hydra` |
 
 The destinations are not aliases. Install every provider copy you intend to
 use. Each copy contains the same `SKILL.md`; provider-specific metadata may be
@@ -26,6 +27,7 @@ Choose the provider explicitly:
 ```bash
 hydra skill install codex
 hydra skill install gemini
+hydra skill install agy
 ```
 
 In an interactive terminal Hydra displays the resolved destination and asks
@@ -58,7 +60,8 @@ hydra skill update gemini
 For unattended use, add `--yes` or `--no`. Gemini CLI can rescan installed
 skills with `/skills reload`. Codex normally detects skill changes
 automatically; restart it only when the skill or updated instructions are not
-visible.
+visible. Antigravity CLI can list loaded skills with `/skills`; restart the host
+when a newly installed or updated skill is not visible.
 
 ## Remove
 

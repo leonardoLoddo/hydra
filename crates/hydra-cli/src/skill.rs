@@ -18,6 +18,7 @@ const MANIFEST_NAME: &str = ".hydra-skill.json";
 pub enum Provider {
     Codex,
     Gemini,
+    Agy,
 }
 
 impl Provider {
@@ -25,6 +26,7 @@ impl Provider {
         match self {
             Self::Codex => "codex",
             Self::Gemini => "gemini",
+            Self::Agy => "agy",
         }
     }
 
@@ -32,6 +34,7 @@ impl Provider {
         match self {
             Self::Codex => "Codex",
             Self::Gemini => "Gemini CLI",
+            Self::Agy => "Antigravity CLI",
         }
     }
 
@@ -39,6 +42,7 @@ impl Provider {
         match self {
             Self::Codex => home.join(".agents/skills/hydra"),
             Self::Gemini => home.join(".gemini/skills/hydra"),
+            Self::Agy => home.join(".gemini/antigravity-cli/skills/hydra"),
         }
     }
 
@@ -52,6 +56,9 @@ impl Provider {
             }
             (Self::Gemini, _) => {
                 "Run /skills reload in Gemini CLI if the Hydra skill does not appear or refresh."
+            }
+            (Self::Agy, _) => {
+                "Restart Antigravity CLI if needed, then use /skills to inspect loaded skills."
             }
         }
     }

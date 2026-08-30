@@ -200,12 +200,14 @@ directory personali documentate dai provider:
 |---|---|---|
 | Codex | `codex` | `$HOME/.agents/skills/hydra` |
 | Gemini CLI | `gemini` | `$HOME/.gemini/skills/hydra` |
+| Antigravity CLI | `agy` | `$HOME/.gemini/antigravity-cli/skills/hydra` |
 
 Le destinazioni non sono intercambiabili. Installa ogni copia che vuoi usare:
 
 ```bash
 hydra skill install codex
 hydra skill install gemini
+hydra skill install agy
 ```
 
 Su un terminale interattivo Hydra mostra la destinazione e chiede conferma con
@@ -230,6 +232,10 @@ hydra skill remove codex
 hydra skill status gemini
 hydra skill update gemini
 hydra skill remove gemini
+
+hydra skill status agy
+hydra skill update agy
+hydra skill remove agy
 ```
 
 Anche aggiornamento e rimozione usano una conferma predefinita negativa quando
@@ -238,8 +244,9 @@ Una skill sconosciuta, un symlink, un file aggiuntivo o un checksum diverso
 causano un rifiuto sicuro senza sovrascrittura o cancellazione.
 
 Codex rileva normalmente le modifiche automaticamente. Gemini CLI può
-riscansionare le skill con `/skills reload`. Puoi invocare la skill
-esplicitamente, per esempio:
+riscansionare le skill con `/skills reload`. In Antigravity CLI usa `/skills`
+per verificare le skill caricate e riavvia l'host se la nuova copia non è
+visibile. Puoi invocare la skill esplicitamente, per esempio:
 
 ```text
 Usa la skill Hydra per sviluppare questa attività in una Head isolata basata su main.

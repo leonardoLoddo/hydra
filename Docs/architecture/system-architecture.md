@@ -163,7 +163,8 @@ Hydra repository-domain behavior. It resolves each supported provider's
 documented personal skill location, renders default-negative confirmations,
 stages the canonical embedded skill, and owns its provider-specific provenance
 manifest. Codex may mutate only `$HOME/.agents/skills/hydra`; Gemini CLI may
-mutate only `$HOME/.gemini/skills/hydra`. Every adapter rejects symlinks,
+mutate only `$HOME/.gemini/skills/hydra`; Antigravity CLI may mutate only
+`$HOME/.gemini/antigravity-cli/skills/hydra`. Every adapter rejects symlinks,
 unknown trees, extra entries, provider mismatches, and checksum mismatches
 before update or removal. It does not read or mutate a Hydra project's Git
 repository, Heads directory, or local metadata, so this host-specific lifecycle

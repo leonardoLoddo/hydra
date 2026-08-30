@@ -108,6 +108,7 @@ personal skill directory you want Hydra to manage:
 ```bash
 hydra skill install codex
 hydra skill install gemini
+hydra skill install agy
 ```
 
 For unattended setup, make the choice explicit:
@@ -128,11 +129,16 @@ hydra skill remove codex
 hydra skill status gemini
 hydra skill update gemini
 hydra skill remove gemini
+
+hydra skill status agy
+hydra skill update agy
+hydra skill remove agy
 ```
 
 Hydra preserves an unknown or locally modified skill instead of overwriting or
 deleting it. Codex normally detects changes automatically. Gemini CLI can
-rescan its skill directories with `/skills reload`.
+rescan its skill directories with `/skills reload`. In Antigravity CLI, restart
+the host if needed and use `/skills` to inspect discovery.
 
 ## Update and uninstall
 
@@ -148,6 +154,8 @@ hydra skill status codex
 hydra skill update codex
 hydra skill status gemini
 hydra skill update gemini
+hydra skill status agy
+hydra skill update agy
 ```
 
 Remove the binary and, only if desired, the skill:
@@ -155,6 +163,7 @@ Remove the binary and, only if desired, the skill:
 ```bash
 hydra skill remove codex
 hydra skill remove gemini
+hydra skill remove agy
 brew uninstall leonardoLoddo/tap/hydra-heads
 ```
 

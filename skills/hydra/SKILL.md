@@ -249,9 +249,9 @@ in place whenever safe integration or removal cannot be proven.
 Do not update or remove the active Hydra skill merely because a newer Hydra
 binary exists. When the user explicitly asks to manage it, identify the host
 provider and use `hydra skill status <provider>` first. Supported providers
-include `codex` and `gemini`; inspect `hydra skill --help` before assuming the
-installed binary supports either one. Use `hydra skill update <provider>` or
-`hydra skill remove <provider>` only after the user confirms the resolved
+include `codex`, `gemini`, and `agy`; inspect `hydra skill --help` before
+assuming the installed binary supports any one. Use `hydra skill update
+<provider>` or `hydra skill remove <provider>` only after the user confirms the resolved
 destination and action. Hydra preserves unknown, provider-mismatched, or
 locally modified skill content; do not bypass that refusal with a manual copy
 or recursive deletion.

@@ -71,7 +71,7 @@ enum Command {
     },
     /// Install and manage optional AI-agent skills
     #[command(
-        after_help = "Command syntax:\n  hydra skill install <PROVIDER>\n  hydra skill status <PROVIDER>\n  hydra skill update <PROVIDER>\n  hydra skill remove <PROVIDER>\n\nProviders: codex, gemini."
+        after_help = "Command syntax:\n  hydra skill install <PROVIDER>\n  hydra skill status <PROVIDER>\n  hydra skill update <PROVIDER>\n  hydra skill remove <PROVIDER>\n\nProviders: codex, gemini, agy."
     )]
     Skill {
         #[command(subcommand)]
@@ -96,6 +96,7 @@ enum Command {
 enum SkillProvider {
     Codex,
     Gemini,
+    Agy,
 }
 
 impl From<SkillProvider> for skill::Provider {
@@ -103,6 +104,7 @@ impl From<SkillProvider> for skill::Provider {
         match provider {
             SkillProvider::Codex => Self::Codex,
             SkillProvider::Gemini => Self::Gemini,
+            SkillProvider::Agy => Self::Agy,
         }
     }
 }
