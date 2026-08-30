@@ -14,6 +14,49 @@ const SKILL_MD: &[u8] = include_bytes!("../../../skills/hydra/SKILL.md");
 const OPENAI_YAML: &[u8] = include_bytes!("../../../skills/hydra/agents/openai.yaml");
 const MANIFEST_NAME: &str = ".hydra-skill.json";
 
+#[derive(Clone, Copy, Debug)]
+pub enum Provider {
+    Codex,
+    Gemini,
+}
+
+impl Provider {
+    fn id(self) -> &'static str {
+        match self {
+            Self::Codex => "codex",
+            Self::Gemini => "gemini",
+        }
+    }
+
+    fn display_name(self) -> &'static str {
+        match self {
+            Self::Codex => "Codex",
+            Self::Gemini => "Gemini CLI",
+        }
+    }
+
+    fn destination(self, home: &Path) -> PathBuf {
+        match self {
+            Self::Codex => home.join(".agents/skills/hydra"),
+            Self::Gemini => home.join(".gemini/skills/hydra"),
+        }
+    }
+
+    fn refresh_guidance(self, updated: bool) -> &'static str {
+        match (self, updated) {
+            (Self::Codex, false) => {
+                "Codex detects skill changes automatically; restart it only if $hydra does not appear."
+            }
+            (Self::Codex, true) => {
+                "Codex detects skill changes automatically; restart it only if the update does not appear."
+            }
+            (Self::Gemini, _) => {
+                "Run /skills reload in Gemini CLI if the Hydra skill does not appear or refresh."
+            }
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub enum Action {
     Install,
@@ -45,10 +88,17 @@ enum InstalledState {
 
 #[derive(Debug)]
 pub enum SkillError {
-    HomeUnavailable,
-    AlreadyExists(PathBuf),
-    NotInstalled(PathBuf),
+    HomeUnavailable(Provider),
+    AlreadyExists {
+        provider: Provider,
+        path: PathBuf,
+    },
+    NotInstalled {
+        provider: Provider,
+        path: PathBuf,
+    },
     Modified {
+        provider: Provider,
         path: PathBuf,
         reason: String,
     },
@@ -66,25 +116,33 @@ pub enum SkillError {
 impl fmt::Display for SkillError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::HomeUnavailable => write!(
+            Self::HomeUnavailable(provider) => write!(
                 formatter,
-                "cannot resolve the Codex skill destination because HOME is unavailable"
+                "cannot resolve the {} skill destination because HOME is unavailable",
+                provider.display_name()
             ),
-            Self::AlreadyExists(path) => write!(
+            Self::AlreadyExists { provider, path } => write!(
                 formatter,
-                "the Codex skill destination already exists and was preserved: {}",
+                "the {} skill destination already exists and was preserved: {}",
+                provider.display_name(),
                 path.display()
             ),
-            Self::NotInstalled(path) => {
+            Self::NotInstalled { provider, path } => {
                 write!(
                     formatter,
-                    "the Codex skill is not installed at {}",
+                    "the {} skill is not installed at {}",
+                    provider.display_name(),
                     path.display()
                 )
             }
-            Self::Modified { path, reason } => write!(
+            Self::Modified {
+                provider,
+                path,
+                reason,
+            } => write!(
                 formatter,
-                "the Codex skill is unknown or locally modified at {}: {reason}; it was preserved",
+                "the {} skill is unknown or locally modified at {}: {reason}; it was preserved",
+                provider.display_name(),
                 path.display()
             ),
             Self::Io {
@@ -113,70 +171,92 @@ impl Error for SkillError {
     }
 }
 
-pub fn run(action: Action, confirmation: Confirmation) -> Result<(), SkillError> {
-    let destination = codex_destination()?;
+pub fn run(
+    action: Action,
+    provider: Provider,
+    confirmation: Confirmation,
+) -> Result<(), SkillError> {
+    let destination = provider_destination(provider)?;
     match action {
-        Action::Install => install(&destination, confirmation),
-        Action::Status => status(&destination),
-        Action::Update => update(&destination, confirmation),
-        Action::Remove => remove(&destination, confirmation),
+        Action::Install => install(provider, &destination, confirmation),
+        Action::Status => status(provider, &destination),
+        Action::Update => update(provider, &destination, confirmation),
+        Action::Remove => remove(provider, &destination, confirmation),
     }
 }
 
-fn codex_destination() -> Result<PathBuf, SkillError> {
+fn provider_destination(provider: Provider) -> Result<PathBuf, SkillError> {
     let home = env::var_os("HOME")
         .filter(|value| !value.is_empty())
         .or_else(|| env::var_os("USERPROFILE").filter(|value| !value.is_empty()))
-        .ok_or(SkillError::HomeUnavailable)?;
+        .ok_or(SkillError::HomeUnavailable(provider))?;
     let home = PathBuf::from(home);
     if !home.is_absolute() {
-        return Err(SkillError::HomeUnavailable);
+        return Err(SkillError::HomeUnavailable(provider));
     }
-    Ok(home.join(".agents/skills/hydra"))
+    Ok(provider.destination(&home))
 }
 
-fn install(destination: &Path, confirmation: Confirmation) -> Result<(), SkillError> {
+fn install(
+    provider: Provider,
+    destination: &Path,
+    confirmation: Confirmation,
+) -> Result<(), SkillError> {
     if confirmation.no {
-        println!("Codex skill not installed.");
+        println!("{} skill not installed.", provider.display_name());
         return Ok(());
     }
     if symlink_metadata(destination)?.is_some() {
-        return Err(SkillError::AlreadyExists(destination.to_path_buf()));
+        return Err(SkillError::AlreadyExists {
+            provider,
+            path: destination.to_path_buf(),
+        });
     }
     if !confirmed(
-        "Install the optional Hydra skill for Codex?",
+        &format!(
+            "Install the optional Hydra skill for {}?",
+            provider.display_name()
+        ),
         destination,
         confirmation,
     )? {
-        println!("Codex skill not installed.");
+        println!("{} skill not installed.", provider.display_name());
         return Ok(());
     }
 
-    publish_new(destination)?;
-    println!("Installed Codex skill at {}.", destination.display());
+    publish_new(provider, destination)?;
     println!(
-        "Codex detects skill changes automatically; restart it only if $hydra does not appear."
+        "Installed {} skill at {}.",
+        provider.display_name(),
+        destination.display()
     );
+    println!("{}", provider.refresh_guidance(false));
     Ok(())
 }
 
-fn status(destination: &Path) -> Result<(), SkillError> {
-    match inspect(destination)? {
-        InstalledState::Absent => Err(SkillError::NotInstalled(destination.to_path_buf())),
+fn status(provider: Provider, destination: &Path) -> Result<(), SkillError> {
+    match inspect(provider, destination)? {
+        InstalledState::Absent => Err(SkillError::NotInstalled {
+            provider,
+            path: destination.to_path_buf(),
+        }),
         InstalledState::Modified(reason) => Err(SkillError::Modified {
+            provider,
             path: destination.to_path_buf(),
             reason,
         }),
         InstalledState::Managed(manifest) => {
-            if is_current(&manifest) {
+            if is_current(provider, &manifest) {
                 println!(
-                    "Codex skill is current at {} (Hydra {}).",
+                    "{} skill is current at {} (Hydra {}).",
+                    provider.display_name(),
                     destination.display(),
                     manifest.hydra_version
                 );
             } else {
                 println!(
-                    "Codex skill is managed and unmodified at {}, but an update to Hydra {} is available.",
+                    "{} skill is managed and unmodified at {}, but an update to Hydra {} is available.",
+                    provider.display_name(),
                     destination.display(),
                     env!("CARGO_PKG_VERSION")
                 );
@@ -186,48 +266,59 @@ fn status(destination: &Path) -> Result<(), SkillError> {
     }
 }
 
-fn update(destination: &Path, confirmation: Confirmation) -> Result<(), SkillError> {
+fn update(
+    provider: Provider,
+    destination: &Path,
+    confirmation: Confirmation,
+) -> Result<(), SkillError> {
     if confirmation.no {
-        println!("Codex skill not updated.");
+        println!("{} skill not updated.", provider.display_name());
         return Ok(());
     }
-    let manifest = require_managed(destination)?;
-    if is_current(&manifest) {
+    let manifest = require_managed(provider, destination)?;
+    if is_current(provider, &manifest) {
         println!(
-            "Codex skill is already current at {}.",
+            "{} skill is already current at {}.",
+            provider.display_name(),
             destination.display()
         );
         return Ok(());
     }
     if !confirmed(
-        "Update the Hydra skill for Codex?",
+        &format!("Update the Hydra skill for {}?", provider.display_name()),
         destination,
         confirmation,
     )? {
-        println!("Codex skill not updated.");
+        println!("{} skill not updated.", provider.display_name());
         return Ok(());
     }
 
-    replace_managed(destination)?;
-    println!("Updated Codex skill at {}.", destination.display());
+    replace_managed(provider, destination)?;
     println!(
-        "Codex detects skill changes automatically; restart it only if the update does not appear."
+        "Updated {} skill at {}.",
+        provider.display_name(),
+        destination.display()
     );
+    println!("{}", provider.refresh_guidance(true));
     Ok(())
 }
 
-fn remove(destination: &Path, confirmation: Confirmation) -> Result<(), SkillError> {
+fn remove(
+    provider: Provider,
+    destination: &Path,
+    confirmation: Confirmation,
+) -> Result<(), SkillError> {
     if confirmation.no {
-        println!("Codex skill not removed.");
+        println!("{} skill not removed.", provider.display_name());
         return Ok(());
     }
-    require_managed(destination)?;
+    require_managed(provider, destination)?;
     if !confirmed(
-        "Remove the Hydra skill from Codex?",
+        &format!("Remove the Hydra skill from {}?", provider.display_name()),
         destination,
         confirmation,
     )? {
-        println!("Codex skill not removed.");
+        println!("{} skill not removed.", provider.display_name());
         return Ok(());
     }
     fs::remove_dir_all(destination).map_err(|source| SkillError::Io {
@@ -235,7 +326,11 @@ fn remove(destination: &Path, confirmation: Confirmation) -> Result<(), SkillErr
         path: destination.to_path_buf(),
         source,
     })?;
-    println!("Removed Codex skill from {}.", destination.display());
+    println!(
+        "Removed {} skill from {}.",
+        provider.display_name(),
+        destination.display()
+    );
     Ok(())
 }
 
@@ -276,14 +371,16 @@ fn confirmed(
     ))
 }
 
-fn publish_new(destination: &Path) -> Result<(), SkillError> {
-    let parent = destination.parent().ok_or(SkillError::HomeUnavailable)?;
+fn publish_new(provider: Provider, destination: &Path) -> Result<(), SkillError> {
+    let parent = destination
+        .parent()
+        .ok_or(SkillError::HomeUnavailable(provider))?;
     fs::create_dir_all(parent).map_err(|source| SkillError::Io {
         operation: "create",
         path: parent.to_path_buf(),
         source,
     })?;
-    let staged = stage_skill(parent)?;
+    let staged = stage_skill(provider, parent)?;
     if let Err(source) = fs::rename(staged.path(), destination) {
         return Err(SkillError::Io {
             operation: "publish",
@@ -294,9 +391,11 @@ fn publish_new(destination: &Path) -> Result<(), SkillError> {
     Ok(())
 }
 
-fn replace_managed(destination: &Path) -> Result<(), SkillError> {
-    let parent = destination.parent().ok_or(SkillError::HomeUnavailable)?;
-    let staged = stage_skill(parent)?;
+fn replace_managed(provider: Provider, destination: &Path) -> Result<(), SkillError> {
+    let parent = destination
+        .parent()
+        .ok_or(SkillError::HomeUnavailable(provider))?;
+    let staged = stage_skill(provider, parent)?;
     let backup = tempfile::Builder::new()
         .prefix(".hydra-skill-backup-")
         .tempdir_in(parent)
@@ -325,7 +424,7 @@ fn replace_managed(destination: &Path) -> Result<(), SkillError> {
     Ok(())
 }
 
-fn stage_skill(parent: &Path) -> Result<tempfile::TempDir, SkillError> {
+fn stage_skill(provider: Provider, parent: &Path) -> Result<tempfile::TempDir, SkillError> {
     let staged = tempfile::Builder::new()
         .prefix(".hydra-skill-install-")
         .tempdir_in(parent)
@@ -343,9 +442,11 @@ fn stage_skill(parent: &Path) -> Result<tempfile::TempDir, SkillError> {
     write_file(&staged.path().join("SKILL.md"), SKILL_MD)?;
     write_file(&agents.join("openai.yaml"), OPENAI_YAML)?;
     let mut manifest_bytes =
-        serde_json::to_vec_pretty(&current_manifest()).map_err(|source| SkillError::Manifest {
-            path: staged.path().join(MANIFEST_NAME),
-            source,
+        serde_json::to_vec_pretty(&current_manifest(provider)).map_err(|source| {
+            SkillError::Manifest {
+                path: staged.path().join(MANIFEST_NAME),
+                source,
+            }
         })?;
     manifest_bytes.push(b'\n');
     write_file(&staged.path().join(MANIFEST_NAME), &manifest_bytes)?;
@@ -360,10 +461,14 @@ fn write_file(path: &Path, contents: &[u8]) -> Result<(), SkillError> {
     })
 }
 
-fn require_managed(destination: &Path) -> Result<Manifest, SkillError> {
-    match inspect(destination)? {
-        InstalledState::Absent => Err(SkillError::NotInstalled(destination.to_path_buf())),
+fn require_managed(provider: Provider, destination: &Path) -> Result<Manifest, SkillError> {
+    match inspect(provider, destination)? {
+        InstalledState::Absent => Err(SkillError::NotInstalled {
+            provider,
+            path: destination.to_path_buf(),
+        }),
         InstalledState::Modified(reason) => Err(SkillError::Modified {
+            provider,
             path: destination.to_path_buf(),
             reason,
         }),
@@ -371,7 +476,7 @@ fn require_managed(destination: &Path) -> Result<Manifest, SkillError> {
     }
 }
 
-fn inspect(destination: &Path) -> Result<InstalledState, SkillError> {
+fn inspect(provider: Provider, destination: &Path) -> Result<InstalledState, SkillError> {
     let Some(metadata) = symlink_metadata(destination)? else {
         return Ok(InstalledState::Absent);
     };
@@ -427,10 +532,11 @@ fn inspect(destination: &Path) -> Result<InstalledState, SkillError> {
             });
         }
     };
-    if manifest.schema_version != 1 || manifest.provider != "codex" {
-        return Ok(InstalledState::Modified(
-            "the provenance manifest is not owned by the supported Codex adapter".to_owned(),
-        ));
+    if manifest.schema_version != 1 || manifest.provider != provider.id() {
+        return Ok(InstalledState::Modified(format!(
+            "the provenance manifest is not owned by the supported {} adapter",
+            provider.display_name()
+        )));
     }
     let expected_files = BTreeSet::from(["SKILL.md", "agents/openai.yaml"]);
     if manifest
@@ -496,10 +602,10 @@ fn read_file(path: &Path) -> Result<Vec<u8>, SkillError> {
     })
 }
 
-fn current_manifest() -> Manifest {
+fn current_manifest(provider: Provider) -> Manifest {
     Manifest {
         schema_version: 1,
-        provider: "codex".to_owned(),
+        provider: provider.id().to_owned(),
         hydra_version: env!("CARGO_PKG_VERSION").to_owned(),
         files: BTreeMap::from([
             ("SKILL.md".to_owned(), sha256_hex(SKILL_MD)),
@@ -508,9 +614,9 @@ fn current_manifest() -> Manifest {
     }
 }
 
-fn is_current(manifest: &Manifest) -> bool {
+fn is_current(provider: Provider, manifest: &Manifest) -> bool {
     manifest.hydra_version == env!("CARGO_PKG_VERSION")
-        && manifest.files == current_manifest().files
+        && manifest.files == current_manifest(provider).files
 }
 
 fn sha256_hex(contents: &[u8]) -> String {

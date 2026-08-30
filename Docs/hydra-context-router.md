@@ -119,7 +119,7 @@ Docs/
 │   └── hydra-mvp-context.md
 └── user/
     ├── cli-reference.md
-    ├── codex-skill.md
+    ├── agent-skills.md
     ├── concepts.md
     ├── configuration.md
     ├── head-workflows.md

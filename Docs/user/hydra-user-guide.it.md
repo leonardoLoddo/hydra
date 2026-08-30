@@ -43,10 +43,10 @@ hydra status
 hydra repair
 hydra doctor storage
 hydra completions <SHELL>
-hydra skill install codex [--yes | --no]
-hydra skill status codex
-hydra skill update codex [--yes | --no]
-hydra skill remove codex [--yes | --no]
+hydra skill install <PROVIDER> [--yes | --no]
+hydra skill status <PROVIDER>
+hydra skill update <PROVIDER> [--yes | --no]
+hydra skill remove <PROVIDER> [--yes | --no]
 hydra head create <NAME> [--from <REF>] [--target <BRANCH>]
 hydra head list
 hydra head status <NAME>
@@ -150,19 +150,22 @@ Il packaging Windows nativo è disponibile a partire da `v0.2.0`. Il link
 stabile risolve l'ultima GitHub Release, mentre l'archivio versionato rimane
 disponibile per download riproducibili.
 
-Per aggiornare binario e skill gestita separatamente:
+Per aggiornare il binario e ogni copia provider gestita separatamente:
 
 ```bash
 brew update
 brew upgrade leonardoLoddo/tap/hydra-heads
 hydra skill status codex
 hydra skill update codex
+hydra skill status gemini
+hydra skill update gemini
 ```
 
 Per rimuovere il binario e, soltanto se lo desideri, la skill:
 
 ```bash
 hydra skill remove codex
+hydra skill remove gemini
 brew uninstall leonardoLoddo/tap/hydra-heads
 ```
 
@@ -189,12 +192,20 @@ eseguito; `which -a hydra` mostra tutte le copie raggiungibili.
 
 ### 3.1 Installa la skill per agenti AI
 
-Il repository distribuisce la skill operativa canonica in `skills/hydra/` e il
-binario può installarla nella directory personale attualmente documentata da
-Codex, `$HOME/.agents/skills/hydra`:
+Il repository distribuisce un'unica skill operativa canonica in
+`skills/hydra/`. Il binario la installa attraverso adapter distinti nelle
+directory personali documentate dai provider:
+
+| Provider | Valore | Destinazione |
+|---|---|---|
+| Codex | `codex` | `$HOME/.agents/skills/hydra` |
+| Gemini CLI | `gemini` | `$HOME/.gemini/skills/hydra` |
+
+Le destinazioni non sono intercambiabili. Installa ogni copia che vuoi usare:
 
 ```bash
 hydra skill install codex
+hydra skill install gemini
 ```
 
 Su un terminale interattivo Hydra mostra la destinazione e chiede conferma con
@@ -215,6 +226,10 @@ da Hydra e non è stata modificata localmente:
 hydra skill status codex
 hydra skill update codex
 hydra skill remove codex
+
+hydra skill status gemini
+hydra skill update gemini
+hydra skill remove gemini
 ```
 
 Anche aggiornamento e rimozione usano una conferma predefinita negativa quando
@@ -222,12 +237,12 @@ devono modificare lo stato; `--yes` e `--no` sono disponibili per automazioni.
 Una skill sconosciuta, un symlink, un file aggiuntivo o un checksum diverso
 causano un rifiuto sicuro senza sovrascrittura o cancellazione.
 
-Codex rileva normalmente le modifiche automaticamente. Riavvia la sessione
-soltanto se la skill non appare o l'aggiornamento non è visibile. Puoi invocarla
-esplicitamente con `$hydra`, per esempio:
+Codex rileva normalmente le modifiche automaticamente. Gemini CLI può
+riscansionare le skill con `/skills reload`. Puoi invocare la skill
+esplicitamente, per esempio:
 
 ```text
-Usa $hydra per sviluppare questa attività in una Head isolata basata su main.
+Usa la skill Hydra per sviluppare questa attività in una Head isolata basata su main.
 ```
 
 La skill verifica i comandi realmente installati, crea o seleziona una Head e

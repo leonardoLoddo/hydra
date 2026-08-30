@@ -79,7 +79,7 @@ syntax.
 
 The complete [English user guide](Docs/user/hydra-user-guide.md) explains the
 concepts, installation, Head lifecycle, configuration, storage and overlays,
-Codex skill, recovery, troubleshooting, and current CLI.
+Agent Skills, recovery, troubleshooting, and current CLI.
 
 Focused pages:
 
@@ -88,18 +88,18 @@ Focused pages:
 - [Head workflows](Docs/user/head-workflows.md)
 - [Configuration](Docs/user/configuration.md)
 - [Storage and overlays](Docs/user/storage-and-overlays.md)
-- [Codex skill](Docs/user/codex-skill.md)
+- [Agent Skills](Docs/user/agent-skills.md)
 - [Recovery and troubleshooting](Docs/user/recovery-and-troubleshooting.md)
 - [CLI reference](Docs/user/cli-reference.md)
 
 The complete [Italian user guide](Docs/user/hydra-user-guide.it.md) is
 maintained alongside the English documentation.
 
-## Optional Codex skill
+## Optional Agent Skill
 
-Hydra ships an optional Agent Skill that teaches Codex the safe Head workflow.
-Homebrew never installs it silently. Install it explicitly and confirm the
-default-negative prompt:
+Hydra ships one portable Agent Skill that teaches supported AI agents the safe
+Head workflow. Homebrew never installs it silently. Choose the provider whose
+personal skill directory you want Hydra to manage:
 
 <p align="center">
   <img src="assets/hydra-codex-skill.png" alt="Codex prompt using the Hydra skill to create an isolated workflow for a payment feature">
@@ -107,6 +107,7 @@ default-negative prompt:
 
 ```bash
 hydra skill install codex
+hydra skill install gemini
 ```
 
 For unattended setup, make the choice explicit:
@@ -123,11 +124,15 @@ Manage only the copy installed by Hydra:
 hydra skill status codex
 hydra skill update codex
 hydra skill remove codex
+
+hydra skill status gemini
+hydra skill update gemini
+hydra skill remove gemini
 ```
 
 Hydra preserves an unknown or locally modified skill instead of overwriting or
-deleting it. Codex normally detects skill changes automatically; restart Codex
-only if `$hydra` does not appear or an update is not visible.
+deleting it. Codex normally detects changes automatically. Gemini CLI can
+rescan its skill directories with `/skills reload`.
 
 ## Update and uninstall
 
@@ -136,17 +141,20 @@ brew update
 brew upgrade leonardoLoddo/tap/hydra-heads
 ```
 
-After upgrading the binary, check the independently managed skill:
+After upgrading the binary, check each independently managed provider copy:
 
 ```bash
 hydra skill status codex
 hydra skill update codex
+hydra skill status gemini
+hydra skill update gemini
 ```
 
 Remove the binary and, only if desired, the skill:
 
 ```bash
 hydra skill remove codex
+hydra skill remove gemini
 brew uninstall leonardoLoddo/tap/hydra-heads
 ```
 

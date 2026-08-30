@@ -27,7 +27,7 @@ mod skill;
     version,
     about = "Git-native workspace manager for isolated development Heads",
     long_about = "Git-native workspace manager for isolated development Heads.\n\nHydra creates independent working directories while preserving familiar Git refs, branches, and repository workflows.",
-    after_help = "Command syntax:\n  hydra init [PATH]\n  hydra status\n  hydra repair\n  hydra doctor storage\n  hydra completions <SHELL>\n  hydra skill install codex\n  hydra skill status codex\n  hydra skill update codex\n  hydra skill remove codex\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head open <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra <command> --help' for details."
+    after_help = "Command syntax:\n  hydra init [PATH]\n  hydra status\n  hydra repair\n  hydra doctor storage\n  hydra completions <SHELL>\n  hydra skill install <PROVIDER>\n  hydra skill status <PROVIDER>\n  hydra skill update <PROVIDER>\n  hydra skill remove <PROVIDER>\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head open <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra <command> --help' for details."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -71,7 +71,7 @@ enum Command {
     },
     /// Install and manage optional AI-agent skills
     #[command(
-        after_help = "Command syntax:\n  hydra skill install codex\n  hydra skill status codex\n  hydra skill update codex\n  hydra skill remove codex\n\nCodex is the only provider currently supported."
+        after_help = "Command syntax:\n  hydra skill install <PROVIDER>\n  hydra skill status <PROVIDER>\n  hydra skill update <PROVIDER>\n  hydra skill remove <PROVIDER>\n\nProviders: codex, gemini."
     )]
     Skill {
         #[command(subcommand)]
@@ -95,6 +95,16 @@ enum Command {
 #[derive(Clone, Copy, ValueEnum)]
 enum SkillProvider {
     Codex,
+    Gemini,
+}
+
+impl From<SkillProvider> for skill::Provider {
+    fn from(provider: SkillProvider) -> Self {
+        match provider {
+            SkillProvider::Codex => Self::Codex,
+            SkillProvider::Gemini => Self::Gemini,
+        }
+    }
 }
 
 #[derive(Subcommand)]
@@ -289,42 +299,32 @@ fn main() -> ExitCode {
 }
 
 fn run_skill(command: &SkillCommand) -> ExitCode {
-    let (action, confirmation) = match command {
-        SkillCommand::Install {
-            provider: SkillProvider::Codex,
-            yes,
-            no,
-        } => (
+    let (action, provider, confirmation) = match command {
+        SkillCommand::Install { provider, yes, no } => (
             skill::Action::Install,
+            (*provider).into(),
             skill::Confirmation { yes: *yes, no: *no },
         ),
-        SkillCommand::Status {
-            provider: SkillProvider::Codex,
-        } => (
+        SkillCommand::Status { provider } => (
             skill::Action::Status,
+            (*provider).into(),
             skill::Confirmation {
                 yes: false,
                 no: false,
             },
         ),
-        SkillCommand::Update {
-            provider: SkillProvider::Codex,
-            yes,
-            no,
-        } => (
+        SkillCommand::Update { provider, yes, no } => (
             skill::Action::Update,
+            (*provider).into(),
             skill::Confirmation { yes: *yes, no: *no },
         ),
-        SkillCommand::Remove {
-            provider: SkillProvider::Codex,
-            yes,
-            no,
-        } => (
+        SkillCommand::Remove { provider, yes, no } => (
             skill::Action::Remove,
+            (*provider).into(),
             skill::Confirmation { yes: *yes, no: *no },
         ),
     };
-    match skill::run(action, confirmation) {
+    match skill::run(action, provider, confirmation) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("error: {error}");

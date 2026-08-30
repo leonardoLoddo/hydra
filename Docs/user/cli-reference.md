@@ -17,10 +17,10 @@ hydra repair
 hydra doctor storage
 hydra completions <SHELL>
 
-hydra skill install codex [--yes | --no]
-hydra skill status codex
-hydra skill update codex [--yes | --no]
-hydra skill remove codex [--yes | --no]
+hydra skill install <PROVIDER> [--yes | --no]
+hydra skill status <PROVIDER>
+hydra skill update <PROVIDER> [--yes | --no]
+hydra skill remove <PROVIDER> [--yes | --no]
 
 hydra head create <NAME> [--from <REF>] [--target <BRANCH>]
 hydra head list
@@ -122,25 +122,27 @@ and it preserves a private branch containing unintegrated commits.
 
 ## Skill commands
 
-Codex is the only current provider.
+Supported providers are `codex` and `gemini`. They install the same canonical
+skill into `$HOME/.agents/skills/hydra` and `$HOME/.gemini/skills/hydra`,
+respectively.
 
-### `hydra skill install codex`
+### `hydra skill install <PROVIDER>`
 
 Installs the packaged skill after a default-negative confirmation. `--yes`
 confirms and `--no` declines without interactive input; they are mutually
 exclusive.
 
-### `hydra skill status codex`
+### `hydra skill status <PROVIDER>`
 
 Reports whether the destination contains a current, unmodified copy managed by
 Hydra.
 
-### `hydra skill update codex`
+### `hydra skill update <PROVIDER>`
 
 Updates only an unmodified, Hydra-managed copy. Supports mutually exclusive
 `--yes` and `--no` automation flags.
 
-### `hydra skill remove codex`
+### `hydra skill remove <PROVIDER>`
 
 Removes only an unmodified, Hydra-managed copy. Supports mutually exclusive
 `--yes` and `--no` automation flags.

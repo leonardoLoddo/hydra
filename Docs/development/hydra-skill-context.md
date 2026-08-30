@@ -62,6 +62,11 @@ Do not claim a provider or installation channel as supported until its package,
 installation procedure, update path, and representative activation workflow
 have been verified on that host. Keep unavailable channels explicitly planned.
 
+Hydra currently provides lifecycle adapters for Codex and Gemini CLI. They
+install the same canonical artifact at `$HOME/.agents/skills/hydra` and
+`$HOME/.gemini/skills/hydra`, respectively. The destinations are independent;
+provider-specific manifests prevent one adapter from claiming another copy.
+
 ---
 
 ## Authoritative Inputs

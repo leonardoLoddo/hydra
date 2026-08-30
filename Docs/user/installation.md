@@ -134,17 +134,19 @@ brew upgrade leonardoLoddo/tap/hydra-heads
 hydra --version
 ```
 
-The optional Codex skill has a separate lifecycle and is never replaced by a
-Homebrew upgrade. Inspect and update it explicitly:
+Each optional provider copy has a separate lifecycle and is never replaced by
+a Homebrew upgrade. Inspect and update every installed copy explicitly:
 
 ```bash
 hydra skill status codex
 hydra skill update codex
+hydra skill status gemini
+hydra skill update gemini
 ```
 
 Hydra asks for confirmation with a default-negative choice before changing an
-installed skill. See [Codex skill](codex-skill.md) for automation and ownership
-rules.
+installed skill. See [Agent Skills](agent-skills.md) for provider destinations,
+automation, and ownership rules.
 
 ## Remove Hydra
 
@@ -159,6 +161,7 @@ explicitly before or after uninstalling the Formula:
 
 ```bash
 hydra skill remove codex
+hydra skill remove gemini
 brew uninstall leonardoLoddo/tap/hydra-heads
 ```
 

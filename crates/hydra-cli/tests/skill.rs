@@ -14,6 +14,10 @@ fn skill_path(home: &Path) -> std::path::PathBuf {
     home.join(".agents/skills/hydra")
 }
 
+fn gemini_skill_path(home: &Path) -> std::path::PathBuf {
+    home.join(".gemini/skills/hydra")
+}
+
 fn install_skill(home: &Path) {
     let output = isolated_hydra(home)
         .args(["skill", "install", "codex", "--yes"])
@@ -27,7 +31,7 @@ fn install_skill(home: &Path) {
 }
 
 #[test]
-fn skill_help_exposes_the_codex_lifecycle() {
+fn skill_help_exposes_the_supported_provider_lifecycle() {
     let output = hydra_command()
         .args(["skill", "--help"])
         .output()
@@ -46,7 +50,12 @@ fn skill_help_exposes_the_codex_lifecycle() {
             "skill help should list {command:?}, got: {stdout:?}"
         );
     }
-    assert!(stdout.contains("Codex"));
+    for provider in ["codex", "gemini"] {
+        assert!(
+            stdout.contains(provider),
+            "skill help should list {provider:?}, got: {stdout:?}"
+        );
+    }
 }
 
 #[test]
@@ -87,6 +96,65 @@ fn codex_install_yes_publishes_the_canonical_skill_and_provenance() {
     );
     let stdout = String::from_utf8(output.stdout).expect("install output should be UTF-8");
     assert!(stdout.contains(&destination.display().to_string()));
+}
+
+#[test]
+fn gemini_lifecycle_uses_its_destination_and_provider_provenance() {
+    let directory = TestDirectory::new("gemini-skill-install");
+    let output = isolated_hydra(directory.path())
+        .args(["skill", "install", "gemini", "--yes"])
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(
+        output.status.success(),
+        "install should succeed, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let destination = gemini_skill_path(directory.path());
+    assert_eq!(
+        fs::read(destination.join("SKILL.md")).expect("installed SKILL.md should exist"),
+        include_bytes!("../../../skills/hydra/SKILL.md")
+    );
+    assert_eq!(
+        fs::read(destination.join("agents/openai.yaml"))
+            .expect("installed OpenAI metadata should exist"),
+        include_bytes!("../../../skills/hydra/agents/openai.yaml")
+    );
+    let manifest: serde_json::Value = serde_json::from_slice(
+        &fs::read(destination.join(".hydra-skill.json")).expect("provenance manifest should exist"),
+    )
+    .expect("provenance manifest should be valid JSON");
+    assert_eq!(manifest["provider"], "gemini");
+    assert!(String::from_utf8_lossy(&output.stdout).contains("Gemini CLI"));
+
+    let status = isolated_hydra(directory.path())
+        .args(["skill", "status", "gemini"])
+        .output()
+        .expect("Hydra CLI should start");
+    assert!(status.status.success());
+    assert!(String::from_utf8_lossy(&status.stdout).contains("current"));
+
+    let manifest_path = destination.join(".hydra-skill.json");
+    let mut older_manifest = manifest;
+    older_manifest["hydraVersion"] = serde_json::Value::String("0.0.0".to_owned());
+    fs::write(
+        &manifest_path,
+        serde_json::to_vec_pretty(&older_manifest).expect("manifest should serialize"),
+    )
+    .expect("older manifest should be written");
+    let update = isolated_hydra(directory.path())
+        .args(["skill", "update", "gemini", "--yes"])
+        .output()
+        .expect("Hydra CLI should start");
+    assert!(update.status.success());
+
+    let remove = isolated_hydra(directory.path())
+        .args(["skill", "remove", "gemini", "--yes"])
+        .output()
+        .expect("Hydra CLI should start");
+    assert!(remove.status.success());
+    assert!(!destination.exists());
 }
 
 #[test]

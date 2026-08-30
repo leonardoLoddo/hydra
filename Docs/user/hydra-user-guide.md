@@ -34,8 +34,8 @@ Use the focused guides when you need more control:
   policies, branch naming, and open/close command adapters.
 - [Storage and overlays](storage-and-overlays.md) explains copy-on-write,
   full-copy fallback, ignored files, symlinks, prompts, and diagnostics.
-- [Codex skill](codex-skill.md) explains the optional Agent Skill and its safe
-  install, update, and removal lifecycle.
+- [Agent Skills](agent-skills.md) explains the optional portable skill and its
+  safe provider-specific install, update, and removal lifecycle.
 - [Recovery and troubleshooting](recovery-and-troubleshooting.md) explains
   `hydra repair`, recoverable states, report-only inconsistencies, and common
   errors.
@@ -136,7 +136,7 @@ Hydra currently manages:
 - deterministic repair proposals;
 - real storage diagnostics;
 - Bash, Zsh, and Fish completions;
-- an optional Codex Agent Skill.
+- an optional Agent Skill for Codex and Gemini CLI.
 
 ## Getting help
 
