@@ -86,12 +86,26 @@ fn configure_git_identity(repository: &Path) {
 }
 
 fn wait_for_merge(repository: &Path) {
-    let deadline = Instant::now() + Duration::from_secs(5);
+    let merge_head = run_git(
+        repository,
+        &[
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-path",
+            "MERGE_HEAD",
+        ],
+    );
+    assert!(
+        merge_head.status.success(),
+        "Git should resolve the MERGE_HEAD path"
+    );
+    let merge_head = String::from_utf8(merge_head.stdout)
+        .expect("MERGE_HEAD path should be UTF-8")
+        .trim()
+        .to_owned();
+    let deadline = Instant::now() + Duration::from_secs(30);
     while Instant::now() < deadline {
-        if run_git(repository, &["rev-parse", "--verify", "MERGE_HEAD"])
-            .status
-            .success()
-        {
+        if Path::new(&merge_head).is_file() {
             return;
         }
         thread::sleep(Duration::from_millis(20));
