@@ -17,7 +17,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub use close::{CloseOutcome, ClosedHead, IntegrationResult, IntegrationStrategy, close_head};
+pub use close::{
+    CloseOutcome, ClosedHead, HeadCloseProgress, IntegrationResult, IntegrationStrategy,
+    close_head, close_head_with_progress,
+};
 pub use error::HeadError;
 use git::{Repository, TrackedEntry};
 pub use inspection::{

@@ -791,7 +791,11 @@ hydra head close payment
 ```
 
 La chiusura rappresenta il workflow esplicito che conclude il lavoro di una
-Head. In assenza di configurazione custom, Hydra:
+Head. Deve essere avviata dalla worktree padre canonica. Se viene avviata da
+una Head, Hydra rifiuta l'operazione prima di qualsiasi mutazione e mostra il
+path del progetto padre. La chiusura nativa richiede inoltre che il `targetRef`
+della Head sia checkoutato nella worktree padre. In assenza di configurazione
+custom, Hydra:
 
 1. verifica che la Head e il relativo target siano coerenti;
 2. integra il branch privato della Head nel suo `targetRef`;
@@ -804,24 +808,19 @@ Per una Head creata da un branch locale senza `--target`, `targetRef` coincide
 con il branch di partenza. Un `--target` esplicito rimane invece autorevole per
 la chiusura.
 
-Il merge predefinito sceglie dinamicamente dove integrare:
+Hydra valida che branch, commit, index e working tree della worktree padre
+corrispondano allo snapshot atteso, quindi esegue un normale `git merge` del
+commit validato della Head ereditandone input e output. Una worktree padre
+sporca o impegnata in un'operazione Git blocca la chiusura senza mutare target
+o Head. Il meccanismo garantisce:
 
-- se `targetRef` è attivo in una worktree registrata, Hydra può avanzare quella
-  worktree soltanto quando branch e commit corrispondono allo snapshot
-  validato, non è in corso un'operazione Git e working tree e index sono
-  puliti;
-- se `targetRef` non è attivo in alcuna worktree, Hydra integra senza checkout
-  e pubblica la ref con compare-and-swap.
-
-Una worktree target sporca o impegnata in un'operazione Git blocca la chiusura
-senza mutare target o Head. Il meccanismo garantisce:
-
-- target ref invariata se il merge fallisce o produce conflitti;
-- aggiornamento coerente di ref, index e file quando il target pulito è
-  checkoutato;
+- output e diagnostica nativi di Git per fast-forward, merge e conflitti;
 - nessuna modifica a working tree diverse dal target selezionato;
-- nessuna eliminazione della Head in caso di conflitto;
-- diagnostica sufficiente per risolvere o ripetere esplicitamente la chiusura.
+- in caso di conflitto, possibilità di risolvere e committare con Git mentre
+  Hydra attende, seguita dalla ripresa automatica della rimozione protetta;
+- se l'utente esegue `git merge --abort`, chiusura abortita e Head preservata;
+- rimozione consentita solo dopo aver verificato che il merge risolto abbia
+  esattamente gli snapshot target e Head attesi come genitori.
 
 La chiusura può essere sostituita da un adapter configurabile:
 
@@ -837,6 +836,10 @@ La chiusura può essere sostituita da un adapter configurabile:
   }
 }
 ```
+
+Anche l'adapter può essere avviato solo dalla worktree padre; Hydra esegue
+comunque il processo con la directory validata della Head come working
+directory.
 
 Se `commands.close` è assente, i default equivalgono concettualmente a:
 
@@ -864,13 +867,10 @@ prodotti da un adapter arbitrario. Se il comando custom fallisce dopo avere
 modificato la target ref, Hydra conserva la Head, non esegue la rimozione e
 segnala la differenza rispetto allo snapshot iniziale.
 
-L'integrazione nativa implementata usa `merge-tree` e `commit-tree` per
-preparare in modo isolato le storie divergenti. Se il target è checkoutato in
-una worktree registrata e pulita, Hydra la avanza al commit validato mantenendo
-coerenti ref, index e file. Se il target non è checkoutato, pubblica invece il
-fast-forward o il merge commit con un aggiornamento compare-and-swap della
-ref. Un conflitto conserva entrambe le ref e la Head; una worktree target
-sporca o impegnata in un'operazione Git blocca la chiusura senza mutazioni.
+L'integrazione nativa implementata esegue `git merge --no-edit` nella worktree
+padre validata. In caso di conflitto lascia il normale stato Git disponibile
+alla risoluzione, attende il commit o `git merge --abort` e riprende soltanto
+dopo aver verificato il risultato.
 
 ### 7.6 Rimozione sicura
 

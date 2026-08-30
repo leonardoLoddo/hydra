@@ -9,8 +9,7 @@ mod integration;
 mod protocol;
 
 pub(super) use integration::{
-    create_merge_commit, delete_ref_if_matches, fast_forward_worktree, is_ancestor, merge_tree,
-    update_ref_if_matches,
+    commit_parents, delete_ref_if_matches, is_ancestor, merge_in_worktree,
 };
 
 use protocol::{bytes_to_path, parse_registered_worktrees, parse_worktree_changes};

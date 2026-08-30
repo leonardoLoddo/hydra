@@ -611,21 +611,26 @@ Una Head pulita può essere integrata nel target registrato e rimossa:
 hydra head close payment
 ```
 
-Hydra sceglie dinamicamente la strategia. Se il target, per esempio `main`, è
-attivo in una worktree registrata e pulita, integra direttamente lì mantenendo
-allineati ref, index e file. Se il target non è attivo in nessuna worktree,
-integra senza checkout. Usa fast-forward quando possibile e crea un merge
-commit per storie divergenti.
+Esegui il comando dalla worktree padre canonica. Per la chiusura nativa, il
+target registrato, per esempio `main`, deve essere checkoutato lì. Se avvii il
+comando da una Head, Hydra rifiuta la chiusura prima di qualsiasi modifica e
+mostra il path del progetto padre. Anche gli adapter configurati rispettano il
+vincolo della worktree padre, ma vengono eseguiti dentro la Head.
+
+Hydra esegue un normale `git merge` del commit validato della Head nella
+worktree padre. Vedi quindi direttamente l'output ordinario di Git per
+fast-forward, merge commit e conflitti.
 
 Una worktree target con modifiche staged, modificate, eliminate o non tracciate,
 oppure con un merge, rebase o altra operazione Git in corso, blocca la chiusura:
 Hydra descrive il motivo e non modifica né il target né la Head. Non serve
 creare un branch temporaneo quando il target è già pulito.
 
-Un conflitto lascia target, branch privato, worktree e inventario invariati.
-Puoi eseguire `head close` dal progetto principale o da qualunque Head dello
-stesso progetto che contenga la configurazione versionata, inclusa la Head da
-chiudere.
+In caso di conflitto Hydra resta in esecuzione e lascia il normale stato di
+merge nella worktree padre. Risolvi i file e crea il commit di merge con l'IDE
+o un altro terminale: Hydra verifica il commit e riprende automaticamente la
+rimozione protetta. Se esegui `git merge --abort`, Hydra abortisce anche la
+chiusura, conserva la Head e termina con errore.
 
 Al successo Hydra indica sia dove ha integrato sia il risultato:
 
@@ -635,8 +640,7 @@ Integration strategy: target worktree /workspace/Shop
 Integration result: fast-forward
 ```
 
-Quando il target non è checkoutato, la strategia riportata è `checkout-free`;
-il risultato può essere `already integrated`, `fast-forward` o `merge commit`.
+Il risultato può essere `already integrated`, `fast-forward` o `merge commit`.
 Se l'integrazione riesce ma la rimozione protetta fallisce, l'errore indica il
 commit già pubblicato: non tentare di annullarlo manualmente e ripeti la
 diagnostica sulla Head rimasta.
@@ -656,10 +660,10 @@ Puoi sostituire l'integrazione nativa con un comando configurato:
 }
 ```
 
-Hydra esegue il programma dalla directory validata della Head, passa ogni
-argomento separatamente e attende il risultato. Il programma è codice fidato
-del progetto: non viene eseguito in una sandbox e può modificare Git, file o
-servizi con i permessi dell'utente.
+Avvia `head close` dalla worktree padre. Hydra esegue poi il programma dalla
+directory validata della Head, passa ogni argomento separatamente e attende il
+risultato. Il programma è codice fidato del progetto: non viene eseguito in una
+sandbox e può modificare Git, file o servizi con i permessi dell'utente.
 
 Con `removeOnSuccess: false`, un comando riuscito conserva worktree, branch e
 inventario:

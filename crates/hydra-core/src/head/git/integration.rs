@@ -1,4 +1,7 @@
-use std::{path::Path, process::Command};
+use std::{
+    path::Path,
+    process::{Command, ExitStatus},
+};
 
 use super::{Repository, command_failure, run_git, stdout_line};
 use crate::head::HeadError;
@@ -41,74 +44,30 @@ pub(in crate::head) fn delete_ref_if_matches(
     .map(|_| ())
 }
 
-pub(in crate::head) fn update_ref_if_matches(
-    repository: &Repository,
-    reference: &str,
-    new_commit: &str,
-    expected_commit: &str,
-) -> Result<(), HeadError> {
-    run_git(
-        &repository.root,
-        &["update-ref", reference, new_commit, expected_commit],
-        "updating the integration target",
-    )
-    .map(|_| ())
-}
-
-pub(in crate::head) fn fast_forward_worktree(
+pub(in crate::head) fn merge_in_worktree(
     path: &Path,
     head_commit: &str,
-) -> Result<(), HeadError> {
-    run_git(
-        path,
-        &["merge", "--ff-only", "--no-edit", "--", head_commit],
-        "fast-forwarding the checked-out integration target",
-    )
-    .map(|_| ())
+) -> Result<ExitStatus, HeadError> {
+    Command::new("git")
+        .arg("-C")
+        .arg(path)
+        .args(["merge", "--no-edit"])
+        .arg(head_commit)
+        .status()
+        .map_err(HeadError::GitUnavailable)
 }
 
-pub(in crate::head) fn merge_tree(
+pub(in crate::head) fn commit_parents(
     repository: &Repository,
-    target_commit: &str,
-    head_commit: &str,
-) -> Result<String, HeadError> {
+    commit: &str,
+) -> Result<Vec<String>, HeadError> {
     let output = run_git(
         &repository.root,
-        &["merge-tree", "--write-tree", target_commit, head_commit],
-        "merging the Head without a worktree",
+        &["show", "-s", "--format=%P", commit],
+        "reading integration commit parents",
     )?;
-    let tree = output
-        .stdout
-        .split(|byte| *byte == b'\n')
-        .next()
-        .ok_or(HeadError::InvalidGitOutput("merged tree"))?;
-    std::str::from_utf8(tree)
-        .ok()
-        .filter(|tree| !tree.is_empty())
+    Ok(stdout_line(&output, "integration commit parents")?
+        .split_ascii_whitespace()
         .map(str::to_owned)
-        .ok_or(HeadError::InvalidGitOutput("merged tree"))
-}
-
-pub(in crate::head) fn create_merge_commit(
-    repository: &Repository,
-    tree: &str,
-    target_parent: &str,
-    head_parent: &str,
-    message: &str,
-) -> Result<String, HeadError> {
-    let output = run_git(
-        &repository.root,
-        &[
-            "commit-tree",
-            tree,
-            "-p",
-            target_parent,
-            "-p",
-            head_parent,
-            "-m",
-            message,
-        ],
-        "creating the integration commit",
-    )?;
-    stdout_line(&output, "integration commit")
+        .collect())
 }

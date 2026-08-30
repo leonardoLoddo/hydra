@@ -231,7 +231,7 @@ enum HeadCommand {
     },
     /// Integrate and remove a completed Head
     #[command(
-        long_about = "Integrate or run the configured close adapter for a completed Head.\n\nThe Head must be clean. By default, Hydra integrates through the target when it is checked out in a clean worktree; when the target is not checked out, integration remains checkout-free. A dirty target worktree or an active Git operation blocks close without mutation. Native close reports its integration strategy and result, then performs protected removal. When .hydra.json defines commands.close, Hydra runs that adapter instead; removeOnSuccess controls whether protected removal follows a successful command.",
+        long_about = "Integrate or run the configured close adapter for a completed Head.\n\nRun this command from the parent project worktree. The Head must be clean. Native close also requires the Head's target branch to be checked out in a clean parent worktree with no Git operation active. It runs git merge there and shows the normal Git output. After a conflict, resolve and commit the merge in that worktree; Hydra waits and then performs protected removal automatically. Run git merge --abort to abort the close and preserve the Head. When .hydra.json defines commands.close, Hydra starts that adapter in the Head worktree instead; removeOnSuccess controls whether protected removal follows a successful command.",
         after_help = "Examples:\n  hydra head close payment"
     )]
     Close {
@@ -516,11 +516,12 @@ fn open_head(name: &str) -> ExitCode {
 }
 
 fn close_head(name: &str) -> ExitCode {
-    if let Err(error) = leave_head_worktree_before_removal(name) {
-        eprintln!("error: {error}");
-        return ExitCode::FAILURE;
-    }
-    match hydra_core::close_head(Path::new("."), name) {
+    match hydra_core::close_head_with_progress(Path::new("."), name, |progress| match progress {
+        hydra_core::HeadCloseProgress::WaitingForMergeResolution { path } => eprintln!(
+            "Waiting for Git merge resolution in {}. Hydra will finish the close after commit or abort.",
+            output::safe_path_label(&path)
+        ),
+    }) {
         Ok(closed) => {
             match closed.outcome {
                 hydra_core::CloseOutcome::Integrated {
@@ -533,9 +534,6 @@ fn close_head(name: &str) -> ExitCode {
                         closed.name, closed.target_ref, target_commit
                     );
                     match strategy {
-                        hydra_core::IntegrationStrategy::CheckoutFree => {
-                            println!("Integration strategy: checkout-free");
-                        }
                         hydra_core::IntegrationStrategy::TargetWorktree { path } => println!(
                             "Integration strategy: target worktree {}",
                             output::safe_path_label(&path)

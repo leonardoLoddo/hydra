@@ -52,11 +52,13 @@ toolchain requirement.
    related: inspect it with `hydra head status <name>` and stop if its ownership,
    task, branch, path, or existing work is unclear.
 
-Hydra lifecycle commands may run from the main project worktree or any managed
-Head. Hydra uses the shared locator to normalize every invocation to the
-canonical parent project, even when `.hydra.json` is missing or stale in the
-calling Head. Configuration, Git defaults, overlays, project reporting, and
-inventory therefore behave exactly as if the command ran from the parent.
+Hydra lifecycle commands generally may run from the main project worktree or
+any managed Head. `hydra head close` is the exception: it must run from the
+canonical parent project worktree. Hydra uses the shared locator to normalize
+other lifecycle invocations to the canonical parent project, even when
+`.hydra.json` is missing or stale in the calling Head. Configuration, Git
+defaults, overlays, project reporting, and inventory therefore behave exactly
+as if the command ran from the parent.
 Creating a Head from another Head creates a sibling in the project's Heads
 directory; it never creates a nested Head or a second Hydra project hierarchy.
 Without explicit `--from` or `--target`, use the parent project's `HEAD` and
@@ -135,7 +137,8 @@ locator; restore the reviewed project configuration or stop for user guidance.
 1. Obtain the authoritative directory with `hydra head path <name>`.
 2. Set every task, edit, build, and test command's working directory to that
    exact path. Lifecycle commands may still be launched there because Hydra
-   resolves their control context to the parent project.
+   resolves their control context to the parent project, except `head close`,
+   which must be launched from the canonical parent worktree.
 3. Verify the boundary with:
 
 ```bash
@@ -177,27 +180,32 @@ branch, status, tests, and whether its commits have been integrated.
 Before closing, inspect `commands.close` in the canonical project
 configuration. If it is absent or uses the native merge strategy, run `hydra
 head close <name>` only when the user has authorized integration and the Head
-is clean. The command may run from the main project or any initialized Head,
-including the Head being closed. If the target branch is checked out in a clean
-worktree, Hydra integrates there and keeps its ref, index, and files in sync. If
-the target is not checked out, Hydra integrates checkout-free.
+is clean. Change the command's working directory to the canonical parent
+project, verify that the Head's recorded target branch is checked out there,
+and verify that parent worktree and index are clean. Hydra runs a normal Git
+merge there and inherits Git's terminal output.
 
-If `commands.close` uses a custom command, report its program, arguments, and
-`removeOnSuccess` policy before execution. Treat the command as trusted project
-code that is not sandboxed and may push branches, create pull requests, modify
-files, or contact services. Execute it only when the user's authorization
-covers those concrete effects. Do not describe a successful custom command as
-an integration unless its observed result proves that claim.
+If Git reports conflicts, keep Hydra running. Resolve the files and commit the
+merge in the parent worktree through the IDE or another terminal. Hydra
+validates the resulting commit and automatically resumes protected removal.
+Run `git merge --abort` to abort the Hydra close and preserve the Head. Do not
+start a different Git operation or replace the expected merge while Hydra is
+waiting.
 
-A target worktree with staged, modified, deleted, or untracked files, or with a
-Git operation in progress, blocks close without mutating the target or Head.
-Report the blocker; do not switch branches, stash another task's files, or
-alter another worktree to force integration. Report Hydra's integration
-strategy and result after a successful close.
+If `commands.close` uses a custom command, still invoke close from the canonical
+parent project. Report its program, arguments, and `removeOnSuccess` policy
+before execution. Hydra starts the adapter in the Head worktree. Treat the
+command as trusted project code that is not sandboxed and may push branches,
+create pull requests, modify files, or contact services. Execute it only when
+the user's authorization covers those concrete effects. Do not describe a
+successful custom command as an integration unless its observed result proves
+that claim.
 
-When closing the Head from its own directory, expect that directory to be
-removed on success. Change the caller's working directory to the parent project
-or another surviving Head before issuing subsequent commands.
+For native close, a target worktree with staged, modified, deleted, or
+untracked files, or with a Git operation in progress, blocks close without
+mutating the target or Head. Report the blocker; do not switch branches, stash
+another task's files, or alter another worktree to force integration. Report
+Hydra's integration strategy and result after a successful close.
 
 Use `hydra head remove <name>` only for an authorized removal after inspecting
 the Head. Never use `--force` unless the user explicitly authorizes discarding

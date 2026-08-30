@@ -90,15 +90,27 @@ fn create_head(repository: &Path, name: &str) {
     );
 }
 
-fn close_head_from(head: &Path, name: &str) {
-    let output = hydra_command()
+fn close_head_from_parent_after_head_rejection(repository: &Path, head: &Path, name: &str) {
+    let rejected = hydra_command()
         .args(["head", "close", name])
         .current_dir(head)
         .output()
         .expect("Hydra CLI should start");
+    assert!(!rejected.status.success());
+    let stderr = String::from_utf8_lossy(&rejected.stderr);
+    assert!(
+        stderr.contains("head close must be run from the parent project worktree"),
+        "close from a Head should report the parent requirement: {stderr}"
+    );
+
+    let output = hydra_command()
+        .args(["head", "close", name])
+        .current_dir(repository)
+        .output()
+        .expect("Hydra CLI should start");
     assert!(
         output.status.success(),
-        "Head {name} should close from itself, stderr: {}",
+        "Head {name} should close from the parent, stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
 }
@@ -389,7 +401,7 @@ fn head_create_rejects_the_unpublished_json_schema_annotation() {
 }
 
 #[test]
-fn commands_from_a_head_use_the_parent_project_context() {
+fn commands_from_a_head_use_parent_context_but_close_requires_the_parent() {
     let directory = TestDirectory::new("head-create-from-head");
     let repository = create_initialized_project(&directory);
     fs::write(repository.join(".gitignore"), b".env\n").expect("overlay rules should be written");
@@ -428,7 +440,7 @@ fn commands_from_a_head_use_the_parent_project_context() {
 
     let output = run_git(&payment, &["restore", ".hydra.json"]);
     assert!(output.status.success());
-    close_head_from(&payment, "payment");
+    close_head_from_parent_after_head_rejection(&repository, &payment, "payment");
 
     let auth_status = hydra_command()
         .args(["head", "status", "auth"])
@@ -441,7 +453,7 @@ fn commands_from_a_head_use_the_parent_project_context() {
         String::from_utf8_lossy(&auth_status.stderr)
     );
     assert!(String::from_utf8_lossy(&auth_status.stdout).contains("Consistency: ok"));
-    close_head_from(&auth, "auth");
+    close_head_from_parent_after_head_rejection(&repository, &auth, "auth");
 }
 
 #[test]

@@ -88,16 +88,18 @@ git commit -m "feat: implement payment flow"
 hydra head status payment
 ```
 
-When the Head is clean and ready, explicitly integrate it into its recorded
-target and remove the completed worktree:
+When the Head is clean and ready, return to the canonical parent project with
+the recorded target branch checked out, then explicitly integrate and remove
+the completed worktree:
 
 ```bash
 hydra head close payment
 ```
 
 Read [Head workflows](head-workflows.md) before closing divergent work or
-using forced removal. A conflict, dirty target, or active Git operation blocks
-native close without deleting the Head.
+using forced removal. Native close exposes the normal Git merge output. After
+a conflict, resolve and commit in the parent worktree while Hydra waits, or run
+`git merge --abort` to abort close and preserve the Head.
 
 On WSL 2, installing through Homebrew does not imply that the current volume
 supports reflinks. Run `hydra doctor storage`; the default ext4 root commonly
@@ -114,7 +116,8 @@ Keep these rules in mind:
 - Hydra never synchronizes a Head with its source branch in the background.
 - Each Head works on a private branch such as `hydra/payment`.
 - `hydra head close` is an explicit integration action. It can update the
-  recorded target branch and normally removes the Head afterward.
+  recorded target branch and normally removes the Head afterward. It must be
+  invoked from the canonical parent worktree with that target checked out.
 - `hydra head remove --force` may permanently discard tracked, staged, and
   untracked worktree changes. It does not bypass ownership or path checks.
 - Hydra preserves an unintegrated private branch during forced removal, so

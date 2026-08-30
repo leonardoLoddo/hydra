@@ -100,7 +100,8 @@ commands for the Head lifecycle.
 
 Hydra does not automatically pull, push, rebase, merge in the background, or
 resolve conflicts. Native integration happens only when you explicitly run
-`hydra head close`.
+`hydra head close` from the canonical parent project. Hydra runs normal Git
+there; after a conflict it waits for your merge commit or abort.
 
 ## Tracked files and overlays
 
@@ -171,8 +172,10 @@ Git repository
     │
     ├─ edit, test, commit, inspect
     │
+    ├─ return to parent with target checked out
+    │
     ├─ hydra head close
-    │      └─ integrate into target + protected removal
+    │      └─ native Git merge + protected removal
     │
     └─ hydra repair
            └─ explicit deterministic reconciliation only

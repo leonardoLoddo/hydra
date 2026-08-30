@@ -113,9 +113,12 @@ configured. Does not require a clean Head.
 
 ### `hydra head close <NAME>`
 
-Requires a clean, consistent Head. Uses native local integration and protected
-removal unless `commands.close` selects a trusted command adapter. There is no
-force option.
+Must be run from the canonical parent project worktree and requires a clean,
+consistent Head. The native path also requires the recorded target branch to
+be checked out in a clean parent worktree; it runs a foreground Git merge,
+waits for a conflicted merge to be committed or aborted, and then performs
+protected removal. A configured `commands.close` adapter still runs in the
+Head worktree. There is no force option.
 
 ### `hydra head remove <NAME>`
 

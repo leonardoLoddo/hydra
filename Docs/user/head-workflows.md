@@ -177,9 +177,10 @@ generated files and uncommitted changes inside this directory.
 
 ## Run Hydra from an existing Head
 
-Lifecycle commands work from the parent project or any managed Head. Hydra
-uses the shared Git-common locator to load configuration, defaults, overlays,
-and inventory from the canonical parent.
+Lifecycle commands generally work from the parent project or any managed
+Head. `hydra head close` is the exception: run it from the canonical parent
+project worktree. Hydra uses the shared Git-common locator to load
+configuration, defaults, overlays, and inventory from the canonical parent.
 
 For example, from `payment`:
 
@@ -266,24 +267,30 @@ The configured program is trusted project code and is not sandboxed. See
 
 ## Close and integrate a Head
 
-Native close requires a clean, consistent Head:
+Native close requires a clean, consistent Head. Run it from the canonical
+parent project worktree with the Head's recorded target branch checked out:
 
 ```bash
 hydra head close payment
 ```
 
-By default Hydra integrates the private branch into the recorded local target:
+By default Hydra runs a normal `git merge` of the validated Head commit in the
+parent worktree:
 
-- if the target is checked out in a clean registered worktree, Hydra advances
-  that worktree while keeping its ref, index, and files synchronized;
-- if the target is not checked out, Hydra integrates without checkout;
+- Git's ordinary fast-forward, merge, and conflict output is printed directly;
 - it reports `already integrated`, `fast-forward`, or `merge commit`;
 - after successful integration, it performs ordinary protected removal.
 
-A checked-out target with staged, modified, deleted, or untracked files, or an
-active merge, rebase, or other Git operation, blocks close before mutation.
-A merge conflict preserves the target, private branch, Head worktree, and
-inventory. Hydra does not resolve conflicts automatically.
+If close is invoked from a Head, Hydra reports the parent path and makes no
+changes. A parent on another branch, with staged, modified, deleted, or
+untracked files, or with an active merge, rebase, or other Git operation,
+blocks close before mutation.
+
+After a merge conflict, Hydra remains running. Resolve the files and commit the
+merge in the parent worktree using your IDE or another terminal. Hydra verifies
+the resulting commit and automatically resumes protected removal. Run
+`git merge --abort` instead to abort close, preserve the Head, and make Hydra
+exit unsuccessfully.
 
 Example success:
 
@@ -293,21 +300,15 @@ Integration strategy: target worktree /workspace/Shop
 Integration result: fast-forward
 ```
 
-When no worktree has the target checked out, the strategy is
-`checkout-free`.
-
 If integration succeeds but protected removal fails, Hydra reports the target
 ref and published commit separately and preserves the remaining Head state.
 Do not try to undo the target manually; inspect the Head and run the documented
 recovery workflow.
 
-You can run close from the Head being closed. On success, its directory is
-removed, so move the shell to the parent project or another surviving Head
-before running more commands.
-
 ### Configured close command
 
-A project can replace native integration with a trusted command adapter. Hydra
+A project can replace native integration with a trusted command adapter. Start
+close from the parent project; Hydra runs the adapter in the Head worktree,
 passes separate arguments, waits for the result, and optionally attempts
 protected removal. It cannot roll back arbitrary effects such as pushes,
 pull-request creation, or external service changes.

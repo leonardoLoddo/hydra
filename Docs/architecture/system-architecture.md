@@ -196,8 +196,8 @@ initialization, Head creation, and Head inspection, including:
 - tracked and overlay materialization with CoW/copy isolation;
 - transactional Head metadata publication and creation rollback;
 - protected Head removal with recoverable private-branch preservation;
-- dynamic Head integration through a clean checked-out target worktree or
-  checkout-free publication when the target is not checked out;
+- parent-worktree Head integration through a foreground native Git merge, with
+  validated conflict continuation and abort handling;
 - validated execution of configured Head-close adapters with optional
   protected removal;
 - validated execution of configured Head-open adapters without a shell;
@@ -247,7 +247,7 @@ Head creation follows the same small-orchestrator rule:
 | `head/command_template.rs` | Expand the shared placeholder grammar and reject unsupported or process-unsafe template values before an adapter is started |
 | `head.rs` | Validate and orchestrate the complete creation transaction |
 | `head/git.rs` | Discover Git state and own ref, branch, index, worktree, and verification commands |
-| `head/git/integration.rs` | Own ancestry checks and compare-and-swap ref, merge-tree, commit-tree, and checked-out fast-forward operations |
+| `head/git/integration.rs` | Own ancestry checks, foreground parent-worktree merge execution, integration-parent inspection, and protected ref deletion |
 | `head/git/protocol.rs` | Decode NUL-delimited Git worktree and status records while preserving platform path semantics |
 | `head/materializer.rs` | Materialize Git tree entries without a standard checkout |
 | `head/materializer/blob_batch.rs` | Own and validate the persistent `git cat-file --batch` protocol used to stream tracked blobs |

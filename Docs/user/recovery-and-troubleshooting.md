@@ -222,17 +222,20 @@ and replace it with a relative link that resolves entirely inside the project.
 
 ### Close is blocked by the target
 
-A checked-out target with staged, modified, deleted, or untracked files, or an
-active Git operation, blocks native close. Do not stash, reset, switch, or
-delete another task's work merely to continue. Finish or preserve that work in
-its owning workflow, then retry close.
+A parent worktree on the wrong branch, with staged, modified, deleted, or
+untracked files, or with an active Git operation, blocks native close. Do not
+stash, reset, switch, or delete another task's work merely to continue. Finish
+or preserve that work in its owning workflow, check out the recorded target in
+the canonical parent project, then retry close.
 
 ### Close reports a conflict
 
-Native close preserves target ref, private branch, Head worktree, and inventory
-on conflict. Hydra does not start a partially resolved merge for you. Inspect
-the two branches and choose an explicit Git resolution strategy while keeping
-the Head recoverable.
+Native close prints Git's conflict output and waits while the merge remains in
+progress in the parent worktree. Resolve the files and commit with normal Git
+or IDE tooling; Hydra validates that exact merge and resumes protected removal
+automatically. Run `git merge --abort` to abort close and preserve the Head.
+Do not start another Git operation or replace the expected merge commit while
+Hydra is waiting.
 
 ### Custom close command failed
 

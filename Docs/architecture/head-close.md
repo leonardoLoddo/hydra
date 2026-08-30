@@ -16,54 +16,48 @@ delegates to the protected contract in [`head-removal.md`](head-removal.md).
 
 ## Safety Preconditions
 
-Hydra requires a fully consistent recorded Head, readable clean worktree,
-existing private and target refs, and matching worktree branch and commit. A
-dirty, staged, or untracked file blocks close; there is no force option.
+Hydra accepts close only from the canonical parent project worktree, including
+one of its subdirectories. An invocation from any managed Head fails before
+loading or executing a configured adapter and reports the canonical parent
+path. Native close additionally requires the parent to have the Head's
+recorded target ref checked out.
 
-For native integration, Hydra locates the worktree, if any, that has the target
-ref checked out. A checked-out target must still point to the validated target
-commit, have no Git operation in progress, and contain no staged, modified,
-deleted, or untracked files. A dirty or busy target blocks close before any
-integration or removal mutation and reports the observed condition.
+Hydra also requires a fully consistent recorded Head, readable clean Head
+worktree, existing private and target refs, and matching Head branch and
+commit. For native close, the parent target must still point to the validated
+target commit, have no Git operation in progress, and contain no staged,
+modified, deleted, or untracked files. Any applicable failed precondition
+blocks close before integration, adapter execution, or removal mutation; there
+is no force option.
 
 ---
 
-## Dynamic Native Integration
+## Native Git Integration
 
-Hydra snapshots target and Head commits, then selects the integration location:
-
-- when the target ref is checked out in a clean registered worktree, Hydra
-  advances that worktree so its ref, index, and files remain synchronized;
-- when the target ref is not checked out, Hydra publishes the integration
-  checkout-free with compare-and-swap ref updates.
-
-In either location Hydra selects:
-
-- no ref update when the Head is already reachable from the target;
-- compare-and-swap fast-forward when the target is an ancestor of the Head;
-- a prepared three-way merge commit when both refs diverged.
-
-Checkout-free diverged integration uses:
+Hydra snapshots target and Head commits, validates the parent worktree, then
+runs the equivalent of this command there without a shell:
 
 ```text
-git merge-tree --write-tree <target-commit> <head-commit>
-git commit-tree <tree> -p <target-commit> -p <head-commit> -m <message>
-git update-ref <target-ref> <new-commit> <expected-target-commit>
+git merge --no-edit <validated-head-commit>
 ```
 
-For a checked-out target, Hydra still computes a divergent merge with
-`merge-tree` and `commit-tree`, then fast-forwards the validated target
-worktree to that exact prepared commit. It revalidates the branch, commit,
-operation state, and cleanliness immediately before publication and verifies
-the resulting ref, index, files, and cleanliness afterward.
+Git inherits the terminal's standard input, output, and error. Users therefore
+see Git's ordinary already-up-to-date, fast-forward, merge-commit, hook, and
+conflict diagnostics. Hydra does not synthesize a commit or resolve conflicts.
 
-`commit-tree` uses the repository's normal Git identity configuration. A
-missing author identity is an actionable Git failure and leaves both refs
-unchanged. `update-ref` publishes only if the target still points to the
-validated snapshot, preventing a concurrent target advance from being lost.
+When Git leaves a merge conflict, Hydra reports that it is waiting and remains
+in the foreground. The user resolves files and commits with normal Git tooling
+in the parent worktree, normally through an IDE or another terminal. Hydra
+polls the Git operation without holding a Hydra project lock. After the merge
+ends, it accepts only a clean target worktree whose current target commit has
+the recorded pre-merge target and Head commits as its two parents, in that
+order. It then resumes protected Head removal automatically.
 
-A merge conflict produces no commit and no ref mutation. The target, private
-branch, worktree, and inventory remain available for explicit resolution.
+If the user runs `git merge --abort`, Hydra recognizes the restored clean
+target snapshot, aborts close, preserves the Head, and exits unsuccessfully.
+If the operation changes type, targets a different commit, finishes dirty, or
+produces a commit with different parents, Hydra stops with an inconsistency
+error and does not remove the Head.
 
 ---
 
@@ -87,21 +81,15 @@ Integration strategy: target worktree /workspace/Shop
 Integration result: fast-forward
 ```
 
-The strategy is `checkout-free` when no worktree has the target checked out;
-the result is `already integrated`, `fast-forward`, or `merge commit`.
-
-Removal commands run from the closing Head use another stable registered
-worktree as their control directory. This permits a Head to close itself after
-successful native integration, and permits configured close adapters with
-`removeOnSuccess` to remove their own Head, without nesting projects or using a
-directory that has just been deleted.
+The result is `already integrated`, `fast-forward`, or `merge commit`. Native
+close always reports the canonical parent as its target worktree strategy.
 
 ---
 
 ## Configured Command Adapter
 
 The optional schema-v2 configuration replaces native integration for every
-`head close` invocation in that project:
+parent-worktree `head close` invocation in that project:
 
 ```json
 {
@@ -153,13 +141,15 @@ Disposable integration tests prove:
 - a Head ahead of its target fast-forwards the target and is removed;
 - diverged non-conflicting histories create a merge commit with target and
   Head parents in that order;
-- conflicts preserve both refs and the physical Head;
-- a clean checked-out target is fast-forwarded or merged with its ref, index,
-  and files synchronized;
-- a dirty checked-out target or target with a Git operation in progress is
+- native Git output is inherited for normal merges;
+- conflicts remain available in the parent worktree, and a valid resolution
+  commit resumes protected removal automatically;
+- `git merge --abort` aborts close and preserves the Head;
+- a dirty parent target or target with a Git operation in progress is
   rejected without integration or removal mutation;
-- a close invoked from the closing Head completes removal through a stable
-  sibling worktree;
+- an invocation from a Head reports the parent path without mutation or adapter
+  execution;
+- the parent must have the recorded target branch checked out;
 - successful native close uses protected removal for worktree, inventory, and
   private branch cleanup;
 - a successful command can preserve the Head or remove an integrated Head;

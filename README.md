@@ -66,7 +66,8 @@ hydra head status payment
 ```
 
 Move your editor, terminal, or agent into the path printed by `head path`.
-When the work is committed and ready to integrate, inspect it before running:
+When the work is committed and ready to integrate, inspect it, return to the
+parent project with the target branch checked out, and run:
 
 ```bash
 hydra head close payment

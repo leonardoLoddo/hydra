@@ -66,6 +66,17 @@ pub enum HeadError {
         reason: String,
     },
     HeadCloseHasUncommittedChanges(String),
+    HeadCloseRequiresParentWorktree {
+        parent: PathBuf,
+    },
+    HeadCloseRequiresTargetBranch {
+        target_ref: String,
+        parent: PathBuf,
+        current_ref: Option<String>,
+    },
+    HeadCloseAborted {
+        name: String,
+    },
     HeadCloseTargetWorktreeDirty {
         target_ref: String,
         path: PathBuf,
@@ -78,10 +89,6 @@ pub enum HeadError {
         target_ref: String,
         path: PathBuf,
         operation: &'static str,
-    },
-    HeadCloseConflict {
-        name: String,
-        target_ref: String,
     },
     InvalidCloseCommand(String),
     CloseCommandUnavailable {
@@ -195,9 +202,11 @@ impl fmt::Display for HeadError {
             | Self::HeadRemovalIncomplete { .. } => display_removal_failure(formatter, self),
             Self::HeadCloseInconsistent { .. }
             | Self::HeadCloseHasUncommittedChanges(_)
+            | Self::HeadCloseRequiresParentWorktree { .. }
+            | Self::HeadCloseRequiresTargetBranch { .. }
+            | Self::HeadCloseAborted { .. }
             | Self::HeadCloseTargetWorktreeDirty { .. }
             | Self::HeadCloseTargetWorktreeOperation { .. }
-            | Self::HeadCloseConflict { .. }
             | Self::InvalidCloseCommand(_)
             | Self::CloseCommandUnavailable { .. }
             | Self::CloseCommandFailed { .. }
@@ -328,6 +337,9 @@ fn display_close_failure(formatter: &mut fmt::Formatter<'_>, error: &HeadError) 
                 "Head {name:?} cannot be closed with uncommitted changes"
             )
         }
+        HeadError::HeadCloseRequiresParentWorktree { .. }
+        | HeadError::HeadCloseRequiresTargetBranch { .. }
+        | HeadError::HeadCloseAborted { .. } => display_close_control_failure(formatter, error),
         HeadError::HeadCloseTargetWorktreeDirty {
             target_ref,
             path,
@@ -348,10 +360,6 @@ fn display_close_failure(formatter: &mut fmt::Formatter<'_>, error: &HeadError) 
             formatter,
             "target {target_ref} is checked out at {} with a {operation} operation in progress; target and Head were preserved",
             path.display()
-        ),
-        HeadError::HeadCloseConflict { name, target_ref } => write!(
-            formatter,
-            "Head {name:?} conflicts with {target_ref}; target and Head were preserved"
         ),
         HeadError::InvalidCloseCommand(reason) => {
             write!(formatter, "close command is invalid: {reason}")
@@ -409,6 +417,34 @@ fn display_close_failure(formatter: &mut fmt::Formatter<'_>, error: &HeadError) 
             "Head {name:?} was integrated into {target_ref} at {target_commit}, but protected removal failed: {source}"
         ),
         _ => unreachable!("caller selects Head-close failures"),
+    }
+}
+
+fn display_close_control_failure(
+    formatter: &mut fmt::Formatter<'_>,
+    error: &HeadError,
+) -> fmt::Result {
+    match error {
+        HeadError::HeadCloseRequiresParentWorktree { parent } => write!(
+            formatter,
+            "head close must be run from the parent project worktree at {}; No changes were made",
+            parent.display()
+        ),
+        HeadError::HeadCloseRequiresTargetBranch {
+            target_ref,
+            parent,
+            current_ref,
+        } => write!(
+            formatter,
+            "target {target_ref} must be checked out in the parent project worktree at {}; current branch is {}; No changes were made",
+            parent.display(),
+            current_ref.as_deref().unwrap_or("detached HEAD")
+        ),
+        HeadError::HeadCloseAborted { name } => write!(
+            formatter,
+            "Head {name:?} close was aborted through Git; Head was preserved"
+        ),
+        _ => unreachable!("caller selects Head-close control failures"),
     }
 }
 
