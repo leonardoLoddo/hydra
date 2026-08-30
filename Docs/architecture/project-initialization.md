@@ -45,7 +45,15 @@ Storage backend: copy-on-write
 ```
 
 The second line is `Storage backend: full copy` when the native clone probe is
-not supported and the safe copy fallback succeeds.
+not supported and the safe copy fallback succeeds. On native Windows and WSL,
+that result also prints the applicable maintained setup guide:
+
+```text
+Copy-on-write guidance: <platform-guide-url>
+```
+
+The link is not printed when the native clone probe succeeds or on other
+platforms.
 
 ---
 

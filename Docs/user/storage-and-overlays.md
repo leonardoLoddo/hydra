@@ -57,7 +57,10 @@ that owns the Heads directory.
 On a compatible Windows ReFS destination, the native line is `Native
 primitive: Windows ReFS block clone`. NTFS normally reports the verified full
 copy fallback. Capability is decided by the real Heads volume, not by the
-drive letter or operating-system name.
+drive letter or operating-system name. On native Windows, initialization,
+storage diagnosis, and Head creation print the URL for
+[Windows copy-on-write setup](windows-copy-on-write.md) when they detect full
+copy.
 
 The command is read-only with respect to Hydra inventory, refs, and worktrees;
 it does not take the Head mutation lock. A probe or cleanup failure is still a
@@ -74,6 +77,9 @@ adapter. WSL itself does not emulate reflinks for every filesystem:
   as DrvFs/9p and are not a Linux reflink volume;
 - an XFS or other reflink-capable Linux filesystem attached to WSL can provide
   copy-on-write when the real Hydra probe succeeds.
+
+On WSL, a full-copy result from initialization, storage diagnosis, or Head
+creation prints the URL for [WSL 2 copy-on-write setup](wsl-copy-on-write.md).
 
 Check which filesystems the running WSL kernel can mount:
 
@@ -309,4 +315,3 @@ new Head's starting state.
 Git submodule entries currently create their directory but do not initialize
 or fetch submodule contents. Initialize submodules explicitly inside the Head
 when your project requires them. Network access is never implicit.
-

@@ -86,10 +86,10 @@ Isolation: supported
 `Storage backend: full copy` and `Native primitive: unavailable` are used when
 the native attempt fails safely. Linux reports its resolved filesystem;
 non-Linux platforms currently report `unknown`. A full-copy result under WSL
-adds guidance to place both the project and its sibling Heads directory on a
-reflink-capable Linux filesystem, for example XFS when the running WSL kernel
-provides it. The guidance is informational and never substitutes an unverified
-backend.
+prints the maintained `Docs/user/wsl-copy-on-write.md` URL; native Windows
+prints `Docs/user/windows-copy-on-write.md`. Initialization and Head creation
+use the same platform-specific URLs. Guidance is informational and never
+substitutes an unverified backend.
 
 ---
 
@@ -116,6 +116,9 @@ CLI integration tests on the actual test volume prove:
   escaped mount paths;
 - every platform adapter has a distinct reported primitive, including Windows
   block cloning;
+- native Windows full-copy output links to the maintained setup guide, while a
+  successful Windows block clone does not print fallback guidance;
+- WSL full-copy output links to its Linux reflink setup guide;
 - the Heads directory contains exactly the same entries before and after;
 - no Hydra mutation lock is created;
 - an uninitialized Git repository is rejected without Hydra artifacts;

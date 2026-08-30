@@ -3,8 +3,8 @@ mod common;
 use std::{ffi::OsString, fs, path::Path};
 
 use common::{
-    TestDirectory, create_initialized_project, head_state_lock_path, heads_directory,
-    hydra_command, run_git,
+    TestDirectory, copy_on_write_guidance_url, create_initialized_project, head_state_lock_path,
+    heads_directory, hydra_command, run_git,
 };
 
 fn directory_entries(path: &Path) -> Vec<OsString> {
@@ -49,12 +49,13 @@ fn doctor_storage_runs_a_real_probe_and_cleans_every_artifact() {
     assert!(stdout.contains("Fallback: full copy (verified)\n"));
     assert!(stdout.contains("Mutable hard links: disabled\n"));
     assert!(stdout.contains("Isolation: supported\n"));
-    if stdout.contains("Environment: Windows Subsystem for Linux\n")
-        && stdout.contains("Storage backend: full copy\n")
-    {
-        assert!(stdout.contains(
-            "Copy-on-write guidance: use a reflink-capable Linux filesystem for both the project and Heads directory (for example XFS when available)\n"
-        ));
+    if let Some(guidance) = copy_on_write_guidance_url() {
+        let guidance = format!("Copy-on-write guidance: {guidance}\n");
+        if stdout.contains("Storage backend: full copy\n") {
+            assert!(stdout.contains(&guidance));
+        } else {
+            assert!(!stdout.contains(&guidance));
+        }
     }
     assert_eq!(directory_entries(&heads), entries_before);
     assert!(!head_state_lock_path(&repository).exists());

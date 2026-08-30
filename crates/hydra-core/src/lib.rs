@@ -6,7 +6,8 @@ mod init;
 mod path;
 
 pub use doctor::{
-    DoctorError, NativeStoragePrimitive, StorageDiagnostics, StorageEnvironment, diagnose_storage,
+    DoctorError, NativeStoragePrimitive, StorageDiagnostics, StorageEnvironment,
+    current_storage_environment, diagnose_storage,
 };
 pub use head::{
     ChangeCounts, CloseOutcome, ClosedHead, CreateHeadOptions, CreatedHead, HeadCreationProgress,

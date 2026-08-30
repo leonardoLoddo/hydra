@@ -3,8 +3,8 @@ mod common;
 use std::{fs, io::Write, path::Path, process::Stdio};
 
 use common::{
-    TestDirectory, create_initialized_project, head_state_path, heads_directory, hydra_command,
-    overlay_copy_on_write_is_supported, run_git,
+    TestDirectory, copy_on_write_guidance_url, create_initialized_project, head_state_path,
+    heads_directory, hydra_command, overlay_copy_on_write_is_supported, run_git,
 };
 
 fn relocate_heads_directory(
@@ -174,6 +174,14 @@ fn head_create_builds_an_isolated_worktree_and_records_its_metadata() {
         stdout.contains("Storage backend: copy-on-write")
             || stdout.contains("Storage backend: full copy")
     );
+    if let Some(guidance) = copy_on_write_guidance_url() {
+        let guidance = format!("Copy-on-write guidance: {guidance}");
+        if stdout.contains("Storage backend: full copy") {
+            assert_eq!(stdout.matches(&guidance).count(), 1);
+        } else {
+            assert!(!stdout.contains(&guidance));
+        }
+    }
 
     assert!(head_path.join(".git").is_file());
     assert_eq!(
@@ -277,6 +285,15 @@ fn head_create_can_force_full_copy_for_tracked_files_and_overlays() {
     let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
     assert!(stdout.contains("Full copy required: 1 file(s), 7 byte(s)"));
     assert!(stdout.contains("Storage backend: full copy"));
+    if let Some(guidance) = copy_on_write_guidance_url() {
+        assert_eq!(
+            stdout
+                .matches(&format!("Copy-on-write guidance: {guidance}"))
+                .count(),
+            1,
+            "the prompt should show platform guidance exactly once"
+        );
+    }
 
     let head = heads_directory(&repository).join("copy-mode");
     assert_eq!(

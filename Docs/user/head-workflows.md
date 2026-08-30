@@ -46,7 +46,10 @@ Initialized Hydra in /workspace/Shop
 Storage backend: copy-on-write
 ```
 
-The backend may instead be `full copy`. Both provide isolated files.
+The backend may instead be `full copy`. Both provide isolated files. Native
+Windows and WSL full-copy results also link to their respective
+[Windows](windows-copy-on-write.md) and [WSL 2](wsl-copy-on-write.md) setup
+guides.
 
 Review and version `.hydra.json`:
 
@@ -106,6 +109,11 @@ Creation can ask two default-negative questions before Git mutation:
 
 - whether to exclude unsafe overlay symlinks and update `.hydra.json`;
 - whether to continue when some overlay files require a full copy.
+
+On native Windows or WSL, the full-copy prompt prints the applicable setup
+guide before `Continue?`. If tracked-file materialization discovers the
+fallback without an overlay prompt, successful output prints the same guide
+after the effective backend. A single creation prints the guide only once.
 
 Read [Storage and overlays](storage-and-overlays.md) before approving either
 prompt. A negative answer or end-of-file safely cancels creation. An approved
@@ -356,4 +364,3 @@ hydra repair
 deterministic mutation. Many ambiguous conditions are intentionally
 report-only. Continue with
 [Recovery and troubleshooting](recovery-and-troubleshooting.md).
-

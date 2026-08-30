@@ -1139,6 +1139,11 @@ Full copy required: 2 file(s), 1048576 byte(s)
 Continue? [y/N]
 ```
 
+Su Windows nativo o WSL, prima di `Continue?` Hydra mostra anche il link alla
+guida CoW della piattaforma. Se il fallback emerge per file tracciati senza un
+prompt overlay, il link appare nell'output finale dopo il backend. Una singola
+creazione mostra la guida una sola volta.
+
 Rispondono positivamente soltanto `y` e `yes`, senza distinzione tra maiuscole
 e minuscole. Invio, EOF o qualunque altra risposta annullano la creazione prima
 delle mutazioni Git.
@@ -1207,6 +1212,8 @@ mai usati come fallback. Il comando richiede un progetto Hydra inizializzato,
 non acquisisce il lock dell’inventario e rimuove tutti gli artefatti della
 prova; un fallimento di cleanup viene segnalato con il percorso rimasto.
 
+### Copy-on-write su WSL 2
+
 Su Linux il report identifica anche il filesystem che contiene la directory
 delle Head. Su WSL 2 Hydra usa lo stesso adapter Linux della Formula Homebrew:
 il root ext4 predefinito e i drive Windows esposti tramite DrvFs/9p possono
@@ -1215,6 +1222,24 @@ copy-on-write, prepara esplicitamente un volume Linux reflink-capable, per
 esempio XFS quando disponibile nel kernel WSL, e colloca sullo stesso volume
 sia un nuovo clone del progetto sia la futura directory sorella delle Head
 prima di eseguire `hydra init`.
+
+Quando WSL ricade su `full copy`, `hydra init`, `hydra doctor storage` e
+`hydra head create` mostrano il link alla guida
+[WSL 2 Copy-on-Write Setup](wsl-copy-on-write.md):
+
+```text
+Storage backend: full copy
+Copy-on-write guidance: https://github.com/leonardoLoddo/hydra/blob/main/Docs/user/wsl-copy-on-write.md
+```
+
+Da PowerShell verifica prima che la distribuzione sia WSL 2 con `wsl -l -v`.
+La guida Microsoft
+[Mount a Linux disk in WSL 2](https://learn.microsoft.com/windows/wsl/wsl2-mount-disk)
+descrive come collegare dischi fisici e VHD. Creazione, partizionamento,
+formattazione e mount possono distruggere dati se viene scelto il target
+sbagliato: identifica il volume esatto, conserva i backup necessari e ottieni
+l'autorizzazione amministrativa o aziendale prima di procedere. Hydra non
+esegue queste operazioni.
 
 Verifica prima la disponibilità del filesystem e poi il volume concreto:
 
@@ -1226,15 +1251,81 @@ hydra doctor storage
 ```
 
 Considera attivo il CoW soltanto se il report mostra `Storage backend:
-copy-on-write` e `Native primitive: Linux reflink`. Hydra non crea, formatta o
-monta il VHD. Non modificare il locator per spostare un progetto già
+copy-on-write`, `Native primitive: Linux reflink` e il mount previsto. Puoi
+controllare il volume di un percorso con `findmnt -T`. Hydra non crea, formatta
+o monta il VHD. Non modificare il locator per spostare un progetto già
 inizializzato: crea invece un clone revisionato sul nuovo volume e inizializza
-quello, poiché la relocation assistita non è ancora disponibile.
+quello, poiché la relocation assistita non è ancora disponibile. Se il fallback
+continua, verifica anche che `.hydra.json` non imposti `storage.mode: "copy"`.
 
 Su un volume Windows ReFS compatibile la riga nativa è `Native primitive:
 Windows ReFS block clone`. Su NTFS il risultato normale è il fallback verificato
 a copia completa. La capacità dipende dal volume reale delle Head, non dalla
 lettera dell'unità o dal solo sistema operativo.
+
+### Copy-on-write su Windows con un Dev Drive
+
+Quando Windows nativo ricade su `full copy`, `hydra init`,
+`hydra doctor storage` e `hydra head create` mostrano il link alla guida
+[Windows Copy-on-Write Setup](windows-copy-on-write.md):
+
+```text
+Storage backend: full copy
+Native primitive: unavailable
+Copy-on-write guidance: https://github.com/leonardoLoddo/hydra/blob/main/Docs/user/windows-copy-on-write.md
+```
+
+Il fallback rimane sicuro: Hydra verifica i byte copiati e non usa hard link
+mutabili. Per ridurre spazio iniziale e I/O serve invece un volume ReFS
+compatibile, preferibilmente un Dev Drive di Windows 11.
+
+Da **Impostazioni > Sistema > Archiviazione > Impostazioni di archiviazione
+avanzate > Dischi e volumi**, seleziona **Crea unità di sviluppo**. Servono
+permessi amministrativi e almeno 50 GB liberi. Un volume esistente non può
+essere convertito in Dev Drive: Windows applica questa designazione durante la
+formattazione di un nuovo volume. Un VHDX a espansione dinamica evita di
+ripartizionare direttamente un disco fisico, ma ogni creazione, formattazione o
+ridimensionamento richiede comunque di verificare la destinazione, conservare
+i backup necessari e rispettare le policy aziendali.
+
+Colloca sullo stesso Dev Drive un nuovo clone e la futura directory sorella
+delle Head:
+
+```text
+D:\Projects\Shop
+D:\Projects\Shop.heads
+```
+
+Questa disposizione consente il block clone anche per gli overlay. Una
+sorgente su un altro volume può costringere singoli file al fallback e far
+risultare l'intera Head come `full copy`. Non spostare un'installazione Hydra
+esistente modificando locator o metadati locali: se il progetto è su NTFS,
+crea e revisiona un nuovo clone sul Dev Drive e inizializza quello.
+
+Da Git Bash:
+
+```bash
+cd /d/Projects/Shop
+hydra init
+hydra doctor storage
+```
+
+Considera disponibile il CoW soltanto quando la prova reale mostra:
+
+```text
+Storage backend: copy-on-write
+Native primitive: Windows ReFS block clone
+Fallback: full copy (verified)
+Mutable hard links: disabled
+Isolation: supported
+```
+
+Se Hydra continua a mostrare `full copy`, verifica che la directory delle Head
+sia sul volume ReFS previsto, che progetto e Head siano sullo stesso volume e
+che `.hydra.json` non imposti deliberatamente `storage.mode: "copy"`; quindi
+ripeti `hydra doctor storage`. Hydra non crea, formatta, ridimensiona, monta o
+contrassegna come attendibile un Dev Drive. I symlink tracciati o selezionati
+dagli overlay rimangono non supportati su Windows nativo.
 
 Per i file tracciati, quando il workspace coincide con il commit scelto Hydra
 può riusare direttamente quei file come sorgenti copy-on-write. In presenza di

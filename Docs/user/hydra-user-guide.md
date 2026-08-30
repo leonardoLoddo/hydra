@@ -34,6 +34,10 @@ Use the focused guides when you need more control:
   policies, branch naming, and open/close command adapters.
 - [Storage and overlays](storage-and-overlays.md) explains copy-on-write,
   full-copy fallback, ignored files, symlinks, prompts, and diagnostics.
+- [Windows copy-on-write setup](windows-copy-on-write.md) explains how to use a
+  compatible ReFS Dev Drive when native Windows reports full copy.
+- [WSL 2 copy-on-write setup](wsl-copy-on-write.md) explains how to place a
+  fresh clone on a reflink-capable Linux volume when WSL reports full copy.
 - [Agent Skills](agent-skills.md) explains the optional portable skill and its
   safe provider-specific install, update, and removal lifecycle.
 - [Recovery and troubleshooting](recovery-and-troubleshooting.md) explains

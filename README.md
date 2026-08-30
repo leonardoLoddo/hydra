@@ -88,6 +88,8 @@ Focused pages:
 - [Head workflows](Docs/user/head-workflows.md)
 - [Configuration](Docs/user/configuration.md)
 - [Storage and overlays](Docs/user/storage-and-overlays.md)
+- [Windows copy-on-write setup](Docs/user/windows-copy-on-write.md)
+- [WSL 2 copy-on-write setup](Docs/user/wsl-copy-on-write.md)
 - [Agent Skills](Docs/user/agent-skills.md)
 - [Recovery and troubleshooting](Docs/user/recovery-and-troubleshooting.md)
 - [CLI reference](Docs/user/cli-reference.md)

@@ -128,5 +128,7 @@ Docs/
     ├── hydra-user-guide.it.md
     ├── installation.md
     ├── recovery-and-troubleshooting.md
-    └── storage-and-overlays.md
+    ├── storage-and-overlays.md
+    ├── windows-copy-on-write.md
+    └── wsl-copy-on-write.md
 ```

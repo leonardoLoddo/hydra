@@ -12,8 +12,17 @@ On native Windows, operate the native `hydra.exe` through Git Bash with Git for
 Windows on `PATH`. Treat copy-on-write as volume-dependent: compatible ReFS
 volumes may use block cloning, while NTFS and unsupported volumes use isolated
 full copies. Run `hydra doctor storage` before making storage-cost assumptions.
+When native Windows initialization, storage diagnosis, or Head creation reports
+full copy, follow the printed setup URL; do not treat the guide as proof until
+a new probe reports `Windows ReFS block clone`.
 Do not create a Head containing tracked or selected overlay symlinks on Windows;
 that materialization remains unsupported.
+
+Inside WSL 2, Hydra uses Linux reflinks rather than Windows block cloning. The
+default ext4 root and Windows interop mounts may require full copy. When
+initialization, diagnosis, or Head creation prints the WSL setup URL, use it to
+prepare a fresh clone on a reflink-capable Linux volume and accept CoW only
+after `hydra doctor storage` reports `Linux reflink`.
 
 When the user asks to install Hydra on native Windows, use the checksummed
 stable Windows ZIP linked from the repository README only after it resolves to
@@ -106,8 +115,9 @@ Creation may pause for confirmation:
   compare-and-swap against an external save in the final pre-rename window.
   After approval, inspect and report the `.hydra.json` diff; commit it only
   when authorized.
-- If Hydra reports that full copy is required, report the file count and byte
-  size and answer yes only after the user authorizes that storage cost.
+- If Hydra reports that full copy is required, report the file count, byte
+  size, and any platform setup URL before answering. Follow the guide only for
+  diagnosis; answer yes only after the user authorizes that storage cost.
 - A negative answer or EOF is a safe cancellation. Do not bypass either prompt
   with manual copying, Git worktree commands, or metadata edits.
 
@@ -210,12 +220,14 @@ that are not integrated, and its output must be reported.
 - Use `hydra doctor storage` when the active backend or fallback behavior needs
   diagnosis. Report its backend, native primitive, environment, and filesystem,
   plus any temporary path that Hydra could not clean up; do not remove such a
-  path blindly. Treat WSL full-copy guidance as setup information, not as proof
-  of CoW. Never create, format, mount, or relocate a volume without explicit
-  user authorization. For a new WSL setup, keep the project and sibling Heads
-  directory on the same reflink-capable Linux volume and accept CoW only after
-  the real probe reports `Linux reflink`; do not edit Hydra's locator to move an
-  existing installation.
+  path blindly. Treat WSL and native Windows full-copy URLs as setup
+  information, not as proof of CoW. Use the Windows guide to prepare a new ReFS
+  Dev Drive layout and accept CoW only after the real probe reports `Windows
+  ReFS block clone`. For a new WSL setup, keep a fresh project clone and sibling
+  Heads directory on the same reflink-capable Linux volume and accept CoW only
+  after the real probe reports `Linux reflink`. Never create, format, mount,
+  resize, or relocate a volume without explicit user authorization; do not edit
+  Hydra's locator to move an existing installation.
 - Run `hydra repair` first to collect its plan and decline each proposed
   mutation. Report the exact deterministic repairs and unresolved
   inconsistencies, then rerun and confirm only the changes the user explicitly

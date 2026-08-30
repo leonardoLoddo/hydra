@@ -61,7 +61,10 @@ pub(super) fn run(name: &str, from: Option<&str>, target: Option<&str>) -> ExitC
             let mut input = stdin.lock();
             let stdout = io::stdout();
             let mut output = stdout.lock();
-            let confirmed = request_full_copy_confirmation(&mut input, &mut output, files, bytes);
+            let guidance =
+                crate::current_copy_on_write_guidance(hydra_core::StorageBackend::FullCopy);
+            let confirmed =
+                request_full_copy_confirmation(&mut input, &mut output, files, bytes, guidance);
             let confirmed = match confirmed {
                 Ok(confirmed) => confirmed,
                 Err(error) => {
@@ -73,9 +76,12 @@ pub(super) fn run(name: &str, from: Option<&str>, target: Option<&str>) -> ExitC
                 eprintln!("error: Head creation cancelled");
                 return ExitCode::FAILURE;
             }
-            finish(create(true, exclude_unsafe_overlay_symlinks))
+            finish(
+                create(true, exclude_unsafe_overlay_symlinks),
+                guidance.is_some(),
+            )
         }
-        result => finish(result),
+        result => finish(result, false),
     }
 }
 
@@ -102,7 +108,10 @@ fn write_progress(
     }
 }
 
-fn finish(result: Result<hydra_core::CreatedHead, hydra_core::HeadError>) -> ExitCode {
+fn finish(
+    result: Result<hydra_core::CreatedHead, hydra_core::HeadError>,
+    guidance_already_shown: bool,
+) -> ExitCode {
     match result {
         Ok(head) => {
             if head.overlay_files > 0 {
@@ -127,6 +136,9 @@ fn finish(result: Result<hydra_core::CreatedHead, hydra_core::HeadError>) -> Exi
                     println!("Storage backend: full copy");
                 }
             }
+            if !guidance_already_shown {
+                crate::print_current_copy_on_write_guidance(head.storage_backend);
+            }
             ExitCode::SUCCESS
         }
         Err(error) => {
@@ -141,11 +153,16 @@ fn request_full_copy_confirmation(
     output: &mut impl Write,
     files: usize,
     bytes: u64,
+    guidance: Option<&str>,
 ) -> io::Result<bool> {
-    write!(
+    writeln!(
         output,
-        "Full copy required: {files} file(s), {bytes} byte(s)\nContinue? [y/N] "
+        "Full copy required: {files} file(s), {bytes} byte(s)"
     )?;
+    if let Some(guidance) = guidance {
+        writeln!(output, "Copy-on-write guidance: {guidance}")?;
+    }
+    write!(output, "Continue? [y/N] ")?;
     output.flush()?;
 
     let mut response = String::new();
@@ -226,13 +243,38 @@ mod tests {
         let mut input = Cursor::new(b"\n");
         let mut output = Vec::new();
 
-        let confirmed = request_full_copy_confirmation(&mut input, &mut output, 2, 13)
+        let confirmed = request_full_copy_confirmation(&mut input, &mut output, 2, 13, None)
             .expect("prompt should be written and read");
 
         assert!(!confirmed);
         assert_eq!(
             String::from_utf8(output).expect("prompt should be UTF-8"),
             "Full copy required: 2 file(s), 13 byte(s)\nContinue? [y/N] "
+        );
+    }
+
+    #[test]
+    fn full_copy_confirmation_shows_platform_guidance_before_the_decision() {
+        let mut input = Cursor::new(b"no\n");
+        let mut output = Vec::new();
+
+        let confirmed = request_full_copy_confirmation(
+            &mut input,
+            &mut output,
+            2,
+            13,
+            Some("https://example.com/copy-on-write"),
+        )
+        .expect("prompt should be written and read");
+
+        assert!(!confirmed);
+        assert_eq!(
+            String::from_utf8(output).expect("prompt should be UTF-8"),
+            concat!(
+                "Full copy required: 2 file(s), 13 byte(s)\n",
+                "Copy-on-write guidance: https://example.com/copy-on-write\n",
+                "Continue? [y/N] "
+            )
         );
     }
 

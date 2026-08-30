@@ -22,6 +22,8 @@ root filesystem is commonly ext4 and may require Hydra's safe full-copy
 fallback. For physical copy-on-write, place a new project and its sibling Heads
 directory on the same reflink-capable Linux volume before `hydra init`; see
 [WSL copy-on-write storage](storage-and-overlays.md#wsl-2-copy-on-write).
+For the complete safe volume-placement and verification procedure, use
+[WSL 2 copy-on-write setup](wsl-copy-on-write.md).
 
 Release archives are native binaries. Installing a published archive or the
 Homebrew Formula does not require a Rust toolchain.
@@ -123,6 +125,11 @@ use the extensionless command. Git for Windows must remain reachable on
 Native Windows packaging is available starting with `v0.2.0`. The stable
 download resolves through the latest GitHub Release, while the versioned
 archive remains available for reproducible downloads.
+
+For native copy-on-write storage, place a fresh clone and its sibling Heads
+directory on a compatible ReFS Dev Drive before initialization. Follow
+[Windows copy-on-write setup](windows-copy-on-write.md) and accept CoW only
+after `hydra doctor storage` reports `Windows ReFS block clone`.
 
 ## Update Hydra
 

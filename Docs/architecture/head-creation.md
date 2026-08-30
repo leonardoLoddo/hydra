@@ -59,7 +59,9 @@ to interrupt the creation transaction.
 
 The backend line is `Storage backend: full copy` when any materialized regular
 file required the safe copy fallback or `storage.mode: "copy"` selected that
-backend explicitly.
+backend explicitly. On native Windows or WSL, the CLI prints the applicable
+maintained copy-on-write setup URL after that line when no earlier prompt has
+already displayed it.
 
 For every non-empty overlay plan, successful creation also prints its logical
 size and file count:
@@ -83,8 +85,13 @@ subset's logical cost and requests confirmation:
 
 ```text
 Full copy required: <count> file(s), <bytes> byte(s)
+Copy-on-write guidance: <platform-guide-url>
 Continue? [y/N]
 ```
+
+The guidance line is present on native Windows and WSL and absent on other
+platforms. When shown in the prompt it is not repeated after successful
+creation.
 
 Only `y` and `yes`, compared case-insensitively after trimming whitespace,
 confirm the fallback. EOF, an empty response, and every other value cancel it
@@ -526,6 +533,8 @@ repositories. Current coverage proves:
 - deterministic full-copy creation for tracked files and overlays through
   `storage.mode: "copy"`, including confirmation, persisted backend, and source
   isolation;
+- platform-specific Windows and WSL full-copy guidance before an overlay cost
+  decision or, when no prompt was needed, in final output without duplication;
 - rejection of unsafe names, unknown refs, missing targets, duplicates,
   existing branches, and existing destinations;
 - target-specific diagnostics for an explicit target that cannot be resolved;
