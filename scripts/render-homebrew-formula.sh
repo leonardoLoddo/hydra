@@ -77,6 +77,7 @@ class HydraHeads < Formula
 
   def install
     bin.install "hydra"
+    generate_completions_from_executable(bin/"hydra", shell_parameter_format: :clap)
     pkgshare.install "hydra-art.txt"
     pkgshare.install "skills"
     pkgshare.install "LICENSE", "LICENSE-MIT", "LICENSE-APACHE"

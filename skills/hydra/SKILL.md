@@ -35,6 +35,9 @@ toolchain requirement.
 
 1. Run `hydra --version` and `hydra --help`. Never assume an installed build
    supports a command or option that its help does not show.
+   Homebrew installs Bash, Zsh, and Fish completion files automatically. If
+   completion is unavailable, do not edit a user's shell profile without
+   authorization; use `hydra completions <shell>` as the documented fallback.
 2. Resolve the current worktree root with `git rev-parse --show-toplevel` and
    inspect `git status --short --branch`.
 3. Run `hydra status` before mutation. Its `Project:` line is the canonical

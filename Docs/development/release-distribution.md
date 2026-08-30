@@ -95,6 +95,13 @@ an interactive user immediately sees how to continue the installation
 experience. Running `hydra skill install codex` remains an explicit opt-in and
 must not be a Formula `post_install` action.
 
+The Formula generates Hydra's dynamic Bash, Zsh, and Fish completion scripts
+from the installed executable with Homebrew's Clap completion DSL. Homebrew
+owns those files in its standard completion directories; the Formula never
+edits personal shell startup files. Maintained installation documentation must
+retain `hydra completions <shell>` as the fallback for shells that do not load
+the package-manager paths and for non-Homebrew installations.
+
 The Formula renders the artwork verbatim and without ANSI control sequences.
 Release validation must compare the displayed block with the packaged asset and
 prove that the artwork appears before both command suggestions. The Formula
@@ -305,6 +312,8 @@ verify at least:
   content;
 - the complete packaged artwork appears at the end of Homebrew installation,
   before both command suggestions, without corrupting logs;
+- Homebrew installs non-empty dynamic completion files for Bash, Zsh, and Fish
+  in the Formula keg;
 - install, update, and removal instructions in the README and maintained
   English and Italian user documentation match the released artifacts.
 

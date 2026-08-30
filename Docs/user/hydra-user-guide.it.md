@@ -74,8 +74,15 @@ hydra head remove --help
 
 ### Completamento della shell
 
-Hydra supporta Bash, Zsh e Fish. Carica la registrazione ad ogni avvio della
-shell, così rimane allineata con il binario installato.
+Hydra supporta Bash, Zsh e Fish. La Formula Homebrew installa automaticamente
+i completamenti dinamici nei percorsi standard del package manager senza
+modificare i file personali della shell. Dopo installazione o aggiornamento,
+riavvia la shell; se questa carica i completamenti Homebrew, non serve altra
+configurazione Hydra.
+
+Per installazioni da sorgente o archivio, oppure se Tab non è ancora
+disponibile, carica manualmente la registrazione ad ogni avvio della shell,
+così rimane allineata con il binario installato.
 
 Per Bash, aggiungi a `~/.bashrc`:
 
@@ -103,7 +110,8 @@ perché quel comando richiede un nome nuovo.
 Fuori da un progetto Hydra, oppure quando lo stato locale non è leggibile, la
 ricerca dinamica non mostra errori: restituisce semplicemente zero nomi. Dopo
 un aggiornamento di Hydra riavvia la shell o ricarica il relativo file di
-configurazione.
+configurazione. Se anche Homebrew richiede il fallback manuale, verifica prima
+che il normale ambiente Homebrew sia inizializzato nella shell.
 
 ---
 

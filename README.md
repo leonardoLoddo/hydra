@@ -25,6 +25,9 @@ brew install leonardoLoddo/tap/hydra-heads
 
 The Formula is named `hydra-heads` because Homebrew already distributes an
 unrelated package named `hydra`. The installed executable is still `hydra`.
+The Formula also installs dynamic Bash, Zsh, and Fish completions in Homebrew's
+standard directories; manual activation remains documented for shells that do
+not load them automatically.
 
 On native Windows x86-64, use the stable release links:
 

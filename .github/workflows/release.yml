@@ -241,6 +241,10 @@ jobs:
           brew audit --strict "$tap_name/hydra-heads"
           brew install "$tap_name/hydra-heads" 2>&1 | tee homebrew-install.log
           scripts/verify-homebrew-caveats.sh homebrew-install.log hydra-art.txt
+          completion_prefix=$(brew --prefix hydra-heads)
+          test -s "$completion_prefix/etc/bash_completion.d/hydra"
+          test -s "$completion_prefix/share/zsh/site-functions/_hydra"
+          test -s "$completion_prefix/share/fish/vendor_completions.d/hydra.fish"
           brew test "$tap_name/hydra-heads"
           brew uninstall hydra-heads
           brew untap "$tap_name"

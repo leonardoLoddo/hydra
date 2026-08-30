@@ -116,6 +116,15 @@ abort "error: missing Homebrew smoke-test step" unless smoke_step
 unless smoke_step.fetch("run").include?('brew audit --strict "$tap_name/hydra-heads"')
   abort "error: Homebrew audit must use the tap-qualified Formula name"
 end
+[
+  'etc/bash_completion.d/hydra',
+  'share/zsh/site-functions/_hydra',
+  'share/fish/vendor_completions.d/hydra.fish',
+].each do |completion_path|
+  unless smoke_step.fetch("run").include?(completion_path)
+    abort "error: Homebrew smoke test does not verify completion: #{completion_path}"
+  end
+end
 
 ["formula", "homebrew-smoke"].each do |job_name|
   checkout = workflow.fetch("jobs").fetch(job_name).fetch("steps").find do |candidate|
@@ -174,6 +183,7 @@ grep -F "/releases/download/v$version/hydra-$version-aarch64-apple-darwin.tar.gz
 grep -F "/releases/download/v$version/hydra-$version-x86_64-apple-darwin.tar.gz" "$formula" >/dev/null
 grep -F "/releases/download/v$version/hydra-$version-aarch64-unknown-linux-gnu.tar.gz" "$formula" >/dev/null
 grep -F "/releases/download/v$version/hydra-$version-x86_64-unknown-linux-gnu.tar.gz" "$formula" >/dev/null
+grep -F 'generate_completions_from_executable(bin/"hydra", shell_parameter_format: :clap)' "$formula" >/dev/null
 ruby -c "$formula"
 brew style "$formula"
 

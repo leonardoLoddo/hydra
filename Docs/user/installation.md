@@ -184,8 +184,15 @@ files, local Heads, private branches, or Hydra's project state.
 
 ## Enable shell completion
 
-Hydra generates completion registration for Bash, Zsh, and Fish. Source it at
-shell startup so it uses the currently installed executable.
+The Homebrew Formula automatically installs Hydra's dynamic Bash, Zsh, and
+Fish completion files in Homebrew's standard directories. It does not modify
+personal shell startup files. Restart the shell after installation or upgrade;
+when the shell is configured to load Homebrew completions, no additional Hydra
+configuration is required.
+
+For a source/archive installation, or when Tab completion is still unavailable,
+load the registration explicitly at shell startup so it uses the currently
+installed executable.
 
 For Bash, add this to `~/.bashrc`:
 
@@ -212,7 +219,9 @@ names for `head status`, `head path`, `head open`, `head close`, and
 
 Outside a readable Hydra project, dynamic Head completion returns no
 candidates and no visible error. Reload the shell configuration after a Hydra
-upgrade.
+upgrade. If a Homebrew installation still needs the manual fallback, first
+ensure the normal Homebrew shell environment is initialized; do not copy a
+versioned completion script into a personal directory.
 
 ## Next step
 

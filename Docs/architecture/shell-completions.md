@@ -24,6 +24,12 @@ source <(hydra completions zsh)
 hydra completions fish | source
 ```
 
+The generated Homebrew Formula installs the same dynamic registrations in
+Homebrew's standard Bash, Zsh, and Fish completion directories. It does not
+edit `.bashrc`, `.zshrc`, or Fish configuration. The commands above remain the
+portable fallback when a shell does not load its package-manager completion
+directory or Hydra was installed by another method.
+
 The generated registration completes the command hierarchy and options. It
 also proposes existing Head names for `head status`, `head path`, `head open`,
 `head close`, and `head remove`. `head create` deliberately has no Head-name
@@ -81,6 +87,10 @@ CLI integration tests prove:
 - byte-for-byte inventory preservation and absence of the mutation lock;
 - successful empty output outside a Hydra project;
 - exclusion of the internal candidate command from public help.
+
+Release-tooling tests additionally prove that the generated Homebrew Formula
+uses Homebrew's Clap completion generator and that clean-install smoke tests
+require non-empty Bash, Zsh, and Fish completion files in the installed keg.
 
 The Head-inspection integration tests remain representative coverage for the
 shared validated inventory loader.
