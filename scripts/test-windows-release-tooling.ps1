@@ -45,6 +45,7 @@ try {
     $expected = @(
         "hydra.exe",
         "hydra-art.txt",
+        "completions\hydra.bash",
         "skills\hydra\SKILL.md",
         "skills\hydra\agents\openai.yaml",
         "LICENSE",
@@ -57,6 +58,14 @@ try {
         if (-not (Test-Path -LiteralPath (Join-Path $expanded $relativePath) -PathType Leaf)) {
             throw "release archive is missing $relativePath"
         }
+    }
+    $completion = Join-Path $expanded "completions\hydra.bash"
+    & bash -n $completion
+    if ($LASTEXITCODE -ne 0) {
+        throw "packaged Git Bash completion has invalid syntax"
+    }
+    if (-not (Select-String -LiteralPath $completion -SimpleMatch "_clap_complete_hydra" -Quiet)) {
+        throw "packaged Git Bash completion is not Hydra's generated registration"
     }
     if (Test-Path -LiteralPath (Join-Path $expanded "assets\hydra-banner.png")) {
         throw "release archive includes the repository banner"

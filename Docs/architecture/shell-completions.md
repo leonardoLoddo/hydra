@@ -30,6 +30,12 @@ edit `.bashrc`, `.zshrc`, or Fish configuration. The commands above remain the
 portable fallback when a shell does not load its package-manager completion
 directory or Hydra was installed by another method.
 
+The native Windows ZIP includes a generated `completions/hydra.bash` file.
+Because the ZIP is a portable archive rather than an installer, packaging does
+not edit `.bashrc` or register the script globally. Users explicitly source the
+packaged file from Git Bash; `source <(hydra completions bash)` remains the
+fallback when that file is unavailable.
+
 The generated registration completes the command hierarchy and options. It
 also proposes existing Head names for `head status`, `head path`, `head open`,
 `head close`, and `head remove`. `head create` deliberately has no Head-name
@@ -91,6 +97,9 @@ CLI integration tests prove:
 Release-tooling tests additionally prove that the generated Homebrew Formula
 uses Homebrew's Clap completion generator and that clean-install smoke tests
 require non-empty Bash, Zsh, and Fish completion files in the installed keg.
+The Windows release job generates a non-empty Bash registration with the
+native executable, packages it at `completions/hydra.bash`, extracts the ZIP,
+and validates the script syntax through Git Bash before publication.
 
 The Head-inspection integration tests remain representative coverage for the
 shared validated inventory loader.

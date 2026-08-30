@@ -101,6 +101,28 @@ jobs:
             -Target "${{ matrix.target }}" `
             -Binary "target/${{ matrix.target }}/release/hydra.exe" `
             -OutputDirectory release-assets
+      - name: Extract Windows release archive for verification
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $archives = @(Get-ChildItem -LiteralPath release-assets -Filter "hydra-${{ steps.release.outputs.version }}-${{ matrix.target }}.zip")
+          if ($archives.Count -ne 1) {
+            throw "expected exactly one versioned Windows release archive"
+          }
+          Expand-Archive -LiteralPath $archives[0].FullName -DestinationPath release-verification
+          $completion = "release-verification/completions/hydra.bash"
+          if (-not (Test-Path -LiteralPath $completion -PathType Leaf)) {
+            throw "Windows release archive does not contain Git Bash completion"
+          }
+          if ((Get-Item -LiteralPath $completion).Length -eq 0) {
+            throw "packaged Git Bash completion is empty"
+          }
+      - name: Validate Windows Git Bash completion
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          bash -n release-verification/completions/hydra.bash
+          grep -F '_clap_complete_hydra' release-verification/completions/hydra.bash
       - name: Upload release archive
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

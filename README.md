@@ -34,8 +34,11 @@ On native Windows x86-64, use the stable release links:
 [Download Hydra for Windows](https://github.com/leonardoLoddo/hydra/releases/latest/download/hydra-windows-x86_64.zip)
 · [SHA-256 checksum](https://github.com/leonardoLoddo/hydra/releases/latest/download/hydra-windows-x86_64.zip.sha256)
 
-Extract `hydra.exe` into a directory on the Windows `PATH`, then use it from
-Git Bash. The stable links always resolve through the latest GitHub Release;
+Extract the archive into a directory on the Windows `PATH`, then use
+`hydra.exe` from Git Bash. The ZIP includes `completions/hydra.bash`; because
+the archive is portable, activate that script explicitly from `~/.bashrc` as
+described in the installation guide. The stable links always resolve through
+the latest GitHub Release;
 the same release also contains the versioned Windows archive and all macOS and
 Linux artifacts. Native Windows packaging is available in published releases
 starting with `v0.2.0`. Homebrew remains the installation channel for macOS,

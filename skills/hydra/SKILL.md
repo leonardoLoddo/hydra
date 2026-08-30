@@ -30,6 +30,10 @@ a published GitHub Release. Do not use expiring CI artifacts or binaries
 committed to the source tree. If no Windows release asset exists yet, report
 that boundary and use a source build only when the user accepts the Rust
 toolchain requirement.
+The portable ZIP includes `completions/hydra.bash` but does not edit the user's
+Git Bash profile. When completion is requested, source that packaged file from
+`~/.bashrc`; if it is unavailable, use `source <(hydra completions bash)`.
+Never modify a user's shell profile without explicit authorization.
 
 ## Establish the starting state
 

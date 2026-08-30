@@ -20,6 +20,7 @@ if ($Target -notmatch '^[A-Za-z0-9_.-]+$') {
 if (-not (Test-Path -LiteralPath $Binary -PathType Leaf)) {
     throw "release binary does not exist: $Binary"
 }
+$resolvedBinary = (Resolve-Path -LiteralPath $Binary).Path
 
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
@@ -29,7 +30,40 @@ $packageRoot = Join-Path $stagingRoot "package"
 
 try {
     New-Item -ItemType Directory -Path (Join-Path $packageRoot "skills\hydra\agents") -Force | Out-Null
-    Copy-Item -LiteralPath $Binary -Destination (Join-Path $packageRoot "hydra.exe")
+    $completionDirectory = Join-Path $packageRoot "completions"
+    New-Item -ItemType Directory -Path $completionDirectory -Force | Out-Null
+
+    $completionStartInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $completionStartInfo.FileName = $resolvedBinary
+    $completionStartInfo.UseShellExecute = $false
+    $completionStartInfo.RedirectStandardOutput = $true
+    $completionStartInfo.RedirectStandardError = $true
+    $completionStartInfo.Environment["COMPLETE"] = "bash"
+    $completionProcess = [System.Diagnostics.Process]::new()
+    $completionProcess.StartInfo = $completionStartInfo
+    if (-not $completionProcess.Start()) {
+        throw "could not start release binary to generate Git Bash completion"
+    }
+    $completionOutput = $completionProcess.StandardOutput.ReadToEndAsync()
+    $completionError = $completionProcess.StandardError.ReadToEndAsync()
+    $completionProcess.WaitForExit()
+    $completionText = $completionOutput.Result
+    $completionErrorText = $completionError.Result
+    if ($completionProcess.ExitCode -ne 0) {
+        throw "Git Bash completion generation failed: $completionErrorText"
+    }
+    if ([string]::IsNullOrWhiteSpace($completionText)) {
+        throw "Git Bash completion generation produced empty output"
+    }
+    $completionProcess.Dispose()
+    $completionPath = Join-Path $completionDirectory "hydra.bash"
+    [System.IO.File]::WriteAllText(
+        $completionPath,
+        $completionText,
+        [System.Text.UTF8Encoding]::new($false)
+    )
+
+    Copy-Item -LiteralPath $resolvedBinary -Destination (Join-Path $packageRoot "hydra.exe")
     Copy-Item -LiteralPath (Join-Path $repositoryRoot "hydra-art.txt") -Destination $packageRoot
     Copy-Item -LiteralPath (Join-Path $repositoryRoot "skills\hydra\SKILL.md") -Destination (Join-Path $packageRoot "skills\hydra")
     Copy-Item -LiteralPath (Join-Path $repositoryRoot "skills\hydra\agents\openai.yaml") -Destination (Join-Path $packageRoot "skills\hydra\agents")

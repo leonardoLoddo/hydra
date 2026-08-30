@@ -84,6 +84,16 @@ Per installazioni da sorgente o archivio, oppure se Tab non è ancora
 disponibile, carica manualmente la registrazione ad ogni avvio della shell,
 così rimane allineata con il binario installato.
 
+Lo ZIP nativo per Windows include `completions/hydra.bash`, ma essendo un
+archivio portabile non modifica automaticamente `.bashrc`. Se la directory
+estratta è nel `PATH`, in Git Bash aggiungi a `~/.bashrc`:
+
+```bash
+source "$(dirname "$(command -v hydra.exe)")/completions/hydra.bash"
+```
+
+Se quel file non è presente, usa il fallback Bash riportato qui sotto.
+
 Per Bash, aggiungi a `~/.bashrc`:
 
 ```bash
@@ -151,8 +161,10 @@ hydra --help
 
 Git Bash risolve automaticamente `hydra` in `hydra.exe`, quindi gli esempi
 restano invariati. Git for Windows deve essere installato e raggiungibile nel
-`PATH`. PowerShell può essere usato per installare il binario, ma il flusso
-operativo e i completamenti documentati usano Git Bash.
+`PATH`. Lo ZIP include anche `completions/hydra.bash`; la registrazione resta
+esplicita perché l'archivio portabile non modifica il profilo dell'utente.
+PowerShell può essere usato per installare il binario, ma il flusso operativo
+e i completamenti documentati usano Git Bash.
 
 Il packaging Windows nativo è disponibile a partire da `v0.2.0`. Il link
 stabile risolve l'ultima GitHub Release, mentre l'archivio versionato rimane

@@ -74,6 +74,45 @@ abort "error: missing Windows release build step" unless windows_build
 unless windows_build["if"] == "runner.os == 'Windows'" && windows_build["shell"] == "pwsh"
   abort "error: Windows release build must use PowerShell only on Windows"
 end
+windows_completion_check = build_job.fetch("steps").find do |candidate|
+  candidate["name"] == "Validate Windows Git Bash completion"
+end
+abort "error: missing Windows Git Bash completion validation step" unless windows_completion_check
+unless windows_completion_check["if"] == "runner.os == 'Windows'" && windows_completion_check["shell"] == "bash"
+  abort "error: Windows completion validation must use Git Bash only on Windows"
+end
+unless windows_completion_check.fetch("run").include?("completions/hydra.bash")
+  abort "error: Windows completion validation does not inspect the packaged Git Bash script"
+end
+windows_completion_extract = build_job.fetch("steps").find do |candidate|
+  candidate["name"] == "Extract Windows release archive for verification"
+end
+abort "error: missing Windows completion extraction step" unless windows_completion_extract
+unless windows_completion_extract["if"] == "runner.os == 'Windows'" && windows_completion_extract["shell"] == "pwsh"
+  abort "error: Windows completion extraction must use PowerShell only on Windows"
+end
+unless windows_completion_extract.fetch("run").include?("Expand-Archive") &&
+       windows_completion_extract.fetch("run").include?("completions/hydra.bash")
+  abort "error: Windows completion extraction does not verify the packaged script"
+end
+
+windows_packaging = File.read("scripts/package-release.ps1")
+[
+  '"completions"',
+  '"hydra.bash"',
+  'COMPLETE',
+  'bash',
+].each do |required_text|
+  unless windows_packaging.include?(required_text)
+    abort "error: Windows package does not generate Git Bash completion: #{required_text}"
+  end
+end
+
+windows_release_test = File.read("scripts/test-windows-release-tooling.ps1")
+unless windows_release_test.include?('"completions\hydra.bash"') &&
+       windows_release_test.include?("bash -n")
+  abort "error: Windows release tooling test does not validate packaged completion"
+end
 
 publish_steps = workflow.fetch("jobs").fetch("publish").fetch("steps")
 repository_bound_steps = [

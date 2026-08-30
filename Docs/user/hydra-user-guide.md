@@ -142,8 +142,9 @@ Hydra currently manages:
 - protected removal;
 - deterministic repair proposals;
 - real storage diagnostics;
-- Homebrew-managed Bash, Zsh, and Fish completions with portable manual
-  registration for other installations;
+- Homebrew-managed Bash, Zsh, and Fish completions, plus a ready-generated Git
+  Bash script in the native Windows ZIP, with portable manual registration
+  when automatic activation is unavailable;
 - an optional Agent Skill for Codex, Gemini CLI, Antigravity CLI, and the
   Antigravity app.
 

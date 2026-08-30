@@ -942,6 +942,11 @@ silenziosamente i file di configurazione personali. La registrazione manuale
 resta disponibile per installazioni diverse da Homebrew e per shell che non
 caricano i percorsi di completamento del package manager.
 
+Lo ZIP nativo Windows include una registrazione Bash già generata. Poiché è un
+archivio portabile e non un installer, Hydra non modifica automaticamente il
+profilo Git Bash: l'utente registra esplicitamente il file incluso oppure usa
+`hydra completions bash` come fallback quando il file non è disponibile.
+
 ### 7.8 Repair e riconciliazione
 
 ```bash

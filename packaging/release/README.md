@@ -7,6 +7,8 @@ for the target named in the archive filename; Rust is not required to run it.
 ## Contents
 
 - `hydra` or `hydra.exe`: the command-line executable;
+- `completions/hydra.bash` on Windows: the ready-generated Git Bash
+  registration;
 - `hydra-art.txt`: terminal artwork shown by the Homebrew Formula;
 - `skills/hydra/`: the canonical portable Hydra Agent Skill;
 - `LICENSE`, `LICENSE-MIT`, and `LICENSE-APACHE`: license terms;
@@ -25,6 +27,19 @@ chmod +x hydra
 On Windows, extract the ZIP to a stable directory on the Windows user `PATH`,
 restart Git Bash, and run `hydra.exe --version` followed by `hydra --help`.
 Git for Windows must also be installed and reachable from Git Bash.
+
+The portable ZIP does not change your shell profile. Enable Tab completion by
+adding this to Git Bash's `~/.bashrc`:
+
+```bash
+source "$(dirname "$(command -v hydra.exe)")/completions/hydra.bash"
+```
+
+If the packaged file is unavailable, generate the registration dynamically:
+
+```bash
+source <(hydra completions bash)
+```
 
 The optional Codex skill is installed explicitly after the executable is on
 your `PATH`:

@@ -241,10 +241,15 @@ current marker.
 The release matrix builds native archives for macOS Apple Silicon, macOS Intel,
 Linux ARM64, Linux x86-64, and native Windows x86-64. Unix targets use
 `.tar.gz`; Windows publishes both the immutable versioned ZIP and a byte-for-byte
-identical `hydra-windows-x86_64.zip` alias containing `hydra.exe`. The stable
-alias and its checksum make the README's latest-release link independent of the
-version number, while the versioned archive remains available for reproducible
-downloads. The preview baseline
+identical `hydra-windows-x86_64.zip` alias containing `hydra.exe` and the
+ready-generated `completions/hydra.bash` registration. Packaging invokes the
+native binary with Clap's Bash completion environment, writes the result as
+UTF-8 without a byte-order mark, and fails on an unsuccessful or empty result.
+The portable ZIP does not alter the user's Git Bash profile; maintained user
+documentation owns the explicit activation command and generated fallback.
+The stable alias and its checksum make the README's latest-release link
+independent of the version number, while the versioned archive remains
+available for reproducible downloads. The preview baseline
 is macOS 11 or newer, glibc 2.35 or newer, and Windows 11 with Git for Windows,
 built on native macOS 15, Ubuntu 22.04, and Windows 2025 runners.
 Generated Homebrew metadata selects the matching immutable archive on all four
@@ -301,6 +306,8 @@ verify at least:
   Rust toolchain;
 - extraction and execution of the native Windows ZIP through Git Bash without
   a preinstalled Rust toolchain;
+- presence and Git Bash syntax validation of the packaged Windows completion
+  registration;
 - `hydra --version` reports the tagged version;
 - Git dependency discovery and a disposable `hydra init` workflow succeed;
 - accepting the Codex prompt installs the exact packaged skill;
