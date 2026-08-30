@@ -4,9 +4,9 @@ Questa guida descrive come usare Hydra e come personalizzarne il comportamento.
 È mantenuta insieme al codice: comandi e opzioni presentati come disponibili
 devono esistere nel binario corrente.
 
-Hydra è ancora una preview iniziale, ma la release pubblica `v0.1.1` è
-disponibile tramite Homebrew e
-[GitHub Releases](https://github.com/leonardoLoddo/hydra/releases/tag/v0.1.1).
+Hydra è ancora una preview iniziale. L'ultima release pubblica è disponibile
+tramite Homebrew e
+[GitHub Releases](https://github.com/leonardoLoddo/hydra/releases/latest).
 
 La [documentazione utente inglese](hydra-user-guide.md) offre lo stesso
 perimetro in pagine tematiche navigabili.
@@ -123,8 +123,8 @@ mai installata automaticamente.
 
 Su WSL verifica da PowerShell che la distribuzione usi WSL 2 con `wsl -l -v` e
 configura Homebrew nel prefisso Linux predefinito prima dell'installazione.
-WSL 1 non è supportato. La Formula `v0.1.1` include gli URL nativi Linux e WSL
-2 la usa con supporto di qualità preview.
+WSL 1 non è supportato. La Formula include gli URL nativi Linux e WSL 2 la usa
+con supporto di qualità preview.
 
 Su Windows 11 x86-64 nativo scarica
 [`hydra-windows-x86_64.zip`](https://github.com/leonardoLoddo/hydra/releases/latest/download/hydra-windows-x86_64.zip)
@@ -146,9 +146,9 @@ restano invariati. Git for Windows deve essere installato e raggiungibile nel
 `PATH`. PowerShell può essere usato per installare il binario, ma il flusso
 operativo e i completamenti documentati usano Git Bash.
 
-La release pubblica `v0.1.1` precede il packaging Windows nativo. Il link
-stabile diventa scaricabile con la prima release successiva; fino alla sua
-pubblicazione usa l'installazione dal sorgente descritta sotto.
+Il packaging Windows nativo è disponibile a partire da `v0.2.0`. Il link
+stabile risolve l'ultima GitHub Release, mentre l'archivio versionato rimane
+disponibile per download riproducibili.
 
 Per aggiornare binario e skill gestita separatamente:
 

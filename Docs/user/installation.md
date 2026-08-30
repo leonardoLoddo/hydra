@@ -37,9 +37,9 @@ brew install leonardoLoddo/tap/hydra-heads
 The Formula is named `hydra-heads` because other Homebrew packages already use
 the name `hydra`. The executable installed on your `PATH` is still `hydra`.
 
-The current `v0.1.1` Formula provides native URLs for all supported macOS and
-Linux architectures. On WSL, first confirm from PowerShell that the
-distribution uses WSL 2:
+The Formula provides native URLs for all supported macOS and Linux
+architectures. On WSL, first confirm from PowerShell that the distribution
+uses WSL 2:
 
 ```powershell
 wsl -l -v
@@ -120,9 +120,9 @@ Git Bash resolves `hydra` to `hydra.exe`, so all normal examples continue to
 use the extensionless command. Git for Windows must remain reachable on
 `PATH`, because Hydra invokes `git` directly.
 
-Public `v0.1.1` predates native Windows packaging. The stable download becomes
-available with the first subsequent release; install from source until that
-release is published.
+Native Windows packaging is available starting with `v0.2.0`. The stable
+download resolves through the latest GitHub Release, while the versioned
+archive remains available for reproducible downloads.
 
 ## Update Hydra
 

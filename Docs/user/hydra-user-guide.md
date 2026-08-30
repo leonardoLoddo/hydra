@@ -13,9 +13,9 @@ The documentation describes only behavior available in the current binary.
 > committed or backed up. When Git, filesystem, ownership, or recovery state
 > is unclear, stop and inspect it before attempting any manual repair.
 
-The latest public preview is
-[`v0.1.1`](https://github.com/leonardoLoddo/hydra/releases/tag/v0.1.1).
-An [Italian user guide](hydra-user-guide.it.md) is also maintained.
+The [latest public preview](https://github.com/leonardoLoddo/hydra/releases/latest)
+is available from GitHub Releases. An
+[Italian user guide](hydra-user-guide.it.md) is also maintained.
 
 ## Start here
 

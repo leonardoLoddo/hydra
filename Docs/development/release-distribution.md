@@ -11,14 +11,14 @@ release workflow exist.
 
 ## Current Status
 
-Public preview `v0.1.1` is available from GitHub Releases and the
-`leonardoLoddo/homebrew-tap` tap. The current Formula contains immutable native
-archive URLs for both macOS and Linux on ARM64 and x86-64. WSL 2 consumes the
-Linux Formula. Public `v0.1.1` predates the native Windows artifacts. Current
-release automation adds native Windows x86-64 to the same release transaction
-as a checksummed ZIP containing `hydra.exe`; that channel becomes public with
-the first subsequent release and is exercised with Git for Windows and Git Bash.
-Direct end-to-end WSL evidence remains part of preview validation.
+The current public preview is available from GitHub Releases and the
+`leonardoLoddo/homebrew-tap` tap. The Formula contains immutable native archive
+URLs for both macOS and Linux on ARM64 and x86-64. WSL 2 consumes the Linux
+Formula. Starting with `v0.2.0`, releases also publish native Windows x86-64 as
+a versioned checksummed ZIP containing `hydra.exe` and as the stable
+`hydra-windows-x86_64.zip` download. Release automation exercises that channel
+with Git for Windows and Git Bash. Direct clean-machine Windows and end-to-end
+WSL evidence remain part of preview validation.
 The intended audience remains a small group of colleagues who can exercise
 preview releases and report platform, installation, upgrade, and workflow
 defects before broader promotion.
@@ -297,11 +297,6 @@ supported merely because a binary can start there.
 The following external evidence is still required before broader promotion:
 
 - verify a clean colleague installation without Rust;
-- publish the first shared release after `v0.1.1` with the immutable archives
-  for every supported macOS, Linux, and Windows target plus the checksummed
-  `hydra-windows-x86_64.zip` stable alias. The Windows executable must remain a
-  GitHub Release asset produced by the verified release matrix, never a binary
-  committed to the source tree or an expiring CI artifact;
 - install that published stable Windows ZIP on a clean Windows 11 x86-64
   machine without Rust, verify its SHA-256 checksum and user `PATH`, and run the
   native executable through Git for Windows and Git Bash. The real end-to-end
@@ -311,5 +306,5 @@ The following external evidence is still required before broader promotion:
   filesystem state;
 - exercise the complete Homebrew workflow directly on WSL 2 before promoting
   it beyond preview support;
-- verify the real Homebrew upgrade path from `v0.1.0` to `v0.1.1` on a clean
-  preview machine.
+- verify the real Homebrew upgrade path from the previous published Formula to
+  the current Formula on a clean preview machine.
