@@ -108,7 +108,7 @@ fn run_probes(destination: &Path) -> Result<StorageDiagnostics, InitError> {
     Ok(StorageDiagnostics {
         storage_backend,
         native_primitive: native_primitive(storage_backend),
-        environment: storage_environment(),
+        environment: current_storage_environment(),
         filesystem: filesystem_for_path(destination),
         full_copy_fallback_verified: true,
         mutable_hard_links_enabled: false,
@@ -149,14 +149,18 @@ const fn current_platform() -> NativePlatform {
 }
 
 #[cfg(target_os = "linux")]
-fn storage_environment() -> StorageEnvironment {
+/// Identifies whether the current process is running under WSL.
+#[must_use]
+pub fn current_storage_environment() -> StorageEnvironment {
     fs::read_to_string("/proc/sys/kernel/osrelease").map_or(StorageEnvironment::Native, |release| {
         storage_environment_from_release(&release)
     })
 }
 
 #[cfg(not(target_os = "linux"))]
-const fn storage_environment() -> StorageEnvironment {
+/// Identifies whether the current process is running under WSL.
+#[must_use]
+pub const fn current_storage_environment() -> StorageEnvironment {
     StorageEnvironment::Native
 }
 

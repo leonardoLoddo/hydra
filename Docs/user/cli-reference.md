@@ -44,7 +44,9 @@ hydra head remove <NAME> [--force]
 
 Initializes the Git repository containing `PATH`; the default is `.`. Creates
 the versioned `.hydra.json` policy and locally owned Heads state after path,
-ownership, and storage validation.
+ownership, and storage validation. On native Windows, a verified full-copy
+fallback links to [Windows copy-on-write setup](windows-copy-on-write.md); WSL
+links to [WSL 2 copy-on-write setup](wsl-copy-on-write.md).
 
 ### `hydra status`
 
@@ -60,9 +62,10 @@ remain report-only; deterministic mutations require confirmation.
 
 Runs a real copy-on-write and full-copy isolation probe on the managed Heads
 volume. Reports the native primitive, execution environment, and filesystem
-when Linux exposes it. A WSL full-copy result includes guidance toward a
-reflink-capable Linux volume. Requires an initialized, internally consistent
-project.
+when Linux exposes it. Native Windows and WSL full-copy results link to their
+respective [Windows](windows-copy-on-write.md) and
+[WSL 2](wsl-copy-on-write.md) setup guides. Requires an initialized,
+internally consistent project.
 
 ### `hydra completions <SHELL>`
 
@@ -81,7 +84,10 @@ Creates an isolated Head.
 | `--target <BRANCH>` | Existing local branch intended for integration |
 
 When the source is not a local branch, `--target` is required. Overlay
-symlinks and full-copy fallback can cause default-negative prompts.
+symlinks and full-copy fallback can cause default-negative prompts. On native
+Windows or WSL, a detected full-copy fallback links to the platform setup guide
+before the storage-cost decision, or in the final output when no prompt was
+needed.
 
 ### `hydra head list`
 

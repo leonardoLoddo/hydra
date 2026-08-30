@@ -27,6 +27,19 @@ pub fn hydra_command() -> Command {
 }
 
 #[allow(dead_code)]
+pub fn copy_on_write_guidance_url() -> Option<&'static str> {
+    if cfg!(windows) {
+        Some("https://github.com/leonardoLoddo/hydra/blob/main/Docs/user/windows-copy-on-write.md")
+    } else if hydra_core::current_storage_environment()
+        == hydra_core::StorageEnvironment::WindowsSubsystemForLinux
+    {
+        Some("https://github.com/leonardoLoddo/hydra/blob/main/Docs/user/wsl-copy-on-write.md")
+    } else {
+        None
+    }
+}
+
+#[allow(dead_code)]
 pub fn canonical_path(path: impl AsRef<Path>) -> std::io::Result<PathBuf> {
     let path = fs::canonicalize(path)?;
     #[cfg(windows)]

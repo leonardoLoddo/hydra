@@ -2,7 +2,10 @@ mod common;
 
 use std::{fs, path::Path, process::Command};
 
-use common::{TestDirectory, create_initialized_project, heads_directory, hydra_command};
+use common::{
+    TestDirectory, copy_on_write_guidance_url, create_initialized_project, heads_directory,
+    hydra_command,
+};
 
 fn initialize_repository(path: &Path) {
     let git = Command::new("git")
@@ -11,6 +14,18 @@ fn initialize_repository(path: &Path) {
         .status()
         .expect("Git should start");
     assert!(git.success(), "temporary Git repository should be created");
+}
+
+fn assert_full_copy_guidance(stdout: &str) {
+    let Some(guidance) = copy_on_write_guidance_url() else {
+        return;
+    };
+    let guidance = format!("Copy-on-write guidance: {guidance}\n");
+    if stdout.contains("Storage backend: full copy\n") {
+        assert!(stdout.contains(&guidance));
+    } else {
+        assert!(!stdout.contains(&guidance));
+    }
 }
 
 #[test]
@@ -37,6 +52,7 @@ fn init_creates_project_configuration_heads_directory_and_local_state() {
             || stdout.contains("Storage backend: full copy"),
         "initialization should report the verified storage backend, got: {stdout:?}"
     );
+    assert_full_copy_guidance(&stdout);
 
     let config: serde_json::Value = serde_json::from_slice(
         &fs::read(repository.join(".hydra.json")).expect("project configuration should be created"),

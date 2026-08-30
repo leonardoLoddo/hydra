@@ -247,6 +247,7 @@ fn main() -> ExitCode {
                         println!("Storage backend: full copy");
                     }
                 }
+                print_current_copy_on_write_guidance(project.storage_backend);
                 ExitCode::SUCCESS
             }
             Err(error) => {
@@ -367,6 +368,75 @@ fn print_head_candidates() -> ExitCode {
     ExitCode::SUCCESS
 }
 
+const WINDOWS_COPY_ON_WRITE_GUIDE_URL: &str =
+    "https://github.com/leonardoLoddo/hydra/blob/main/Docs/user/windows-copy-on-write.md";
+const WSL_COPY_ON_WRITE_GUIDANCE: &str =
+    "https://github.com/leonardoLoddo/hydra/blob/main/Docs/user/wsl-copy-on-write.md";
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum StoragePlatform {
+    MacOs,
+    Linux,
+    Windows,
+    Other,
+}
+
+const fn current_storage_platform() -> StoragePlatform {
+    if cfg!(target_os = "macos") {
+        StoragePlatform::MacOs
+    } else if cfg!(target_os = "linux") {
+        StoragePlatform::Linux
+    } else if cfg!(target_os = "windows") {
+        StoragePlatform::Windows
+    } else {
+        StoragePlatform::Other
+    }
+}
+
+const fn copy_on_write_guidance(
+    backend: hydra_core::StorageBackend,
+    environment: hydra_core::StorageEnvironment,
+    platform: StoragePlatform,
+) -> Option<&'static str> {
+    if !matches!(backend, hydra_core::StorageBackend::FullCopy) {
+        return None;
+    }
+    if matches!(
+        environment,
+        hydra_core::StorageEnvironment::WindowsSubsystemForLinux
+    ) {
+        return Some(WSL_COPY_ON_WRITE_GUIDANCE);
+    }
+    if matches!(platform, StoragePlatform::Windows) {
+        return Some(WINDOWS_COPY_ON_WRITE_GUIDE_URL);
+    }
+    None
+}
+
+fn print_copy_on_write_guidance(
+    backend: hydra_core::StorageBackend,
+    environment: hydra_core::StorageEnvironment,
+) {
+    if let Some(guidance) = copy_on_write_guidance(backend, environment, current_storage_platform())
+    {
+        println!("Copy-on-write guidance: {guidance}");
+    }
+}
+
+fn current_copy_on_write_guidance(backend: hydra_core::StorageBackend) -> Option<&'static str> {
+    copy_on_write_guidance(
+        backend,
+        hydra_core::current_storage_environment(),
+        current_storage_platform(),
+    )
+}
+
+fn print_current_copy_on_write_guidance(backend: hydra_core::StorageBackend) {
+    if let Some(guidance) = current_copy_on_write_guidance(backend) {
+        println!("Copy-on-write guidance: {guidance}");
+    }
+}
+
 fn doctor_storage() -> ExitCode {
     match hydra_core::diagnose_storage(Path::new(".")) {
         Ok(diagnostics) => {
@@ -399,13 +469,7 @@ fn doctor_storage() -> ExitCode {
                 "Filesystem: {}",
                 diagnostics.filesystem.as_deref().unwrap_or("unknown")
             );
-            if diagnostics.environment == hydra_core::StorageEnvironment::WindowsSubsystemForLinux
-                && diagnostics.storage_backend == hydra_core::StorageBackend::FullCopy
-            {
-                println!(
-                    "Copy-on-write guidance: use a reflink-capable Linux filesystem for both the project and Heads directory (for example XFS when available)"
-                );
-            }
+            print_copy_on_write_guidance(diagnostics.storage_backend, diagnostics.environment);
             if diagnostics.full_copy_fallback_verified {
                 println!("Fallback: full copy (verified)");
             }
@@ -565,11 +629,50 @@ fn safe_path_label(path: &Path) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::Cli;
+    use super::{Cli, StoragePlatform, copy_on_write_guidance};
     use clap::CommandFactory;
+    use hydra_core::{StorageBackend, StorageEnvironment};
 
     #[test]
     fn clap_command_definition_is_internally_consistent() {
         Cli::command().debug_assert();
+    }
+
+    #[test]
+    fn windows_full_copy_guidance_links_to_the_setup_guide() {
+        assert_eq!(
+            copy_on_write_guidance(
+                StorageBackend::FullCopy,
+                StorageEnvironment::Native,
+                StoragePlatform::Windows,
+            ),
+            Some(
+                "https://github.com/leonardoLoddo/hydra/blob/main/Docs/user/windows-copy-on-write.md"
+            )
+        );
+    }
+
+    #[test]
+    fn windows_copy_on_write_does_not_print_fallback_guidance() {
+        assert_eq!(
+            copy_on_write_guidance(
+                StorageBackend::CopyOnWrite,
+                StorageEnvironment::Native,
+                StoragePlatform::Windows,
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn wsl_full_copy_guidance_remains_platform_specific() {
+        assert_eq!(
+            copy_on_write_guidance(
+                StorageBackend::FullCopy,
+                StorageEnvironment::WindowsSubsystemForLinux,
+                StoragePlatform::Linux,
+            ),
+            Some("https://github.com/leonardoLoddo/hydra/blob/main/Docs/user/wsl-copy-on-write.md")
+        );
     }
 }

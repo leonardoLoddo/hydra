@@ -8,8 +8,8 @@ use std::io::Write;
 #[cfg(unix)]
 use common::heads_directory;
 use common::{
-    TestDirectory, assert_no_head_creation_artifacts, create_initialized_project, hydra_command,
-    overlay_copy_on_write_is_supported, run_git,
+    TestDirectory, assert_no_head_creation_artifacts, copy_on_write_guidance_url,
+    create_initialized_project, hydra_command, overlay_copy_on_write_is_supported, run_git,
 };
 
 #[test]
@@ -57,6 +57,9 @@ fn head_create_overlay_prompt_matches_the_test_volume_capability() {
     } else {
         assert!(!output.status.success());
         assert!(stdout.contains("Full copy required: 1 file(s), 7 byte(s)"));
+        if let Some(guidance) = copy_on_write_guidance_url() {
+            assert!(stdout.contains(&format!("Copy-on-write guidance: {guidance}\n")));
+        }
         assert!(stdout.contains("Continue? [y/N]"));
         assert!(String::from_utf8_lossy(&output.stderr).contains("Head creation cancelled"));
         assert_no_head_creation_artifacts(&repository, "payment");
