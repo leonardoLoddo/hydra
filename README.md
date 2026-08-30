@@ -38,9 +38,9 @@ Extract the archive into a directory on the Windows `PATH`, then use
 `hydra.exe` from Git Bash. The ZIP includes `completions/hydra.bash`; because
 the archive is portable, activate that script explicitly from `~/.bashrc` as
 described in the installation guide. The stable links always resolve through
-the latest GitHub Release;
-the same release also contains the versioned Windows archive and all macOS and
-Linux artifacts. Native Windows packaging is available in published releases
+the latest GitHub Release; the same release also contains the versioned
+Windows archive and all macOS and Linux artifacts. Native Windows packaging is
+available in published releases
 starting with `v0.2.0`. Homebrew remains the installation channel for macOS,
 Linux, and WSL 2.
 
@@ -78,6 +78,11 @@ parent project with the target branch checked out, and run:
 ```bash
 hydra head close payment
 ```
+
+Native close runs an ordinary `git merge` in the parent worktree and prints
+Git's output directly. If Git reports conflicts, resolve and commit them there
+while Hydra waits; Hydra then resumes protected Head removal automatically.
+Running `git merge --abort` aborts the close and preserves the Head.
 
 Use `hydra --help` and `hydra <command> --help` for the complete installed
 syntax.
