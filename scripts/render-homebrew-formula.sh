@@ -85,7 +85,17 @@ class HydraHeads < Formula
 
   def caveats
     art = (pkgshare/"hydra-art.txt").read
-    "#{art}\nGet started:\n  hydra --help\n\nOptional Codex skill:\n  hydra skill install codex\n"
+    <<~EOS
+      #{art}
+      Get started:
+        hydra --help
+
+      Optional AI-agent skill (choose a provider):
+        hydra skill install codex
+        hydra skill install gemini
+        hydra skill install agy
+        hydra skill install antigravity
+    EOS
   end
 
   test do

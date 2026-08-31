@@ -51,9 +51,9 @@ Use Homebrew's default Linux prefix on WSL. Do not move the installation to a
 custom prefix merely to make Hydra visible; Homebrew bottles and environment
 setup expect the standard Linuxbrew layout.
 
-Homebrew prints Hydra's artwork, `hydra --help`, and the optional
-`hydra skill install codex` command after installation. It never installs the
-Codex skill silently.
+Homebrew prints Hydra's artwork, `hydra --help`, and one optional copyable
+skill-installation command for each supported provider: `codex`, `gemini`,
+`agy`, and `antigravity`. It never installs a provider skill silently.
 
 ## Verify the executable
 

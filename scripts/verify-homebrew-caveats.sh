@@ -24,8 +24,18 @@ sed -n "${start_line},${end_line}p" "$installation_log" > "$extracted"
 cmp "$artwork" "$extracted"
 
 help_line=$(grep -n -F -m 1 "  hydra --help" "$installation_log" | cut -d: -f1 || true)
-skill_line=$(grep -n -F -m 1 "  hydra skill install codex" "$installation_log" | cut -d: -f1 || true)
-if [[ -z $help_line || -z $skill_line || $help_line -le $end_line || $skill_line -le $help_line ]]; then
+skill_heading_line=$(grep -n -F -m 1 "Optional AI-agent skill (choose a provider):" "$installation_log" | cut -d: -f1 || true)
+if [[ -z $help_line || -z $skill_heading_line || $help_line -le $end_line || $skill_heading_line -le $help_line ]]; then
   echo "error: Homebrew guidance is missing or ordered incorrectly" >&2
   exit 1
 fi
+
+previous_line=$skill_heading_line
+for provider in codex gemini agy antigravity; do
+  provider_line=$(grep -n -F -m 1 "  hydra skill install $provider" "$installation_log" | cut -d: -f1 || true)
+  if [[ -z $provider_line || $provider_line -le $previous_line ]]; then
+    echo "error: Homebrew guidance is missing or ordered incorrectly" >&2
+    exit 1
+  fi
+  previous_line=$provider_line
+done

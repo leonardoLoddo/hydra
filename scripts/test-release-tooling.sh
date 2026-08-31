@@ -223,6 +223,10 @@ grep -F "/releases/download/v$version/hydra-$version-x86_64-apple-darwin.tar.gz"
 grep -F "/releases/download/v$version/hydra-$version-aarch64-unknown-linux-gnu.tar.gz" "$formula" >/dev/null
 grep -F "/releases/download/v$version/hydra-$version-x86_64-unknown-linux-gnu.tar.gz" "$formula" >/dev/null
 grep -F 'generate_completions_from_executable(bin/"hydra", shell_parameter_format: :clap)' "$formula" >/dev/null
+grep -F 'Optional AI-agent skill (choose a provider):' "$formula" >/dev/null
+for provider in codex gemini agy antigravity; do
+  grep -F "  hydra skill install $provider" "$formula" >/dev/null
+done
 ruby -c "$formula"
 brew style "$formula"
 
@@ -234,10 +238,18 @@ installation_log="$test_root/homebrew-install.log"
   echo "Get started:"
   echo "  hydra --help"
   echo
-  echo "Optional Codex skill:"
-  echo "  hydra skill install codex"
+  echo "Optional AI-agent skill (choose a provider):"
+  for provider in codex gemini agy antigravity; do
+    echo "  hydra skill install $provider"
+  done
 } > "$installation_log"
 scripts/verify-homebrew-caveats.sh "$installation_log" hydra-art.txt
+
+sed '/hydra skill install antigravity/d' "$installation_log" > "$test_root/incomplete-homebrew-install.log"
+if scripts/verify-homebrew-caveats.sh "$test_root/incomplete-homebrew-install.log" hydra-art.txt 2>/dev/null; then
+  echo "error: caveat verification accepted incomplete provider guidance" >&2
+  exit 1
+fi
 
 printf 'no caveats\n' > "$installation_log"
 if scripts/verify-homebrew-caveats.sh "$installation_log" hydra-art.txt 2>/dev/null; then

@@ -95,8 +95,11 @@ commands:
 Get started:
   hydra --help
 
-Optional Codex skill:
+Optional AI-agent skill (choose a provider):
   hydra skill install codex
+  hydra skill install gemini
+  hydra skill install agy
+  hydra skill install antigravity
 ```
 
 Homebrew therefore finishes successfully even in unattended automation, while
@@ -112,8 +115,9 @@ retain `hydra completions <shell>` as the fallback for shells that do not load
 the package-manager paths and for non-Homebrew installations.
 
 The Formula renders the artwork verbatim and without ANSI control sequences.
-Release validation must compare the displayed block with the packaged asset and
-prove that the artwork appears before both command suggestions. The Formula
+Release validation must compare the displayed block with the packaged asset,
+prove that the artwork appears before the orientation commands, and require
+one copyable installation command for every supported provider. The Formula
 must not maintain a second hand-edited copy that can drift from
 `hydra-art.txt`.
 
@@ -327,7 +331,8 @@ verify at least:
 - Homebrew uninstall does not silently delete user-owned or modified skill
   content;
 - the complete packaged artwork appears at the end of Homebrew installation,
-  before both command suggestions, without corrupting logs;
+  before the orientation and provider-specific skill commands, without
+  corrupting logs;
 - Homebrew installs non-empty dynamic completion files for Bash, Zsh, and Fish
   in the Formula keg;
 - install, update, and removal instructions in the README and maintained

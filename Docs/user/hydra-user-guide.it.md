@@ -151,8 +151,10 @@ brew install leonardoLoddo/tap/hydra-heads
 La Formula si chiama `hydra-heads` per non entrare in conflitto con un altro
 pacchetto Homebrew chiamato `hydra`, ma il comando installato rimane `hydra`.
 Al termine Homebrew mostra l'artwork Hydra, `hydra --help` come punto di
-ingresso e il comando opzionale `hydra skill install codex`. La skill non viene
-mai installata automaticamente.
+ingresso e un comando opzionale copiabile per ciascun provider supportato:
+`hydra skill install codex`, `hydra skill install gemini`,
+`hydra skill install agy` e `hydra skill install antigravity`. La skill non
+viene mai installata automaticamente.
 
 Su WSL verifica da PowerShell che la distribuzione usi WSL 2 con `wsl -l -v` e
 configura Homebrew nel prefisso Linux predefinito prima dell'installazione.

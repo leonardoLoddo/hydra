@@ -1476,11 +1476,13 @@ l'archivio ZIP con `hydra.exe` da GitHub Releases e Git Bash come shell
 operativa; WSL 1 non è supportato. Homebrew rimane non interattivo: installa gli artefatti
 versionati e al termine mostra nei caveat l'intero `hydra-art.txt`, incluso il
 wordmark `HYDRA`. Subito sotto l'artwork mostra prima `hydra --help` come punto
-di ingresso generale e poi il comando opzionale `hydra skill install codex`,
-senza eseguirlo automaticamente. Quest'ultimo mostra la destinazione risolta e
-chiede conferma prima di installare la skill. Codex, Gemini CLI, Antigravity
-CLI e l'app Antigravity sono provider supportati e il rifiuto deve rimanere
-sempre disponibile e sicuro.
+di ingresso generale e poi un comando opzionale copiabile per ciascun provider
+supportato: `hydra skill install codex`, `hydra skill install gemini`,
+`hydra skill install agy` e `hydra skill install antigravity`, senza eseguirli
+automaticamente. Il comando scelto mostra la destinazione risolta e chiede
+conferma prima di installare la skill. Codex, Gemini CLI, Antigravity CLI e
+l'app Antigravity sono provider supportati e il rifiuto deve rimanere sempre
+disponibile e sicuro.
 Versioni, artefatti e aggiornamento della Formula derivano da release
 immutabili create secondo le Conventional Commits; il contratto di
 distribuzione è mantenuto in
