@@ -2,8 +2,10 @@ mod common;
 
 use std::{
     fs,
+    io::{BufRead, BufReader},
     path::Path,
-    process::Stdio,
+    process::{Child, Stdio},
+    sync::mpsc,
     thread,
     time::{Duration, Instant},
 };
@@ -111,6 +113,56 @@ fn wait_for_merge(repository: &Path) {
         thread::sleep(Duration::from_millis(20));
     }
     panic!("Git merge state should become visible");
+}
+
+fn wait_for_hydra_merge_resolution(child: &mut Child) -> thread::JoinHandle<Vec<u8>> {
+    let stderr = child
+        .stderr
+        .take()
+        .expect("Hydra stderr should be captured");
+    let (waiting_sender, waiting_receiver) = mpsc::channel();
+    let stderr_reader = thread::spawn(move || {
+        let mut reader = BufReader::new(stderr);
+        let mut captured = Vec::new();
+        let mut line = Vec::new();
+        let mut waiting_reported = false;
+
+        loop {
+            line.clear();
+            let bytes_read = reader
+                .read_until(b'\n', &mut line)
+                .expect("Hydra stderr should remain readable");
+            if bytes_read == 0 {
+                break;
+            }
+            captured.extend_from_slice(&line);
+            if !waiting_reported
+                && String::from_utf8_lossy(&line).contains("Waiting for Git merge resolution")
+            {
+                let _ = waiting_sender.send(());
+                waiting_reported = true;
+            }
+        }
+
+        captured
+    });
+
+    if waiting_receiver
+        .recv_timeout(Duration::from_secs(30))
+        .is_err()
+    {
+        let _ = child.kill();
+        let _ = child.wait();
+        let stderr = stderr_reader
+            .join()
+            .expect("Hydra stderr reader should finish");
+        panic!(
+            "Hydra should report that it is waiting for merge resolution, stderr: {}",
+            String::from_utf8_lossy(&stderr)
+        );
+    }
+
+    stderr_reader
 }
 
 fn configure_close(repository: &Path, program: &str, args: &[&str], remove_on_success: bool) {
@@ -795,22 +847,25 @@ fn head_close_finishes_as_aborted_when_the_user_aborts_the_git_merge() {
     let head_before = revision(&head, "HEAD");
     configure_git_identity(&repository);
 
-    let child = hydra_command()
+    let mut child = hydra_command()
         .args(["head", "close", "payment"])
         .current_dir(&repository)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .expect("Hydra CLI should start");
-    wait_for_merge(&repository);
+    let stderr_reader = wait_for_hydra_merge_resolution(&mut child);
     assert!(run_git(&repository, &["merge", "--abort"]).status.success());
 
     let output = child
         .wait_with_output()
         .expect("Hydra close should finish after merge abort");
+    let captured_stderr = stderr_reader
+        .join()
+        .expect("Hydra stderr reader should finish");
 
     assert!(!output.status.success());
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stderr = String::from_utf8_lossy(&captured_stderr);
     assert!(
         stderr.contains("close was aborted through Git"),
         "stderr: {stderr}"
