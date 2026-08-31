@@ -10,14 +10,24 @@ Each Head has its own working tree, index, and private branch, so humans and AI
 agents can work in parallel without sharing uncommitted files.
 
 > [!IMPORTANT]
-> Hydra is an early preview intended for a small group of testers. Use it on
-> repositories whose important work is already committed or backed up, and
-> report unexpected Git or filesystem state before attempting manual repair.
+> Hydra 1.x is the current SemVer compatibility line for the documented core.
+> Distribution remains a public preview intended for a small group of testers
+> while real projects complete field validation. Use it on repositories whose
+> important work is already committed or backed up, and report unexpected Git
+> or filesystem state before attempting manual repair.
+
+Version `1.0.0` establishes the compatibility baseline for Hydra's documented
+CLI, configuration, persisted state, and Head lifecycle. Future incompatible
+changes to those contracts require another major version. The preview label
+describes the current breadth of real-world qualification; it does not make
+published compatibility guarantees disposable. See the
+[latest release](https://github.com/leonardoLoddo/hydra/releases/latest) and
+[changelog](CHANGELOG.md).
 
 ## Install
 
-Install the Homebrew preview from the dedicated tap on macOS, native Linux, or
-WSL 2:
+Install the current public preview from the dedicated Homebrew tap on macOS,
+native Linux, or WSL 2:
 
 ```bash
 brew install leonardoLoddo/tap/hydra-heads
@@ -185,6 +195,11 @@ hydra skill status antigravity
 hydra skill update antigravity
 ```
 
+When upgrading from `0.2.x`, note the `1.0.0` breaking change: run
+`hydra head close` from the canonical parent project with the recorded target
+branch checked out. Git merges and any conflict resolution now happen in that
+parent worktree.
+
 Remove the binary and, only if desired, the skill:
 
 ```bash
@@ -197,7 +212,7 @@ brew uninstall leonardoLoddo/tap/hydra-heads
 
 Homebrew uninstall does not remove user-owned skill content.
 
-## Preview platforms
+## Supported preview platforms
 
 Release automation builds native archives for:
 

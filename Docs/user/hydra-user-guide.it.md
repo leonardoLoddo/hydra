@@ -4,9 +4,24 @@ Questa guida descrive come usare Hydra e come personalizzarne il comportamento.
 È mantenuta insieme al codice: comandi e opzioni presentati come disponibili
 devono esistere nel binario corrente.
 
-Hydra è ancora una preview iniziale. L'ultima release pubblica è disponibile
-tramite Homebrew e
+Hydra 1.x è l'attuale linea di compatibilità SemVer del nucleo documentato. La
+distribuzione rimane una public preview mentre i sistemi supportati e i
+progetti reali completano la validazione sul campo. Usa Hydra su repository il
+cui lavoro importante è già committato o salvato altrove.
+
+La versione `1.0.0` stabilisce la baseline di compatibilità per CLI,
+configurazione, stato persistito e ciclo di vita delle Head documentati. Un
+cambiamento incompatibile di questi contratti richiede una nuova major. Lo
+stato di public preview è invece un segnale di maturità separato e rimane fino
+a una promozione di prodotto esplicita, supportata da evidenza sufficiente su
+installazione, aggiornamento e flussi reali.
+
+L'ultima release pubblica è disponibile tramite Homebrew e
 [GitHub Releases](https://github.com/leonardoLoddo/hydra/releases/latest).
+
+Chi aggiorna da `0.2.x` deve eseguire `hydra head close` dal progetto padre
+canonico, con il branch target registrato già in checkout. Il merge Git nativo
+e l'eventuale risoluzione dei conflitti avvengono ora in quella worktree padre.
 
 La [documentazione utente inglese](hydra-user-guide.md) offre lo stesso
 perimetro in pagine tematiche navigabili.

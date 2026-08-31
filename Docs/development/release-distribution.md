@@ -23,6 +23,15 @@ The intended audience remains a small group of colleagues who can exercise
 preview releases and report platform, installation, upgrade, and workflow
 defects before broader promotion.
 
+Version `1.0.0` begins Hydra's 1.x SemVer compatibility line for the documented
+core. From that release onward, incompatible changes to documented CLI,
+configuration, persisted-state, or Head-lifecycle contracts require a new
+major version. This compatibility baseline does not by itself end the public
+preview: preview status records the remaining need for direct field evidence
+on clean supported systems and real projects, while SemVer governs the
+contracts already published. Promotion beyond preview is therefore a separate
+reviewed product decision rather than a side effect of release automation.
+
 The source repository remains `leonardoLoddo/hydra`. The executable remains
 named `hydra`.
 

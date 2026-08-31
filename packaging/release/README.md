@@ -3,6 +3,8 @@
 Hydra is a Git-native workspace manager for isolated development Heads.
 This archive contains a prebuilt `hydra` executable (`hydra.exe` on Windows)
 for the target named in the archive filename; Rust is not required to run it.
+Hydra 1.x is the current SemVer compatibility line for the documented core;
+distribution remains a public preview while field validation continues.
 
 ## Contents
 

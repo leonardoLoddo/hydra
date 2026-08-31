@@ -9,13 +9,25 @@ This is the entry point for Hydra's maintained English user documentation.
 The documentation describes only behavior available in the current binary.
 
 > [!IMPORTANT]
-> Hydra is an early preview. Use it on repositories whose important work is
-> committed or backed up. When Git, filesystem, ownership, or recovery state
-> is unclear, stop and inspect it before attempting any manual repair.
+> Hydra 1.x is the current SemVer compatibility line for the documented core.
+> Distribution remains a public preview while supported systems and real
+> projects complete field validation. Use it on repositories whose important
+> work is committed or backed up. When Git, filesystem, ownership, or recovery
+> state is unclear, stop and inspect it before attempting any manual repair.
 
 The [latest public preview](https://github.com/leonardoLoddo/hydra/releases/latest)
 is available from GitHub Releases. An
 [Italian user guide](hydra-user-guide.it.md) is also maintained.
+
+Version `1.0.0` establishes the compatibility baseline for the documented CLI,
+configuration, persisted state, and Head lifecycle. An incompatible change to
+those contracts requires another major version. Public-preview status is a
+separate maturity signal: it remains until installation, upgrade, and workflow
+evidence is broad enough for an explicit product promotion.
+
+Users upgrading from `0.2.x` must run `hydra head close` from the canonical
+parent project with the recorded target branch checked out. Native Git merge
+and conflict resolution now happen in that parent worktree.
 
 ## Start here
 

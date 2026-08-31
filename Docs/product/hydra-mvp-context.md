@@ -1353,7 +1353,24 @@ Per l’MVP, file JSON e scritture atomiche sono sufficienti. SQLite e dipendenz
 
 ---
 
-## 14. Fuori dall’MVP
+## 14. Perimetro, maturità e sviluppi successivi
+
+La release `v1.0.0` stabilisce la linea di compatibilità SemVer `1.x` per il
+nucleo documentato di Hydra. I contratti pubblici di CLI, configurazione,
+stato persistito e ciclo di vita delle Head non possono cambiare in modo
+incompatibile senza una nuova major release.
+
+La numerazione `1.x` non conclude automaticamente la validazione sul campo.
+Hydra rimane una public preview destinata a un gruppo ristretto finché
+installazione, aggiornamento e flussi reali non avranno evidenza sufficiente su
+tutte le piattaforme dichiarate. Compatibilità SemVer e maturità distributiva
+sono quindi decisioni distinte: la prima protegge i contratti già pubblicati,
+la seconda richiede una promozione di prodotto esplicita.
+
+Le funzionalità successive non ricevono in anticipo un numero di versione. Il
+numero viene deciso dalla natura compatibile o incompatibile del cambiamento
+quando esiste un incremento completo e verificabile, evitando roadmap `0.x`
+diventate impossibili dopo la pubblicazione di `v1.0.0`.
 
 | Funzionalità | Fase prevista |
 |---|---|
@@ -1370,15 +1387,15 @@ Per l’MVP, file JSON e scritture atomiche sono sufficienti. SQLite e dipendenz
 | Documentazione utente inglese granulare e guida italiana mantenute | MVP |
 | Skill operativa installabile per agenti AI | MVP |
 | Materiali per contributor e tester pubblici (`CONTRIBUTING.md`, `SECURITY.md`, template issue e note curate di `v0.1.0`) | Prima preview pubblica |
-| Distribuzione pubblicabile e multiprovider della skill | v0.2 |
+| Distribuzione pubblicabile e multiprovider della skill | Baseline v1.0.0 |
 | Schema della configurazione pubblicato tramite SchemaStore | Successivo |
 | Head Recipe condivisibili e materializzabili | Successivo |
-| Hook o comando di setup | v0.2 |
-| Adapter per agenti | v0.2 |
-| Processi runtime e porte | v0.2 |
-| Dashboard web locale | v0.3 |
-| Diff visuale navigabile | v0.3 |
-| Merge/rebase assistiti e risoluzione interattiva | v0.3 |
+| Hook o comando di setup | Successivo |
+| Adapter per agenti | Successivo |
+| Processi runtime e porte | Successivo |
+| Dashboard web locale | Successivo |
+| Diff visuale navigabile | Successivo |
+| Merge/rebase assistiti e risoluzione interattiva | Successivo |
 | Terminale incorporato | Successivo |
 | Docker e servizi isolati | Successivo |
 | Isolamento di database e cache | Successivo |
@@ -1510,7 +1527,7 @@ fallita o generare un commit implicito non autorizzato.
 
 ## 15. Definition of done
 
-Hydra v0.1 è conclusa quando:
+Il nucleo MVP che costituisce la baseline di `v1.0.0` è concluso quando:
 
 1. può inizializzare un normale repository Git;
 2. crea per default una directory sorella `<nome-progetto>.heads`;
