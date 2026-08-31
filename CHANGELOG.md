@@ -5,6 +5,21 @@ All notable changes to Hydra will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0](https://github.com/leonardoLoddo/hydra/compare/v0.2.0...v1.0.0) (2026-08-31)
+
+
+### ⚠ BREAKING CHANGES
+
+* **head:** Run hydra head close from the canonical parent project worktree. Native close also requires the recorded target branch to be checked out there.
+
+### Features
+
+* **cli:** support Antigravity app skill lifecycle ([a8d8679](https://github.com/leonardoLoddo/hydra/commit/a8d86799f263b7ca0b03a30e1ec1bb398e35fd52))
+* **cli:** support Antigravity CLI skill lifecycle ([be96fd6](https://github.com/leonardoLoddo/hydra/commit/be96fd6b83e1bd1f15f2e14bf5665ff4b71ac856))
+* **cli:** support Gemini skill lifecycle ([bf30183](https://github.com/leonardoLoddo/hydra/commit/bf301839f0fd26337a6c40a471acea34b11675a4))
+* **head:** run close merges from parent worktree ([7b1d3c1](https://github.com/leonardoLoddo/hydra/commit/7b1d3c1093a788c3050a480b0eb6b397fdbcfbf4))
+* **storage:** link copy-on-write setup guidance ([f7d0ba3](https://github.com/leonardoLoddo/hydra/commit/f7d0ba3536c2d639998398238d984cc225aa66d9))
+
 ## [0.2.0](https://github.com/leonardoLoddo/hydra/compare/v0.1.1...v0.2.0) (2026-08-27)
 
 
