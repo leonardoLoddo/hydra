@@ -793,6 +793,7 @@ fn head_close_finishes_as_aborted_when_the_user_aborts_the_git_merge() {
     commit_all(&repository, "target change");
     let target_before = revision(&repository, "main");
     let head_before = revision(&head, "HEAD");
+    configure_git_identity(&repository);
 
     let child = hydra_command()
         .args(["head", "close", "payment"])
