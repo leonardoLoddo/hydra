@@ -1,5 +1,15 @@
 # Hydra Repair
 
+**Status:** current
+**Scope:** `hydra repair` planning, confirmation, reconciliation, and safety boundaries
+**Canonical owner:** [ROUTER.md](ROUTER.md)
+
+## Consult when
+
+Read this leaf when a task changes inventory reconciliation, recovery records,
+stale or missing worktrees, abandoned locks, guided repairs, or report-only
+inconsistencies.
+
 ## Purpose
 
 This document defines the implemented reconciliation workflow:

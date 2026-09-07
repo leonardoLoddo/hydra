@@ -1,5 +1,15 @@
 # Head Inspection
 
+**Status:** current
+**Scope:** read-only project and Head inspection commands
+**Canonical owner:** [ROUTER.md](ROUTER.md)
+
+## Consult when
+
+Read this leaf when a task changes `hydra status`, `hydra head list`, `hydra
+head status`, `hydra head path`, inventory reads, Git comparison, or
+consistency reporting.
+
 ## Purpose
 
 This document defines the implemented read-only model behind:

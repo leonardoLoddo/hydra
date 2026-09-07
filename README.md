@@ -251,8 +251,10 @@ cargo test --workspace
 ```
 
 See [AGENTS.md](AGENTS.md) and the
-[documentation router](Docs/hydra-context-router.md) for the project contracts,
-TDD workflow, and safety invariants.
+[LibrAIrian project knowledge router](Docs/ai/ROUTER.md) for the project
+contracts, TDD workflow, and safety invariants. Hydra uses
+[LibrAIrian Protocol](https://github.com/leonardoLoddo/librairian) to route the
+smallest complete set of repository-local knowledge required by an AI agent.
 
 Bug reports and preview feedback are welcome through the repository's
 [issue templates](https://github.com/leonardoLoddo/hydra/issues/new/choose).

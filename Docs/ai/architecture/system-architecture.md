@@ -1,5 +1,15 @@
 # System Architecture
 
+**Status:** current
+**Scope:** Cargo workspace boundaries, crate responsibilities, and dependency direction
+**Canonical owner:** [ROUTER.md](ROUTER.md)
+
+## Consult when
+
+Read this leaf before adding a crate, moving responsibilities across crates,
+changing dependency direction, or deciding whether behavior belongs in the
+CLI or core.
+
 ## Purpose
 
 This document defines the implemented structural boundaries of Hydra and the

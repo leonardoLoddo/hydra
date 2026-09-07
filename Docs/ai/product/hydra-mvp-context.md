@@ -1,5 +1,15 @@
 # Hydra
 
+**Status:** current
+**Scope:** Hydra product definition, 1.x core compatibility baseline, safety invariants, and explicitly identified future scope
+**Canonical owner:** [ROUTER.md](ROUTER.md)
+
+## Consult when
+
+Read this leaf for product identity, Head semantics, supported scope, safety
+guarantees, user-visible lifecycle behavior, or roadmap boundaries. Skip it
+for changes that are purely editorial and cannot alter product meaning.
+
 > **One repository. Many heads.**
 
 Hydra è un workspace manager Git-native e local-first che materializza più copie operative isolate dello stesso repository come directory complete e indipendenti.

@@ -1,5 +1,14 @@
 # Storage Doctor
 
+**Status:** current
+**Scope:** `hydra doctor storage` capability probing and reporting
+**Canonical owner:** [ROUTER.md](ROUTER.md)
+
+## Consult when
+
+Read this leaf when a task changes storage capability detection, native clone
+reporting, full-copy fallback, isolation claims, or diagnostic cleanup.
+
 ## Purpose
 
 This document defines the implemented storage diagnostic:

@@ -26,7 +26,7 @@ Hydra is at an early stage. Agents must preserve documented product intent while
 When resolving uncertainty, use this priority order:
 
 1. Explicit requirements in the current task.
-2. Project documentation routed from [`Docs/hydra-context-router.md`](Docs/hydra-context-router.md).
+2. Project knowledge routed from [`Docs/ai/ROUTER.md`](Docs/ai/ROUTER.md).
 3. Existing code, tests, configuration, and observed runtime behavior.
 4. Official documentation for the exact tools and versions in use.
 5. Generic ecosystem knowledge.
@@ -37,14 +37,17 @@ If routed documentation conflicts with code or observed behavior, stop and repor
 
 ---
 
-# Mandatory Documentation Routing
+# LibrAIrian Protocol
+
+LibrAIrian Protocol maintenance is required for every implementation task.
 
 Before proposing or implementing a solution, the agent MUST:
 
-1. Open [`Docs/hydra-context-router.md`](Docs/hydra-context-router.md).
-2. Classify all documentation domains touched by the task.
+1. Open [`Docs/ai/ROUTER.md`](Docs/ai/ROUTER.md).
+2. Classify every project-knowledge concern touched by the task.
 3. Follow every applicable child router until the required leaf documents have been identified and consulted.
 4. Treat routes as cumulative when a task spans multiple domains.
+5. Combine selected knowledge with targeted implementation evidence.
 
 The macro-router and its child routers are the sole source of truth for documentation paths and consultation triggers.
 
@@ -53,11 +56,25 @@ The macro-router and its child routers are the sole source of truth for document
 - If no route clearly covers the task, inspect the relevant code and identify whether a documentation gap exists.
 - If ambiguity would materially change product behavior, architecture, safety, compatibility, or scope, ask for clarification before proceeding.
 
+Use the repository-local `librairian` skill at
+`.agents/skills/librairian/SKILL.md`. If the host cannot load the skill, follow
+the repository-local protocol routed from `Docs/ai/ROUTER.md`.
+
+Before completing an implementation task, perform the knowledge-impact check.
+Update affected canonical knowledge and routes in the same change, then
+validate them. `No knowledge update required` is valid only with a concrete
+reason.
+
+Report material conflicts between normative authority and current
+implementation. Do not encode unresolved assumptions as current policy.
+
 ---
 
 # Documentation Architecture
 
-Project documentation is organized by domain under `Docs/`.
+AI-facing project knowledge is organized by domain under `Docs/ai/`.
+Human-facing documentation remains under `Docs/user/` and is not part of the
+active project-knowledge graph.
 
 Each documentation subfolder MUST contain a context router that:
 
@@ -69,7 +86,7 @@ Each documentation subfolder MUST contain a context router that:
 
 When documentation is created, renamed, moved, or removed, update its owning router and every affected ancestor router in the same change.
 
-The canonical topology and maintenance rules live in [`Docs/hydra-context-router.md`](Docs/hydra-context-router.md).
+The canonical topology and maintenance rules live in [`Docs/ai/ROUTER.md`](Docs/ai/ROUTER.md).
 
 ---
 
@@ -431,8 +448,9 @@ Update documentation when a change introduces or alters:
 Update the owning leaf document, its router, and every affected ancestor router in the same task.
 
 For every user-visible CLI, configuration, workflow, validation, output, or
-recovery change, agents MUST also follow the User documentation route selected
-by the macro-router and update both the granular English documentation rooted
+recovery change, agents MUST also open
+[`Docs/user/user-context-router.md`](Docs/user/user-context-router.md) and
+update both the granular English documentation rooted
 at [`Docs/user/hydra-user-guide.md`](Docs/user/hydra-user-guide.md) and the
 maintained Italian guide in the same task.
 

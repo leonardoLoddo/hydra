@@ -66,7 +66,7 @@ When adding, renaming, moving, or removing a document:
 1. update the **Routes** table;
 2. update consultation rules when ownership changes;
 3. update the parent router at
-   [`../hydra-context-router.md`](../hydra-context-router.md);
+   [`../ai/ROUTER.md`](../ai/ROUTER.md);
 4. verify every relative link and command example.
 
 Do not store implementation notes, task logs, or speculative command syntax in

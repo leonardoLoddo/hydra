@@ -1,5 +1,15 @@
 # Head Close
 
+**Status:** current
+**Scope:** `hydra head close` integration and protected-removal workflow
+**Canonical owner:** [ROUTER.md](ROUTER.md)
+
+## Consult when
+
+Read this leaf when a task changes Head integration, target validation, native
+Git merge behavior, conflict continuation or abort, close adapters, or removal
+after integration.
+
 ## Purpose
 
 This document defines the implemented close workflow:

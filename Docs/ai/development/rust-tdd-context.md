@@ -1,5 +1,15 @@
 # Rust, TDD, and Anti-Regression Standard
 
+**Status:** current
+**Scope:** Rust implementation, tests, dependencies, refactors, and quality gates
+**Canonical owner:** [ROUTER.md](ROUTER.md)
+
+## Consult when
+
+Read this leaf for every Rust code or test change, bug fix, refactor,
+dependency change, Cargo change, unsafe boundary, platform-specific behavior,
+or regression assessment.
+
 ## Purpose
 
 This document defines the binding engineering workflow for Hydra.

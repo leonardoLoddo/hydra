@@ -1677,8 +1677,8 @@ prodotto.
 
 Per intenti di prodotto e dettagli tecnici:
 
-- [contesto MVP](../product/hydra-mvp-context.md);
-- [inizializzazione](../architecture/project-initialization.md);
-- [creazione delle Head](../architecture/head-creation.md);
-- [ispezione delle Head](../architecture/head-inspection.md);
-- [completamento della shell](../architecture/shell-completions.md).
+- [contesto MVP](../ai/product/hydra-mvp-context.md);
+- [inizializzazione](../ai/architecture/project-initialization.md);
+- [creazione delle Head](../ai/architecture/head-creation.md);
+- [ispezione delle Head](../ai/architecture/head-inspection.md);
+- [completamento della shell](../ai/architecture/shell-completions.md).

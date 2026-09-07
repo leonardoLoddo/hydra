@@ -1,0 +1,4 @@
+interface:
+  display_name: "LibrAIrian"
+  short_description: "Route and maintain project knowledge"
+  default_prompt: "Use $librairian to adopt or maintain LibrAIrian in this repository."

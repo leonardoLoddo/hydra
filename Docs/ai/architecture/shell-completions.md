@@ -1,5 +1,14 @@
 # Shell Completions
 
+**Status:** current
+**Scope:** Bash, Zsh, and Fish completion generation and candidate discovery
+**Canonical owner:** [ROUTER.md](ROUTER.md)
+
+## Consult when
+
+Read this leaf when a task changes shell registration, completion output,
+dynamic Head-name candidates, failure behavior, or packaged completion files.
+
 ## Purpose
 
 This document defines the implemented completion boundary behind:

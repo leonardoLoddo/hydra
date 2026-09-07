@@ -1,5 +1,15 @@
 # Release and Distribution
 
+**Status:** current
+**Scope:** Hydra releases, artifacts, Homebrew distribution, and skill packaging
+**Canonical owner:** [ROUTER.md](ROUTER.md)
+
+## Consult when
+
+Read this leaf when a task changes repository identity, versions, release
+automation, GitHub artifacts, Homebrew metadata, onboarding, or release-time
+Agent Skill distribution.
+
 ## Purpose
 
 This document defines the release and distribution contract for Hydra.

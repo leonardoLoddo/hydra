@@ -1,5 +1,14 @@
 # Commit Conventions
 
+**Status:** current
+**Scope:** commits authored or reviewed in the Hydra repository
+**Canonical owner:** [ROUTER.md](ROUTER.md)
+
+## Consult when
+
+Read this leaf when creating, amending, squashing, reviewing, proposing, or
+documenting commits and release-relevant history.
+
 ## Purpose
 
 Hydra uses Conventional Commits to keep its history readable and suitable for long-term maintenance, automated changelogs, semantic versioning, release tooling, and targeted history searches.

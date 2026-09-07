@@ -1,5 +1,15 @@
 # Hydra AI-Agent Skill Maintenance Standard
 
+**Status:** current
+**Scope:** source, packaging, synchronization, and verification of `skills/hydra/`
+**Canonical owner:** [ROUTER.md](ROUTER.md)
+
+## Consult when
+
+Read this leaf when a task changes the installable Hydra Agent Skill or any
+workflow, command, configuration, safety, troubleshooting, or recovery rule
+that the skill projects to agents.
+
 ## Purpose
 
 This document owns the packaging, synchronization, and verification rules for

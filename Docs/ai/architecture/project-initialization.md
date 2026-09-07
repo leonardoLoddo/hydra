@@ -1,5 +1,15 @@
 # Project Initialization
 
+**Status:** current
+**Scope:** `hydra init`, project discovery, configuration, local state, and rollback
+**Canonical owner:** [ROUTER.md](ROUTER.md)
+
+## Consult when
+
+Read this leaf when a task changes initialization, repository discovery,
+project identity, default Heads placement, configuration persistence, storage
+selection, rollback, or initialization errors.
+
 ## Purpose
 
 This document defines how the current implementation realizes:

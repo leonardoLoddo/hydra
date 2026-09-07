@@ -16,7 +16,7 @@ public issue.
 ## Prepare a change
 
 1. Read [AGENTS.md](AGENTS.md) and start from the
-   [documentation router](Docs/hydra-context-router.md).
+   [LibrAIrian project knowledge router](Docs/ai/ROUTER.md).
 2. Confirm the behavior belongs to the current MVP and inspect the existing
    implementation and tests before proposing a design.
 3. For every behavior change, follow Red-Green-Refactor: observe the focused
@@ -48,7 +48,8 @@ state the limitation clearly in the pull request.
 
 ## Commit and pull request
 
-Hydra uses English [Conventional Commits](Docs/development/commit-conventions.md).
+Hydra uses English
+[Conventional Commits](Docs/ai/development/commit-conventions.md).
 Keep each commit focused and include its production code, TDD tests, and
 required documentation together.
 

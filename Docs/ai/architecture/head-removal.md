@@ -1,5 +1,14 @@
 # Head Removal
 
+**Status:** current
+**Scope:** `hydra head remove` validation, deletion, and recoverability
+**Canonical owner:** [ROUTER.md](ROUTER.md)
+
+## Consult when
+
+Read this leaf when a task changes clean or forced Head removal, worktree or
+inventory deletion, private-branch preservation, or partial-removal recovery.
+
 ## Purpose
 
 This document defines the implemented protected removal workflow:

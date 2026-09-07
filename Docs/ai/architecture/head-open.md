@@ -1,5 +1,15 @@
 # Head Open
 
+**Status:** current
+**Scope:** `hydra head open` configured process launch
+**Canonical owner:** [ROUTER.md](ROUTER.md)
+
+## Consult when
+
+Read this leaf when a task changes open-command configuration, placeholder
+expansion, process argument separation, worktree validation, or opener failure
+behavior.
+
 ## Purpose
 
 This document defines the implemented configured adapter workflow:

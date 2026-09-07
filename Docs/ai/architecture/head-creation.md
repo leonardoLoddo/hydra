@@ -1,5 +1,15 @@
 # Head Creation
 
+**Status:** current
+**Scope:** `hydra head create` transaction, materialization, metadata, and rollback
+**Canonical owner:** [ROUTER.md](ROUTER.md)
+
+## Consult when
+
+Read this leaf when a task changes Head naming, base or target resolution,
+private branches, worktree registration, overlay materialization, locking,
+creation rollback, or cleanup.
+
 ## Purpose
 
 This document defines how the current implementation realizes:
