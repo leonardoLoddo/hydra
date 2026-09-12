@@ -10,6 +10,15 @@ Read this leaf before adding a crate, moving responsibilities across crates,
 changing dependency direction, or deciding whether behavior belongs in the
 CLI or core.
 
+## Inherited defaults
+
+Load these product contracts before interpreting the implementation rules:
+
+- [hydra-mvp-context](../product/hydra-mvp-context.md)
+
+The local rules extend those contracts with implementation constraints. Safety
+summaries retain local visibility; the linked product rules own product policy.
+
 ## Purpose
 
 This document defines the implemented structural boundaries of Hydra and the
@@ -18,100 +27,19 @@ must preserve unless an intentional architecture change updates this document
 and its routed dependencies.
 
 The product model and MVP scope remain authoritative in
-[`../product/hydra-mvp-context.md`](../product/hydra-mvp-context.md).
+[hydra-mvp-context.md](../product/hydra-mvp-context.md).
 
 ---
 
-## Current Workspace
+## Workspace boundary
 
-Hydra is a Cargo workspace with two packages:
+Hydra has two Cargo packages, `hydra-cli` and `hydra-core`. The root manifests
+own exact workspace membership, Rust version, edition, dependencies, and lints.
+Do not maintain a second file inventory or copy version numbers here.
 
-```text
-Hydra/
-├── Cargo.toml
-├── rust-toolchain.toml
-└── crates/
-    ├── hydra-cli/
-    │   ├── src/
-    │   │   ├── head_create.rs
-    │   │   ├── inspection.rs
-    │   │   ├── main.rs
-    │   │   ├── output.rs
-    │   │   ├── repair.rs
-    │   │   ├── skill.rs
-    │   │   └── repair/
-    │   │       └── presentation.rs
-    │   └── tests/
-    │       ├── common/mod.rs
-    │       ├── cli_contract.rs
-    │       ├── doctor_storage.rs
-    │       ├── head_close.rs
-    │       ├── head_create_conflicts.rs
-    │       ├── head_create_overlay_failures.rs
-    │       ├── head_create_performance.rs
-    │       ├── head_create_state_failures.rs
-    │       ├── head_create_success.rs
-    │       ├── head_inspection.rs
-    │       ├── head_open.rs
-    │       ├── head_remove.rs
-    │       ├── init_conflicts.rs
-    │       ├── init_git_errors.rs
-    │       ├── init_success.rs
-    │       └── repair.rs
-    └── hydra-core/
-        └── src/
-            ├── doctor.rs
-            ├── lib.rs
-            ├── head.rs
-            ├── head/
-            │   ├── close.rs
-            │   ├── command_template.rs
-            │   ├── error.rs
-            │   ├── git.rs
-            │   ├── git/
-            │   │   ├── integration.rs
-            │   │   └── protocol.rs
-            │   ├── inspection.rs
-            │   ├── materializer.rs
-            │   ├── materializer/
-            │   │   └── blob_batch.rs
-            │   ├── overlay.rs
-            │   ├── overlay/
-            │   │   ├── hash.rs
-            │   │   └── materialization.rs
-            │   ├── open.rs
-            │   ├── persistence.rs
-            │   ├── repair.rs
-            │   ├── repair/
-            │   │   ├── application.rs
-            │   │   └── planning.rs
-            │   ├── removal.rs
-            │   ├── state.rs
-            │   └── state/
-            │       ├── configuration.rs
-            │       └── installation.rs
-            ├── init.rs
-            └── init/
-                ├── artifacts.rs
-                ├── configuration.rs
-                ├── error.rs
-                ├── git.rs
-                ├── persistence.rs
-                ├── recovery.rs
-                └── storage.rs
-```
-
-The root Cargo manifests are authoritative for the exact Rust version, edition,
-dependency versions, and lint configuration. This document intentionally does
-not duplicate those values.
-
-The product specification describes additional possible crates such as
-`hydra-git`, `hydra-materializer`, `hydra-overlays`, and `hydra-config`. They
-are not current components. Introduce one only after implemented behavior
-establishes a stable boundary that the existing crates cannot represent
-clearly.
-
----
+Additional Git, materialization, overlay, or configuration crates are not current
+components. Introduce one only after a stable implemented boundary cannot be
+represented clearly by private modules in the existing crates.
 
 ## Dependency Direction
 
@@ -172,12 +100,10 @@ The private `skill.rs` CLI module is a narrow distribution adapter rather than
 Hydra repository-domain behavior. It resolves each supported provider's
 documented personal skill location, renders default-negative confirmations,
 stages the canonical embedded skill, and owns its provider-specific provenance
-manifest. Codex may mutate only `$HOME/.agents/skills/hydra`; Gemini CLI may
-mutate only `$HOME/.gemini/skills/hydra`; Antigravity CLI may mutate only
-`$HOME/.gemini/antigravity-cli/skills/hydra`; the Antigravity app adapter may
-mutate only `$HOME/.gemini/config/skills/hydra`. Every adapter rejects
-symlinks, unknown trees, extra entries, provider mismatches, and checksum
-mismatches before update or removal. It does not read or mutate a Hydra
+manifest. Provider destinations and exact ownership checks are canonical in
+[../development/release-distribution.md](../development/release-distribution.md);
+load that contract for adapter changes. Unknown or locally modified installed
+content remains protected. It does not read or mutate a Hydra
 project's Git repository, Heads directory, or local metadata, so this
 host-specific lifecycle does not belong in `hydra-core`.
 
@@ -222,93 +148,35 @@ process, or parse CLI syntax.
 Expected failures from Git, user paths, existing state, serialization, and the
 filesystem return errors rather than panicking.
 
-### Initialization module boundaries
+### Side-effect ownership
 
-Project initialization is kept inside one public core capability while its
-internal responsibilities remain separated:
+Keep orchestration separate from side-effect boundaries using private modules
+and narrow `pub(super)` APIs. Public operations remain exported through
+`crates/hydra-core/src/lib.rs`; do not widen visibility merely to move files.
 
-| Module | Responsibility |
-|---|---|
-| `init.rs` | Orchestrate initialization and validate derived destinations before mutation |
-| `init/git.rs` | Execute Git discovery commands and translate their path output |
-| `init/configuration.rs` | Build and serialize the schema-annotated shared configuration, local locator, ownership marker, and initial inventory |
-| `init/storage.rs` | Probe native CoW support and verify the full-copy fallback |
-| `init/persistence.rs` | Sequence filesystem mutations and publish metadata atomically |
-| `init/recovery.rs` | Validate authoritative ownership evidence and recognize an empty existing installation whose missing default configuration can be reconstructed safely |
-| `init/artifacts.rs` | Track exact owned artifacts and perform non-recursive rollback |
-| `init/error.rs` | Define and render typed initialization and cleanup failures |
+- Initialization separates configuration serialization, Git discovery, storage
+  probing, atomic persistence, exact artifact rollback, and empty-installation
+  recovery. The initialization workflow owns mutation order.
+- Creation separates Git refs and worktrees, validated Git protocol decoding,
+  tracked materialization, overlay selection and materialization, state
+  transactions, recovery evidence, and errors. Persistent blob reads and bounded
+  overlay hashing belong behind those materialization boundaries.
+- Inspection composes read-only state and Git observations. Terminal escaping
+  remains in the CLI; state validation remains in core.
+- Repair separates read-only planning from revalidated application. Prompt
+  presentation belongs to the CLI, never the repair planner.
+- Open and close share command-template validation; close composes protected
+  removal rather than implementing another deletion policy.
+- Doctor reuses the initialization storage adapter. It owns diagnostic-directory
+  lifecycle and combined probe/cleanup errors, not another clone implementation.
 
-These are private implementation modules, not independent services or crates.
-They may depend on one another only through narrow `pub(super)` functions and
-types. The public API continues to be re-exported by `hydra-core/src/lib.rs`.
+Creation confirmation requests and progress are typed core data. The CLI presents
+them and supplies explicit retry authorization. The core recomputes plans and
+owns policy changes, mutations, rollback, and recovery. Informational progress
+observers MUST NOT interrupt transactions.
 
-`doctor.rs` reuses the same `init/storage.rs` capability adapter after resolving
-the validated managed Heads directory through the Head state boundary. It owns
-only diagnostic-directory lifecycle, report classification, and combined
-probe/cleanup errors; it does not duplicate the clone or copy implementation.
-
-### Head creation module boundaries
-
-Head creation follows the same small-orchestrator rule:
-
-| Module | Responsibility |
-|---|---|
-| `head/close.rs` | Select native or configured close behavior, execute command adapters safely, observe target changes, and compose protected removal |
-| `head/command_template.rs` | Expand the shared placeholder grammar and reject unsupported or process-unsafe template values before an adapter is started |
-| `head.rs` | Validate and orchestrate the complete creation transaction |
-| `head/git.rs` | Discover Git state and own ref, branch, index, worktree, and verification commands |
-| `head/git/integration.rs` | Own ancestry checks, foreground parent-worktree merge execution, integration-parent inspection, and protected ref deletion |
-| `head/git/protocol.rs` | Decode NUL-delimited Git worktree and status records while preserving platform path semantics |
-| `head/materializer.rs` | Materialize Git tree entries without a standard checkout |
-| `head/materializer/blob_batch.rs` | Own and validate the persistent `git cat-file --batch` protocol used to stream tracked blobs |
-| `head/overlay.rs` | Expand overlay rules, select safe source files, and produce a deterministic materialization plan |
-| `head/overlay/hash.rs` | Compute overlay identities through bounded parallel `git hash-object` batches and restore deterministic order |
-| `head/overlay/materialization.rs` | Revalidate planned overlay sources, materialize files and symlinks, and verify destination identities |
-| `head/open.rs` | Validate an existing Head, expand configured placeholders, and execute the open adapter without a shell |
-| `head/removal.rs` | Validate and orchestrate protected worktree, inventory, and private-branch removal |
-| `head/repair.rs` | Define the public repair models and expose the stable planning and application API |
-| `head/repair/planning.rs` | Compare inventory with Git, filesystem, recovery evidence, and lock state without mutation |
-| `head/repair/application.rs` | Revalidate approved plans under the state transaction and apply only deterministic repairs |
-| `head/state.rs` | Manage the physical inventory transaction and classify commit boundaries |
-| `head/state/configuration.rs` | Parse and validate version-2 directory policies and shared Head settings |
-| `head/state/installation.rs` | Resolve the Git-common locator, verify directory ownership and worktree boundaries, and locate the physical inventory |
-| `head/persistence.rs` | Serialize the versioned state-lock marker, hold the ownership marker's advisory guard, classify abandoned lock state, and publish local state atomically |
-| `head/error.rs` | Define and render typed lifecycle, rollback, partial-removal, and post-commit cleanup failures |
-
-The terminal confirmation remains in `hydra-cli`; the core exposes the
-confirmation requirement as data and recomputes the overlay plan after
-confirmation. Detailed workflow ownership is documented in
-[`head-creation.md`](head-creation.md).
-
-When planning returns unsafe overlay symlinks, the core reports every
-deterministically ordered relative path. A confirmed retry appends literal,
-root-anchored negation rules to the loaded project configuration, replaces
-`.hydra.json` atomically while the Head state lock is held, and replans before
-creating a branch or worktree. Other unsafe path classes never enter this
-configuration-update flow.
-
-The core also owns typed Head-creation phase events, while the CLI owns whether
-and how to render them. The executable writes these events only to interactive
-`stderr`; redirected and machine-consumed output remains unchanged. Progress
-observers are informational and cannot be allowed to interrupt the creation
-transaction.
-
-### Head inspection module boundaries
-
-| Module | Responsibility |
-|---|---|
-| `head/inspection.rs` | Compose validated inventory metadata, filesystem presence, Git refs, worktree registration, changes, and ahead/behind into public read-only models |
-| `head/git.rs` | Execute and parse the Git queries shared by creation and inspection |
-| `head/state.rs` | Load the versioned inventory without taking the mutation lock and expose metadata through narrow internal accessors |
-| `hydra-cli/src/inspection.rs` | Render project summaries, detailed Head status, ordered names, paths, and command exit status |
-| `hydra-cli/src/output.rs` | Neutralize control characters for human terminal output while allowing command-specific raw machine output |
-
-Inspection reuses the same configuration, locator, ownership, and directory
-policy validation as creation. It does not acquire `heads.json.lock`, write
-state, or repair inconsistencies. Detailed behavior is documented in
-[`head-inspection.md`](head-inspection.md).
-
----
+Select workflow details through the [architecture router](ROUTER.md). Do not copy
+those transaction rules into this structural boundary document.
 
 ## Git and Process Boundary
 
@@ -323,15 +191,9 @@ Every Git invocation MUST:
 - check the exit status before consuming output;
 - validate output before converting it into paths or state.
 
-High-cardinality file operations MUST NOT spawn one Git process per file.
-Overlay hashing uses bounded argument batches with an explicit `--` separator,
-runs independent batches through a worker pool capped at eight processes,
-restores deterministic result order, and retries smaller ordered batches if
-the operating system rejects an argument list. Tracked blob fallback uses a
-persistent `cat-file --batch` child whose request identifiers, response
-headers, payload lengths, error stream, exit status, and lifecycle are
-validated. These optimizations must not weaken arbitrary-path handling,
-content verification, or error propagation.
+High-cardinality process performance and protocol validation are owned by
+[materialization.md](materialization.md). Load that leaf when changing shared Git
+batching or blob readers; path safety and error propagation remain mandatory.
 
 If Git integration becomes large enough to justify a separate `hydra-git`
 crate, the new crate should own only the Git adapter and Git-specific data
@@ -381,3 +243,13 @@ Create or split a crate only when all of the following are true:
 
 Do not create a crate solely because it appears in the recommended future
 layout. Prefer modules inside `hydra-core` until a stronger boundary emerges.
+
+## Evidence and verification
+
+Inspect the root Cargo manifests, `crates/hydra-core/src/lib.rs`,
+`crates/hydra-cli/src/main.rs`, and the specific workflow modules selected by
+the architecture router. Verify core public APIs return data or typed errors,
+CLI policy decisions stay in core, and configured host skill distribution does
+not touch project state. For structural changes, run the complete before/after
+baseline and quality gates required by the Development structural-refactoring
+route; representative consumers must preserve public and persisted contracts.

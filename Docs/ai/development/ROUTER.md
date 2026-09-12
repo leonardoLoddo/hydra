@@ -2,7 +2,7 @@
 
 ## Purpose and scope
 
-This router owns Hydra's reusable Rust engineering, testing, commit, release,
+This router owns Hydra's scoped working agreements, Rust engineering, testing, commit, release,
 distribution, and Agent Skill maintenance rules. It excludes product behavior
 and implementation architecture owned by other domains.
 
@@ -10,6 +10,7 @@ and implementation architecture owned by other domains.
 
 | Conditions | Priority | Read | Skip when |
 |---|---|---|---|
+| any: repository change, implementation planning, engineering decision, authorization boundary, non-trivial task completion | required | [working-agreements.md](working-agreements.md) | read-only consultation without a repository change or engineering decision |
 | any: Rust code or test, bug fix, refactor, dependency, Cargo configuration, quality gate, platform-specific implementation, unsafe boundary, regression assessment | required | [rust-tdd-context.md](rust-tdd-context.md) | the change is documentation-only and cannot affect compiled or runtime behavior |
 | any: create, amend, squash, review, propose, or document a commit; choose type or scope; prepare release history | required | [commit-conventions.md](commit-conventions.md) | no commit or history operation is involved |
 | any: create, change, package, document, validate, or assess impact on Hydra's installable Agent Skill; change agent-operable workflow or safety guidance | required | [hydra-skill-context.md](hydra-skill-context.md) | the task cannot change what an agent executes, decides, validates, or reports |
@@ -19,6 +20,9 @@ and implementation architecture owned by other domains.
 
 - Add [../product/ROUTER.md](../product/ROUTER.md) when behavior visible to users or supported scope may change.
 - Add [../architecture/ROUTER.md](../architecture/ROUTER.md) when crate boundaries, Git or filesystem workflows, persistence, initialization, or rollback may change.
+- Add [../governance/ROUTER.md](../governance/ROUTER.md) for the completion
+  knowledge-impact check and AI-facing documentation changes. Ordinary human
+  prose does not select AI authoring rules.
 
 ## Routing examples
 
@@ -28,7 +32,7 @@ and implementation architecture owned by other domains.
 
 ## Ownership and maintenance
 
-This router canonically owns `rust-tdd-context.md`, `commit-conventions.md`,
+This router canonically owns `working-agreements.md`, `rust-tdd-context.md`, `commit-conventions.md`,
 `hydra-skill-context.md`, and `release-distribution.md`. Update this router and
 [../ROUTER.md](../ROUTER.md) when owned knowledge is created, moved, renamed,
 split, merged, demoted, or removed.

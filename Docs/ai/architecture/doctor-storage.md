@@ -9,6 +9,18 @@
 Read this leaf when a task changes storage capability detection, native clone
 reporting, full-copy fallback, isolation claims, or diagnostic cleanup.
 
+Skip when neither the stated workflow nor a shared boundary it depends on can
+be affected. A nearby command name alone does not select this leaf.
+
+## Inherited defaults
+
+Load these product contracts before interpreting the implementation rules:
+
+- [storage-and-platforms](../product/storage-and-platforms.md)
+
+The local rules extend those contracts with implementation constraints. Safety
+summaries retain local visibility; the linked product rules own product policy.
+
 ## Purpose
 
 This document defines the implemented storage diagnostic:
@@ -19,7 +31,7 @@ hydra doctor storage
 
 The command verifies the actual volume that owns the initialized project's
 Heads directory. Product requirements remain authoritative in
-[`../product/hydra-mvp-context.md`](../product/hydra-mvp-context.md).
+[storage-and-platforms.md](../product/storage-and-platforms.md).
 
 ---
 
@@ -116,6 +128,11 @@ content.
 ---
 
 ## Verification Contract
+
+Implementation evidence: `crates/hydra-core/src/doctor.rs`. CLI integration evidence: `doctor_storage`
+test targets under `crates/hydra-cli/tests/`. Run the affected targets with
+`cargo test -p hydra-cli --test <target>` and inspect the observable results below.
+A listed test contract is not evidence that every platform passed in this task.
 
 CLI integration tests on the actual test volume prove:
 

@@ -183,3 +183,11 @@ Report preview defects through the repository's
 [issue templates](https://github.com/leonardoLoddo/hydra/issues/new/choose).
 Use the private process in
 [`SECURITY.md`](../../SECURITY.md) for security-sensitive reports.
+
+## Maintaining this guide
+
+User-visible behavior changes update the affected English pages and the
+[Italian guide](hydra-user-guide.it.md) together. These guides describe implemented
+behavior. Contributors consult the [product contracts by concern](../ai/product/ROUTER.md)
+and [contribution workflow](../../CONTRIBUTING.md) for technical authority and
+knowledge maintenance; proposed capabilities are not user instructions.

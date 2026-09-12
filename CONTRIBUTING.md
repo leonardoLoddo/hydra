@@ -33,7 +33,7 @@ shown insufficient.
 
 ## Verify the change
 
-Run the focused tests first, then the complete quality gates:
+For production changes, run the focused tests first, then the complete quality gates:
 
 ```bash
 cargo fmt --all --check
@@ -45,6 +45,14 @@ cargo test --workspace
 Run platform-specific, all-feature, packaging, or disposable-repository tests
 when the affected contract requires them. If a relevant check cannot run,
 state the limitation clearly in the pull request.
+
+After implementation verification, perform the LibrAIrian knowledge-impact check.
+Follow the [Governance route](Docs/ai/governance/ROUTER.md) for canonical ownership,
+authoring, runnable link and graph checks, representative routing cases, and
+fallback validation. Update affected knowledge with the implementation. A pure
+documentation change uses these checks instead of artificial Rust tests; no-update
+conclusions need a concrete reason. Report code verification and knowledge
+verification separately.
 
 ## Commit and pull request
 

@@ -10,7 +10,8 @@ architecture, or development rules.
 
 | Conditions | Priority | Read | Skip when |
 |---|---|---|---|
-| any: protocol adoption, router change, knowledge maintenance, documentation authoring or review, audit, upgrade, fallback operation | required | [librairian-protocol.md](librairian-protocol.md) | ordinary implementation after all affected project routes are selected |
+| any: implementation completion, knowledge-impact check, protocol adoption, router change, knowledge maintenance, AI-knowledge authoring or review, audit, upgrade, fallback operation | required | [librairian-protocol.md](librairian-protocol.md) | initial implementation investigation before knowledge maintenance or completion |
+| any: knowledge change, protocol installation, audit, routing or inheritance change, fallback verification | required | [knowledge-validation.md](knowledge-validation.md) | a completed impact check identifies no changed knowledge with a concrete reason |
 
 ## Cross-context composition
 
@@ -19,5 +20,6 @@ demoted, or removed.
 
 ## Ownership and maintenance
 
-This router canonically owns `librairian-protocol.md`. Update the macro-router
-only when the governance boundary or top-level path changes.
+This router canonically owns `librairian-protocol.md` and
+`knowledge-validation.md`. Update this router and every affected ancestor for
+changes in owned artifacts, paths, or selection boundaries.

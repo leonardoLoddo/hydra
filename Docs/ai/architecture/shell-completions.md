@@ -9,6 +9,18 @@
 Read this leaf when a task changes shell registration, completion output,
 dynamic Head-name candidates, failure behavior, or packaged completion files.
 
+Skip when neither the stated workflow nor a shared boundary it depends on can
+be affected. A nearby command name alone does not select this leaf.
+
+## Inherited defaults
+
+Load these product contracts before interpreting the implementation rules:
+
+- [cli-contract](../product/cli-contract.md)
+
+The local rules extend those contracts with implementation constraints. Safety
+summaries retain local visibility; the linked product rules own product policy.
+
 ## Purpose
 
 This document defines the implemented completion boundary behind:
@@ -18,7 +30,7 @@ hydra completions <shell>
 ```
 
 The user-visible scope remains authoritative in
-[`../product/hydra-mvp-context.md`](../product/hydra-mvp-context.md). Validated
+[cli-contract.md](../product/cli-contract.md). Validated
 inventory loading remains owned by [`head-inspection.md`](head-inspection.md).
 
 ---
@@ -92,6 +104,11 @@ not inspect each Head's worktree or invoke per-Head Git commands.
 ---
 
 ## Verification Contract
+
+Implementation evidence: `crates/hydra-cli/src/main.rs`. CLI integration evidence: `completions` and `cli_contract`
+test targets under `crates/hydra-cli/tests/`. Run the affected targets with
+`cargo test -p hydra-cli --test <target>` and inspect the observable results below.
+A listed test contract is not evidence that every platform passed in this task.
 
 CLI integration tests prove:
 

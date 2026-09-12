@@ -9,6 +9,19 @@
 Read this leaf when a task changes clean or forced Head removal, worktree or
 inventory deletion, private-branch preservation, or partial-removal recovery.
 
+Skip when neither the stated workflow nor a shared boundary it depends on can
+be affected. A nearby command name alone does not select this leaf.
+
+## Inherited defaults
+
+Load these product contracts before interpreting the implementation rules:
+
+- [lifecycle](../product/lifecycle.md)
+- [state-and-recovery](../product/state-and-recovery.md)
+
+The local rules extend those contracts with implementation constraints. Safety
+summaries retain local visibility; the linked product rules own product policy.
+
 ## Purpose
 
 This document defines the implemented protected removal workflow:
@@ -20,7 +33,7 @@ hydra head remove <name> [--force]
 It owns validation, Git worktree removal, inventory publication, private-branch
 cleanup, recoverability, and failure boundaries. Product intent remains
 authoritative in
-[`../product/hydra-mvp-context.md`](../product/hydra-mvp-context.md).
+[lifecycle.md](../product/lifecycle.md).
 
 ---
 
@@ -137,6 +150,11 @@ future `hydra repair`; Hydra does not guess at destructive reconciliation.
 ---
 
 ## Verification Contract
+
+Implementation evidence: `crates/hydra-core/src/head/removal.rs`. CLI integration evidence: `head_remove`
+test targets under `crates/hydra-cli/tests/`. Run the affected targets with
+`cargo test -p hydra-cli --test <target>` and inspect the observable results below.
+A listed test contract is not evidence that every platform passed in this task.
 
 Disposable-repository CLI tests prove:
 

@@ -10,6 +10,18 @@ Read this leaf when a task changes open-command configuration, placeholder
 expansion, process argument separation, worktree validation, or opener failure
 behavior.
 
+Skip when neither the stated workflow nor a shared boundary it depends on can
+be affected. A nearby command name alone does not select this leaf.
+
+## Inherited defaults
+
+Load these product contracts before interpreting the implementation rules:
+
+- [lifecycle](../product/lifecycle.md)
+
+The local rules extend those contracts with implementation constraints. Safety
+summaries retain local visibility; the linked product rules own product policy.
+
 ## Purpose
 
 This document defines the implemented configured adapter workflow:
@@ -20,7 +32,7 @@ hydra head open <name>
 
 The command validates a recorded Head and starts a user-configured program for
 its worktree. Product intent remains authoritative in
-[`../product/hydra-mvp-context.md`](../product/hydra-mvp-context.md).
+[lifecycle.md](../product/lifecycle.md).
 
 ---
 
@@ -105,6 +117,11 @@ they do not sandbox the external program.
 ---
 
 ## Verification Contract
+
+Implementation evidence: `crates/hydra-core/src/head/open.rs`. CLI integration evidence: `head_open`
+test targets under `crates/hydra-cli/tests/`. Run the affected targets with
+`cargo test -p hydra-cli --test <target>` and inspect the observable results below.
+A listed test contract is not evidence that every platform passed in this task.
 
 Disposable-repository CLI tests prove:
 

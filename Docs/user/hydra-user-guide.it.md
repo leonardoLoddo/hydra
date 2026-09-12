@@ -1677,7 +1677,7 @@ prodotto.
 
 Per intenti di prodotto e dettagli tecnici:
 
-- [contesto MVP](../ai/product/hydra-mvp-context.md);
+- [contratti di prodotto per argomento](../ai/product/ROUTER.md);
 - [inizializzazione](../ai/architecture/project-initialization.md);
 - [creazione delle Head](../ai/architecture/head-creation.md);
 - [ispezione delle Head](../ai/architecture/head-inspection.md);

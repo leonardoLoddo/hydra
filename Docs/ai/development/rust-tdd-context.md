@@ -25,9 +25,10 @@ Hydra is implemented in Rust. Every production behavior change is developed test
 - The repository-declared Rust toolchain and edition are authoritative.
 - Safe Rust is the default.
 - Platform-specific behavior is isolated behind narrow interfaces so portable logic can be tested independently.
-- Another runtime or language must not become a dependency of core Hydra behavior without an explicit architectural decision.
+- Another runtime or language must not become a dependency of core Hydra behavior without an explicit architectural decision and user approval.
 
-`unsafe` code is allowed only when all of the following are true:
+The current workspace forbids `unsafe` code. Do not relax that lint implicitly.
+Any explicitly approved policy change still requires all of the following:
 
 1. a required platform capability cannot be implemented adequately with safe Rust;
 2. the unsafe block is isolated behind the smallest practical safe interface;
@@ -53,7 +54,8 @@ Every change that can affect compiled behavior, runtime behavior, CLI output, ex
 8. Repeat for the next behavior.
 9. Run the broader regression suite and Rust quality gates.
 
-An implementation followed by tests is not TDD.
+An unavoidable deviation requires explicit user authorization before production
+implementation and MUST be reported. An implementation followed by tests is not TDD.
 
 A test that already passes before the behavior is implemented does not establish a Red phase. Improve the test until it fails for the missing contract.
 
@@ -158,7 +160,8 @@ CLI tests verify observable behavior:
 
 - exit status;
 - stdout and stderr ownership;
-- human-readable and JSON output contracts;
+- human-readable output and existing machine-composition contracts;
+- JSON output only if a future explicit contract implements it;
 - absence of unintended side effects;
 - state left after both success and failure.
 

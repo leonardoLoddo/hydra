@@ -10,6 +10,21 @@ Read this leaf when a task changes initialization, repository discovery,
 project identity, default Heads placement, configuration persistence, storage
 selection, rollback, or initialization errors.
 
+Skip when neither the stated workflow nor a shared boundary it depends on can
+be affected. A nearby command name alone does not select this leaf.
+
+## Inherited defaults
+
+Load these product contracts before interpreting the implementation rules:
+
+- [lifecycle](../product/lifecycle.md)
+- [configuration-and-overlays](../product/configuration-and-overlays.md)
+- [state-and-recovery](../product/state-and-recovery.md)
+- [storage-and-platforms](../product/storage-and-platforms.md)
+
+The local rules extend those contracts with implementation constraints. Safety
+summaries retain local visibility; the linked product rules own product policy.
+
 ## Purpose
 
 This document defines how the current implementation realizes:
@@ -21,7 +36,7 @@ hydra init [path]
 It owns the technical workflow, persistence order, failure behavior, and
 implementation constraints of project initialization. The intended
 user-visible contract remains authoritative in
-[`../product/hydra-mvp-context.md`](../product/hydra-mvp-context.md).
+[lifecycle.md](../product/lifecycle.md).
 
 When this document records an implementation gap, the product requirement is
 not relaxed. The gap must be closed in code and tests or resolved through an
@@ -130,7 +145,9 @@ common directory and reads its local locator. Hydra then validates that the
 locator's canonical `projectRoot` belongs to that same Git common directory and
 uses the resulting parent repository as the command context.
 
-Consequently, invoking Hydra from a managed Head is equivalent to invoking it
+Except for the explicit `head close` caller restriction inherited from
+[lifecycle.md](../product/lifecycle.md#close-caller-exception), invoking Hydra
+from a managed Head is equivalent to invoking it
 from the parent project for configuration loading, Git defaults, overlay
 sources, project reporting, and state ownership. The calling Head does not need
 to contain `.hydra.json`, and its private branch, working files, or stale copy
@@ -218,27 +235,12 @@ format was never released.
 The current `projectId` is generated once during initialization and becomes
 stable through persistence in `.hydra.json`.
 
-Its implementation format is:
-
-```text
-<repository-slug>-<32 random hexadecimal characters>
-```
-
-The slug:
-
-- lowercases ASCII alphanumeric characters;
-- replaces other characters with `-`;
-- collapses repeated `-`;
-- removes leading and trailing `-`;
-- falls back to `project` when no slug characters remain.
-
-The random suffix comes from a UUID version 4. Callers must treat the complete
-identifier as opaque; its formatting is not a user-facing compatibility
-guarantee.
-
-`installationId` is generated independently as `local-` followed by the 32
-hexadecimal UUID characters. It identifies only this local initialization and
-must match between the locator and directory marker.
+Callers MUST treat `projectId` as opaque; its generated slug and random suffix
+are implementation details, not a user-facing format guarantee. Generation
+currently uses UUID v4 entropy, and `installationId` is independent. The latter
+identifies only this local initialization and must match locator and marker.
+Inspect `crates/hydra-core/src/init/configuration.rs` when generation changes;
+tests must preserve persisted identity stability and distinct installation identity.
 
 ---
 
@@ -413,6 +415,11 @@ CLI renders the error but does not reinterpret it or retry mutations.
 ---
 
 ## Verification Contract
+
+Implementation evidence: `crates/hydra-core/src/init.rs`. CLI integration evidence: `init_success`, `init_conflicts`, and `init_git_errors`
+test targets under `crates/hydra-cli/tests/`. Run the affected targets with
+`cargo test -p hydra-cli --test <target>` and inspect the observable results below.
+A listed test contract is not evidence that every platform passed in this task.
 
 Initialization behavior is protected through CLI integration tests that launch
 the compiled `hydra` executable against unique temporary directories and real

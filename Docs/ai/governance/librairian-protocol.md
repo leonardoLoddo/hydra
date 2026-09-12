@@ -52,6 +52,28 @@ version-control state are descriptive evidence. When intent and reality
 disagree, report the conflict. Do not silently convert either side into the
 other.
 
+## Status, scope, and inherited rules
+
+Use `current`, `proposed`, `disputed`, and `historical` as status values. Current
+leaves govern only their declared scope. Proposed or historical material MUST NOT
+enter ordinary implementation context unless its explicit consultation condition
+holds. Historical knowledge names a successor when retained; Git history normally
+preserves superseded text without a duplicate active archive.
+
+`MUST` and `MUST NOT` are mandatory. `SHOULD` is the default unless a documented
+project-specific reason justifies an exception. `MAY` is optional.
+
+At one authority level, apply the most specific documented override or exception,
+then the nearest inherited default, then broader defaults. An override explicitly
+replaces a rule or extends it with constraints. Defaults MUST state applicability
+and MUST NOT be inferred from repetition. Unrelated conflicting defaults are
+ambiguous: report them and stop the affected decision. Do not invent an exception
+because implementation differs or a case appears unusual.
+
+Resolve explicit dependencies once and keep inheritance shallow. Cross-links for
+related reading do not automatically inherit rules. Routers select knowledge and
+record canonical ownership; they do not own shared defaults themselves.
+
 ## Authoring standard
 
 AI-facing knowledge uses controlled technical English unless Hydra explicitly
@@ -85,15 +107,51 @@ failure behavior, safety, authorization, and verification.
 
 ## Knowledge-impact check
 
-Ask whether the implementation changed behavior, architecture, terminology,
-workflow, dependency, invariant, operational procedure, routing, priority,
-canonical ownership, or reusable verified knowledge.
+After implementation verification, answer all five questions:
 
-Update, move, consolidate, split, demote, or remove affected knowledge. `No
-knowledge update required` is valid only with a concrete reason.
+1. Did behavior, architecture, terminology, workflow, dependency, invariant, or
+   operational procedure change?
+2. Did routed knowledge or a local annotation become false, incomplete, misplaced,
+   or redundant?
+3. Was verified reusable non-obvious knowledge discovered?
+4. Should knowledge be added, updated, moved, consolidated, split, demoted, or removed?
+5. Did routing, priority, ownership, or cross-context composition change?
+
+Update the canonical owner in the same change; remove stale copies and update
+all affected owning and ancestor routers. Recheck dependent defaults and local
+annotations. `No knowledge update required` is valid only with a concrete reason.
+Routine maintenance is scoped to affected knowledge, not a repository-wide audit.
+
+A local `AI-KNOWLEDGE` annotation is optional only for a verified, component-local
+semantic invariant that a test, type, assertion, or ordinary comment cannot express
+more safely. Place it adjacent to the smallest scope, include `Invariant`, and add
+rationale, change impact, or evidence only when useful. Never encode authorship,
+sessions, cheap source structure, or speculative rules in annotations.
 
 ## Validation
 
-Validate affected files, links, reachability, canonical ownership, inherited-default dependencies, route
-behavior, and changed claims against current evidence. Structural checks do
-not prove semantic truth, freshness, or route completeness.
+For a knowledge change, audit, installation, or fallback check, load
+[knowledge-validation.md](knowledge-validation.md). It owns runnable structural
+checks, routing and inheritance cases, evidence review, and operational verification.
+Run only the checks applicable to the actual change. Structural success does not
+prove semantic truth, freshness, route completeness, or information value.
+
+## Procedure without the skill
+
+For adoption, inventory current knowledge and relevant historical sources, classify
+status, route valuable content before rewriting it, and consolidate only with clear
+ownership. For an audit, diagnose first; repair only within authorized scope.
+For a protocol version upgrade, read an explicit approved migration before changing
+version or reinterpreting policy. If no migration exists, request a decision.
+A same-version user-approved skill refresh still compares changed mechanics and
+synchronizes this fallback and affected routes; do not invent a new version.
+
+Before accepting a leaf, verify explicit scope and exclusions, authority, terminology,
+conditions, exceptions, inherited defaults, evidence, and observable completion.
+Reject task residue, duplicate authority, generic guidance, and cheap code narration.
+Every leaf needs an independent consultation trigger; split by semantic selection,
+not a line quota. Preserve safety-critical context when removing repeated copies.
+
+Report procedure, scope, protocol version before and after, knowledge changes,
+evidence, conflicts, actual structural/routing/semantic/operational checks, and
+remaining uncertainty. Do not claim whole-system correctness from sampled claims.

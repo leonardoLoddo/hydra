@@ -13,7 +13,8 @@ Rust engineering rules.
 |---|---|---|---|
 | any: crate boundary, dependency direction, CLI versus core responsibility | required | [system-architecture.md](system-architecture.md) | no structural responsibility changes or decisions are involved |
 | any: `hydra init`, repository discovery, initial configuration or state, Heads directory, initialization rollback | required | [project-initialization.md](project-initialization.md) | initialization cannot be affected |
-| any: `hydra head create`, Head name, base or target ref, private branch, worktree registration, overlay materialization, creation lock, rollback or cleanup | required | [head-creation.md](head-creation.md) | Head creation cannot be affected |
+| any: `hydra head create`, Head name, base or target ref, private branch, worktree registration, materialization transaction ordering, creation lock, rollback or cleanup | required | [head-creation.md](head-creation.md) | Head creation cannot be affected |
+| any: tracked materialization, overlay matching or materialization, Git blob streaming, content-source reuse, hash batching, permissions, symlink recreation | required | [materialization.md](materialization.md) | naming, ref selection, terminal wording, or state publication cannot affect file content |
 | any: `hydra status`, `head list`, `head status`, `head path`, inventory reads, ahead or behind comparison, read-only consistency reporting | required | [head-inspection.md](head-inspection.md) | no inspection behavior or shared inventory read is involved |
 | any: `hydra head remove`, forced removal, worktree deletion, inventory removal, private-branch preservation, partial-removal recovery | required | [head-removal.md](head-removal.md) | removal and its shared protected workflow cannot be affected |
 | any: `hydra head close`, target integration, native Git merge, conflict continuation or abort, close adapter, removal after integration | required | [head-close.md](head-close.md) | close and integration cannot be affected |
@@ -26,11 +27,14 @@ Rust engineering rules.
 
 - Add [../product/ROUTER.md](../product/ROUTER.md) for user-visible behavior or safety guarantees.
 - Add [../development/ROUTER.md](../development/ROUTER.md) for every Rust implementation, test, dependency, quality-gate, commit, or release concern.
+- Resolve every selected leaf's explicit inherited product defaults once.
 - Select every matching architecture leaf. Command workflows may share inventory, configuration, storage, or protected-removal boundaries.
 
 ## Routing examples
 
 - Positive: changing repair adoption selects `repair.md` because it mutates reconciliation behavior.
+- Positive: changing blob streaming selects `materialization.md`; select creation
+  as well when transaction ordering or propagated failure behavior changes.
 - Negative: editing release prose skips `repair.md` when repair behavior and guidance are unchanged.
 - Cumulative: changing removal used by close selects both `head-removal.md` and `head-close.md`.
 

@@ -10,6 +10,19 @@ Read this leaf when a task changes Head integration, target validation, native
 Git merge behavior, conflict continuation or abort, close adapters, or removal
 after integration.
 
+Skip when neither the stated workflow nor a shared boundary it depends on can
+be affected. A nearby command name alone does not select this leaf.
+
+## Inherited defaults
+
+Load these product contracts before interpreting the implementation rules:
+
+- [lifecycle](../product/lifecycle.md)
+- [state-and-recovery](../product/state-and-recovery.md)
+
+The local rules extend those contracts with implementation constraints. Safety
+summaries retain local visibility; the linked product rules own product policy.
+
 ## Purpose
 
 This document defines the implemented close workflow:
@@ -145,6 +158,11 @@ Close command completed for Head payment; Head removed
 ---
 
 ## Verification Contract
+
+Implementation evidence: `crates/hydra-core/src/head/close.rs`. CLI integration evidence: `head_close`
+test targets under `crates/hydra-cli/tests/`. Run the affected targets with
+`cargo test -p hydra-cli --test <target>` and inspect the observable results below.
+A listed test contract is not evidence that every platform passed in this task.
 
 Disposable integration tests prove:
 

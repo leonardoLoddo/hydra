@@ -25,19 +25,19 @@ documentation maintenance or verification.
 
 | Concern | Meaning | Excludes |
 |---|---|---|
-| Product | Product identity, supported scope, Head semantics, user-visible contracts, safety guarantees, and roadmap boundaries | Implementation structure and engineering workflow |
-| Architecture | Implemented crate boundaries, Git and filesystem workflows, persistence, rollback, inspection, repair, and command internals | Product policy not yet represented in implementation |
+| Product | Product identity, supported scope, Head semantics, configuration and overlays, storage and platforms, lifecycle, state and recovery, CLI interaction, and separate roadmap proposals | Implementation structure and engineering workflow |
+| Architecture | Implemented crate boundaries, independently selected materialization mechanics, Git and filesystem workflows, persistence, rollback, inspection, repair, and command internals | Product policy not yet represented in implementation |
 | Development | Rust and TDD rules, commit conventions, releases, distribution, and the installable Hydra Agent Skill | Product and architecture contracts owned by their domains |
-| Governance | LibrAIrian adoption, routing, authoring, ownership, audits, upgrades, and knowledge-impact maintenance | Ordinary implementation after all affected project routes are selected |
+| Governance | LibrAIrian adoption, routing, authoring, ownership, audits, upgrades, and knowledge-impact maintenance | Initial implementation investigation before knowledge maintenance or completion |
 
 ## Routes
 
 | Conditions | Priority | Read | Skip when |
 |---|---|---|---|
-| any: product identity, Head lifecycle or semantics, supported scope or platform, user-visible behavior, safety guarantee, roadmap boundary | required | [product/ROUTER.md](product/ROUTER.md) | the task is purely internal and cannot affect product behavior or scope |
+| any: product identity, Head lifecycle or semantics, configuration or overlay policy, storage or platform, state or recovery, CLI interaction, compatibility, safety guarantee, roadmap boundary | required | [product/ROUTER.md](product/ROUTER.md) | the task is purely internal and cannot affect product behavior or scope |
 | any: crate boundary, Git or filesystem workflow, initialization, Head command internals, storage, persistence, rollback, inspection, or repair | required | [architecture/ROUTER.md](architecture/ROUTER.md) | the task changes only product policy or engineering process |
-| any: Rust code or test, bug fix, refactor, dependency, quality gate, commit or history operation, release or distribution, Hydra Agent Skill | required | [development/ROUTER.md](development/ROUTER.md) | the task changes only product policy or human documentation |
-| any: protocol adoption, router or leaf change, knowledge authoring or review, audit, upgrade, fallback operation, knowledge-impact check | required | [governance/ROUTER.md](governance/ROUTER.md) | ordinary implementation after every affected knowledge route is selected |
+| any: implementation task, repository change, engineering workflow, Rust code or test, bug fix, refactor, dependency, quality gate, commit or history operation, release or distribution, Hydra Agent Skill | required | [development/ROUTER.md](development/ROUTER.md) | read-only consultation with no repository change or engineering decision |
+| any: implementation completion, protocol adoption, router or leaf change, knowledge authoring or review, audit, upgrade, fallback operation, knowledge-impact check | required | [governance/ROUTER.md](governance/ROUTER.md) | initial implementation investigation before knowledge maintenance or completion |
 
 ## Cross-context composition
 
@@ -68,7 +68,6 @@ scope, request an explicit decision.
 
 ## Verification
 
-Validate `.agents/skills/librairian/` and `skills/hydra/` with the Agent Skill
-validator. Run concrete Markdown link checks, YAML parsing, and `git diff
---check`. Exercise at least one positive, near-miss, cumulative, and
-knowledge-maintenance routing case for routing changes.
+Follow the Governance validation route for structural checks, routing cases,
+semantic evidence, inheritance, and skill-unavailable fallback verification.
+Read-only consultation does not require an audit of unrelated knowledge.

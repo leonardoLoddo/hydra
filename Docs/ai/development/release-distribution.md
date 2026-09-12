@@ -33,14 +33,12 @@ The intended audience remains a small group of colleagues who can exercise
 preview releases and report platform, installation, upgrade, and workflow
 defects before broader promotion.
 
-Version `1.0.0` begins Hydra's 1.x SemVer compatibility line for the documented
-core. From that release onward, incompatible changes to documented CLI,
-configuration, persisted-state, or Head-lifecycle contracts require a new
-major version. This compatibility baseline does not by itself end the public
-preview: preview status records the remaining need for direct field evidence
-on clean supported systems and real projects, while SemVer governs the
-contracts already published. Promotion beyond preview is therefore a separate
-reviewed product decision rather than a side effect of release automation.
+## Inherited defaults
+
+Load the compatibility and maturity contract in
+[../product/hydra-mvp-context.md](../product/hydra-mvp-context.md#compatibility-and-maturity).
+The release procedure extends it: a 1.x release preserves published core contracts,
+and release automation does not independently promote preview maturity.
 
 The source repository remains `leonardoLoddo/hydra`. The executable remains
 named `hydra`.
@@ -368,3 +366,13 @@ The following external evidence is still required before broader promotion:
   it beyond preview support;
 - verify the real Homebrew upgrade path from the previous published Formula to
   the current Formula on a clean preview machine.
+
+## Evidence and verification
+
+Inspect `.github/workflows/`, `release-please-config.json`, `version.txt`,
+`Cargo.toml`, `Cargo.lock`, `scripts/`, and `crates/hydra-cli/src/skill.rs` before
+changing distribution. Run `bash scripts/test-release-tooling.sh` and, for native
+Windows packaging changes, `scripts/test-windows-release-tooling.ps1` in PowerShell.
+Inspect actual workflow artifacts to verify version agreement, archive contents, checksums,
+Formula generation, and ordered publication. External host documentation is a
+review trigger, not a substitute for discovery on the supported host build.

@@ -65,8 +65,9 @@ When adding, renaming, moving, or removing a document:
 
 1. update the **Routes** table;
 2. update consultation rules when ownership changes;
-3. update the parent router at
-   [`../ai/ROUTER.md`](../ai/ROUTER.md);
+3. update the English index and Italian guide when their navigation changes;
+   update the AI macro-router only if its own boundary changes, because this
+   human-documentation domain is outside the active AI knowledge graph;
 4. verify every relative link and command example.
 
 Do not store implementation notes, task logs, or speculative command syntax in

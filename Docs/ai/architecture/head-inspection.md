@@ -10,6 +10,20 @@ Read this leaf when a task changes `hydra status`, `hydra head list`, `hydra
 head status`, `hydra head path`, inventory reads, Git comparison, or
 consistency reporting.
 
+Skip when neither the stated workflow nor a shared boundary it depends on can
+be affected. A nearby command name alone does not select this leaf.
+
+## Inherited defaults
+
+Load these product contracts before interpreting the implementation rules:
+
+- [lifecycle](../product/lifecycle.md)
+- [state-and-recovery](../product/state-and-recovery.md)
+- [cli-contract](../product/cli-contract.md)
+
+The local rules extend those contracts with implementation constraints. Safety
+summaries retain local visibility; the linked product rules own product policy.
+
 ## Purpose
 
 This document defines the implemented read-only model behind:
@@ -22,7 +36,7 @@ hydra head path <name>
 ```
 
 The user-visible scope remains authoritative in
-[`../product/hydra-mvp-context.md`](../product/hydra-mvp-context.md). Head
+[lifecycle.md](../product/lifecycle.md). Head
 creation and state publication remain owned by
 [`head-creation.md`](head-creation.md).
 
@@ -151,6 +165,11 @@ Consistency checks currently cover:
 ---
 
 ## Verification Contract
+
+Implementation evidence: `crates/hydra-core/src/head/inspection.rs`. CLI integration evidence: `head_inspection`
+test targets under `crates/hydra-cli/tests/`. Run the affected targets with
+`cargo test -p hydra-cli --test <target>` and inspect the observable results below.
+A listed test contract is not evidence that every platform passed in this task.
 
 CLI integration tests use disposable Git repositories and prove:
 

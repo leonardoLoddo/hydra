@@ -7,8 +7,24 @@
 ## Consult when
 
 Read this leaf when a task changes Head naming, base or target resolution,
-private branches, worktree registration, overlay materialization, locking,
-creation rollback, or cleanup.
+private branches, worktree registration, materialization transaction ordering,
+locking, creation rollback, or cleanup. Isolated file-content mechanics are
+selected separately through the architecture router.
+
+Skip when neither the stated workflow nor a shared boundary it depends on can
+be affected. A nearby command name alone does not select this leaf.
+
+## Inherited defaults
+
+Load these product contracts before interpreting the implementation rules:
+
+- [lifecycle](../product/lifecycle.md)
+- [configuration-and-overlays](../product/configuration-and-overlays.md)
+- [storage-and-platforms](../product/storage-and-platforms.md)
+- [state-and-recovery](../product/state-and-recovery.md)
+
+The local rules extend those contracts with implementation constraints. Safety
+summaries retain local visibility; the linked product rules own product policy.
 
 ## Purpose
 
@@ -21,7 +37,7 @@ hydra head create <name> [--from <ref>] [--target <ref>]
 It owns the implemented orchestration, Git and filesystem boundaries,
 materialization rules, state transaction, and rollback behavior. The intended
 user-visible contract remains authoritative in
-[`../product/hydra-mvp-context.md`](../product/hydra-mvp-context.md).
+[lifecycle.md](../product/lifecycle.md).
 
 An implementation gap recorded here does not relax the product requirement.
 
@@ -338,138 +354,13 @@ worktree or directory are preserved.
 
 ---
 
-## Tracked Materialization
+## Materialization dependency
 
-The expected tracked entries and blob identities come from:
-
-```text
-git ls-tree -r -z --full-tree <baseCommit>
-```
-
-Hydra reads this tree once during preparation and retains the validated entries
-for materialization and overlay-collision checks.
-
-Before creating the worktree, Hydra checks whether the source working tree's
-tracked state matches `baseCommit`:
-
-```text
-git diff --quiet --no-ext-diff <baseCommit> --
-```
-
-When it matches, existing regular working files are safe content sources for
-that exact commit. Hydra validates that each source is a regular file below
-the canonical repository root and attempts a direct CoW clone into the Head.
-This both avoids redundant Git decompression and shares the source file's
-physical blocks. Untracked files do not disable the fast path. A tracked
-change disables it for the complete pass, so uncommitted tracked edits are
-never used as the starting content of a new Head. Missing or non-clonable
-sources fall back to the blob path below, and final clean-worktree verification
-detects a concurrent source change.
-
-Blob fallback uses one lazy, persistent:
-
-```text
-git cat-file --batch
-```
-
-process for the complete materialization pass rather than one Git process per
-entry. Every request is a validated full SHA-1 or SHA-256 object ID. Each
-response must echo that ID, declare type `blob`, provide a valid size, contain
-exactly that many payload bytes, and end with the protocol newline. Regular
-payloads are streamed with a fixed-size buffer; tracked symlink payloads use
-the same reader without altering their bytes. The child error stream is
-drained with bounded capture, unsuccessful exits are reported, and unfinished
-readers terminate and wait for their child defensively.
-
-For a regular entry that needs blob fallback, Hydra streams into a uniquely
-named temporary file in the Heads directory and:
-
-1. creates parent directories;
-2. attempts a native CoW clone from the temporary blob in `auto` mode;
-3. uses an exclusive full copy when cloning is unavailable or `copy` mode was
-   selected;
-4. synchronizes copied bytes;
-5. applies the executable bit represented by Git mode;
-6. removes the exact temporary blob.
-
-Mutable hard links are never used.
-
-On Unix, tracked Git symlinks are recreated from their blob payload. On
-non-Unix platforms they currently fail as unsupported tracked entries.
-Submodule entries create their worktree directory but do not initialize or
-fetch submodule content.
-
-Every Git tree path must consist only of normal relative components. Unknown
-Git modes and unsafe paths abort creation.
-
----
-
-## Overlay Planning and Materialization
-
-Overlay files always come from the working tree in which the command runs,
-while tracked files come from `baseCommit`.
-
-The planner:
-
-1. reads `overlay.copy` in order;
-2. expands `... <relative-file>` in place;
-3. applies Gitignore matching semantics, including negation and precedence;
-4. walks only existing entries below the canonical repository root;
-5. records each selected entry's logical size and any symlink target;
-6. sorts selected relative paths for deterministic materialization;
-7. computes regular-file identities with bounded
-   `git hash-object --no-filters --` argument batches executed by at most eight
-   workers, then restores the original path order;
-8. retries an argument batch as smaller ordered halves if the operating system
-   reports an argument-list limit;
-9. in `auto` mode, probes every regular-file source against the Heads volume
-   and records the exact files that need full-copy fallback; in `copy` mode,
-   marks every regular overlay for the same confirmation without probing.
-
-An absent expanded rules file contributes no rules. An existing expanded file
-must be a regular file at a safe relative path.
-
-Overlay protection rejects:
-
-- `.git` and everything below it;
-- special files;
-- absolute, broken, or escaping overlay symlinks;
-- a selected path that would overwrite a tracked entry;
-- an included rules path that is absolute or contains non-normal components;
-- a source that no longer resolves inside the repository at materialization
-  time.
-
-Initial planning reports all selected unsafe symlinks together so the CLI can
-offer their exact persistent exclusions. If that repair is not explicitly
-authorized, the protection remains a rejection and no Head artifact is
-created. Safe relative symlinks continue through normal materialization and
-are never proposed for exclusion.
-
-Parent directories are deduplicated and created before regular-file
-materialization. Each source is then revalidated immediately before use. Hydra
-uses the same CoW-first, exclusive-copy fallback as tracked regular files, but
-performs the fallback only after explicit confirmation. It preserves
-permissions, then hashes every materialized destination in bounded parallel
-batches and compares it with the identity captured during planning. A source
-change that affects the copied payload therefore aborts instead of publishing
-a partial Head. A later source removal or edit does not invalidate a
-destination that already matches the planned identity and has been isolated by
-CoW.
-
-On Unix, a selected symlink is accepted only when its stored target is relative
-and its resolved source remains inside the canonical project root. Regular
-overlay files are materialized first; Hydra then recreates the symlink with the
-same target text instead of dereferencing it. It re-reads the source target
-immediately before creation and verifies afterward that the materialized link
-resolves inside the canonical Head root. This supports dependency launchers
-such as `node_modules/.bin` and `vendor/bin` without linking a Head back to the
-source workspace. Symlinks remain unsupported on non-Unix platforms.
-
-The final `git status --porcelain` must be empty. This proves that tracked
-materialization matches the index and that selected overlays remain ignored by
-the effective Git rules.
-
----
+Load [materialization.md](materialization.md) when changing creation's file-content
+phase. It owns tracked content reuse, persistent blob reads, overlay matching,
+content verification, per-file clone probes, permissions, and symlink mechanics.
+Creation MUST preserve their error propagation and final clean-worktree verification
+before publishing inventory; those phases cannot be skipped to simplify rollback.
 
 ## State Publication and Rollback
 
@@ -516,6 +407,11 @@ would make the already-published state inconsistent.
 ---
 
 ## Verification Contract
+
+Implementation evidence: `crates/hydra-core/src/head.rs`. CLI integration evidence: `head_create_success`, `head_create_conflicts`, `head_create_overlay_failures`, and `head_create_state_failures`
+test targets under `crates/hydra-cli/tests/`. Run the affected targets with
+`cargo test -p hydra-cli --test <target>` and inspect the observable results below.
+A listed test contract is not evidence that every platform passed in this task.
 
 CLI integration tests use unique temporary directories and real disposable Git
 repositories. Current coverage proves:
@@ -592,7 +488,7 @@ cargo test --release -p hydra-cli \
 
 ## Known Implementation Gaps
 
-1. **Cross-Head content-source reuse.** Tracked files can reuse the invoking
+1. **Cross-Head content-source reuse.** Tracked files can reuse the canonical parent
    working tree when its tracked state matches `baseCommit`, while overlays
    clone from that same workspace. Hydra does not yet search existing Heads or
    a persistent content cache for another matching source.

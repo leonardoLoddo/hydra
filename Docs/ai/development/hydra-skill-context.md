@@ -51,54 +51,19 @@ must not own workflow or safety behavior that other compatible agents need.
 
 ---
 
-## Distribution Direction
+## Distribution ownership
 
-The repository artifact is the single source used by every future distribution
-channel. Hydra must eventually make the skill easy to download, install,
-update, publish, and remove across compatible AI-agent hosts without requiring
-users to reconstruct the directory manually.
-
-Provider plugins, marketplaces, extensions, archives, package-manager entries,
-and installers are distribution adapters. They must not fork `SKILL.md` or
-become independent behavior specifications. Each adapter must identify the
-canonical skill version, preserve provenance, validate the installed artifact,
-and document host-specific discovery and refresh behavior.
-
-A future interactive Hydra installer must ask whether the user wants to install
-the skill. It must not silently place the skill alongside the CLI, and the
-prompt must make the applicable destination clear before copying the artifact.
-
-Do not claim a provider or installation channel as supported until its package,
-installation procedure, update path, and representative activation workflow
-have been verified on that host. Keep unavailable channels explicitly planned.
-
-Hydra currently provides lifecycle adapters for Codex, Gemini CLI,
-Antigravity CLI, and the Antigravity app. They install the same canonical
-artifact at `$HOME/.agents/skills/hydra`, `$HOME/.gemini/skills/hydra`,
-`$HOME/.gemini/antigravity-cli/skills/hydra`, and
-`$HOME/.gemini/config/skills/hydra`, respectively. The destinations are
-independent; provider-specific manifests prevent one adapter from claiming
-another copy.
-
-Host discovery can overlap without changing adapter ownership. Gemini CLI also
-recognizes `$HOME/.agents/skills`, so it may discover the Codex adapter's copy.
-This can eliminate the need for a second Gemini installation, but lifecycle
-commands must still select `codex` for that destination. AGY and the
-Antigravity app retain separate global discovery paths.
-
-Google's current Antigravity CLI references disagree on the global skill
-payload: the CLI reference describes flat Markdown files, while the official
-Antigravity Skills Codelab copies folder-based skills containing `SKILL.md`.
-The `agy` adapter follows the folder-based Codelab contract so Hydra can keep
-its portable resources together. Release qualification must exercise discovery
-with an installed `agy` binary before treating that packaging detail as
-runtime-verified.
-
----
+Load [release-distribution.md](release-distribution.md) when changing provider
+adapters, personal installation destinations, manifests, opt-in installation,
+release archives, or host qualification. That leaf canonically owns distribution
+policy; this leaf owns the vendor-neutral instructional artifact and its
+synchronization with Hydra behavior. Distribution adapters MUST project the same
+artifact rather than fork instructions for each vendor.
 
 ## Authoritative Inputs
 
-Derive the skill from the normal Hydra source-of-truth order. In particular:
+Separate approved product and workflow authority from implementation evidence.
+Derive the skill through these relationships:
 
 1. routed product documentation defines scope and safety invariants;
 2. the maintained granular English guide and Italian guide define supported

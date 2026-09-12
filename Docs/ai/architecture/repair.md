@@ -10,6 +10,18 @@ Read this leaf when a task changes inventory reconciliation, recovery records,
 stale or missing worktrees, abandoned locks, guided repairs, or report-only
 inconsistencies.
 
+Skip when neither the stated workflow nor a shared boundary it depends on can
+be affected. A nearby command name alone does not select this leaf.
+
+## Inherited defaults
+
+Load these product contracts before interpreting the implementation rules:
+
+- [state-and-recovery](../product/state-and-recovery.md)
+
+The local rules extend those contracts with implementation constraints. Safety
+summaries retain local visibility; the linked product rules own product policy.
+
 ## Purpose
 
 This document defines the implemented reconciliation workflow:
@@ -21,7 +33,7 @@ hydra repair
 The command compares Hydra's local inventory with Git's registered worktrees,
 their symbolic branches, the managed filesystem paths, and private branch
 refs. Product intent remains authoritative in
-[`../product/hydra-mvp-context.md`](../product/hydra-mvp-context.md).
+[state-and-recovery.md](../product/state-and-recovery.md).
 
 ---
 
@@ -236,6 +248,11 @@ Declining every prompt leaves Git, filesystem, inventory, and refs unchanged.
 ---
 
 ## Verification Contract
+
+Implementation evidence: `crates/hydra-core/src/head/repair.rs`. CLI integration evidence: `repair`
+test targets under `crates/hydra-cli/tests/`. Run the affected targets with
+`cargo test -p hydra-cli --test <target>` and inspect the observable results below.
+A listed test contract is not evidence that every platform passed in this task.
 
 Disposable-repository tests prove:
 
