@@ -18,8 +18,8 @@ documentation authoring, audits, upgrades, and fallback operation when the
 - Portable fallback: this document
 - Canonical upstream: `https://github.com/leonardoLoddo/librairian`
 
-The checked-in skill MUST remain a complete, validated copy of one approved
-LibrAIrian Protocol release. Upgrade the skill, fallback protocol, protocol
+The checked-in skill MUST remain a complete, validated copy of the user-approved
+LibrAIrian Protocol distribution. Upgrade the skill, fallback protocol, protocol
 version, and affected routing mechanics together.
 
 ## Operating rules
@@ -28,15 +28,17 @@ version, and affected routing mechanics together.
    concerns.
 2. Follow every applicable route. Routing is cumulative.
 3. Read required knowledge before making project-specific decisions.
-4. Combine selected knowledge with targeted implementation evidence.
-5. Separate normative authority from descriptive evidence and report
+4. Resolve explicit inherited-default dependencies and apply only documented
+   exceptions or overrides.
+5. Combine selected knowledge with targeted implementation evidence.
+6. Separate normative authority from descriptive evidence and report
    conflicts.
-6. Routers select; leaves explain.
-7. Every active leaf has one canonical owner.
-8. Persist only verified or explicitly uncertain knowledge that is reusable,
+7. Routers select; leaves explain.
+8. Every active leaf has one canonical owner.
+9. Persist only verified or explicitly uncertain knowledge that is reusable,
    non-obvious, durable, and worth its cost.
-9. Update affected knowledge and routes in the same change as implementation.
-10. Perform the knowledge-impact check before completing every implementation
+10. Update affected knowledge and routes in the same change as implementation.
+11. Perform the knowledge-impact check before completing every implementation
     task.
 
 ## Authority and evidence
@@ -63,6 +65,12 @@ empty sections.
 Use canonical domain terms and exact code identifiers. Each durable rule has
 one canonical owner. Link instead of copying rules.
 
+Prefer structural compression over cryptic wording. Keep shared defaults in
+leaves with explicit applicability. Dependent leaves MUST name and link the
+canonical default, and selected context MUST include it. Exceptions identify
+the default and scope; overrides explicitly replace or extend it. Never infer
+exceptions from implementation. Keep enough safety-critical context locally.
+
 Create a leaf only when it has a distinct consultation trigger, coherent
 scope, independent lifecycle, and future value greater than its context and
 maintenance cost. Split by semantic trigger, not line count. Merge material
@@ -86,6 +94,6 @@ knowledge update required` is valid only with a concrete reason.
 
 ## Validation
 
-Validate affected files, links, reachability, canonical ownership, route
+Validate affected files, links, reachability, canonical ownership, inherited-default dependencies, route
 behavior, and changed claims against current evidence. Structural checks do
 not prove semantic truth, freshness, or route completeness.

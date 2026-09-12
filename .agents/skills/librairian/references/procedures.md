@@ -84,8 +84,9 @@ For each valuable artifact:
 2. Route valuable existing documents before rewriting them.
 3. Introduce only domains with distinct triggers.
 4. Consolidate duplicate rules without losing project-specific exceptions.
-5. Mark historical and proposed material explicitly.
-6. Add the instruction-file trigger only after the fallback path works.
+5. Extract stable repeated rules as defaults only when applicability is verified and deviations remain explicit.
+6. Mark historical and proposed material explicitly.
+7. Add the instruction-file trigger only after the fallback path works.
 
 Do not attempt an exhaustive rewrite during initial adoption.
 
@@ -104,8 +105,9 @@ Use for every implementation task in an adopted repository.
 3. Map the task to every relevant concern.
 4. Traverse matching routes once each.
 5. Read required leaves.
-6. Load other priorities only when conditions hold.
-7. Inspect targeted implementation evidence.
+6. Resolve explicit inherited-default dependencies and applicable exceptions or overrides.
+7. Load other priorities only when conditions hold.
+8. Inspect targeted implementation evidence.
 
 ### Resolve knowledge during work
 
@@ -149,6 +151,9 @@ Trace from the macro-router and identify:
 - unreachable active artifacts;
 - duplicate canonical owners;
 - cycles or repeated traversal;
+- missing, cyclic, or ambiguous inherited-default relationships;
+- exceptions that do not identify the default or applicability they modify;
+- overrides that do not state whether they replace or extend;
 - stale paths;
 - routers containing leaf knowledge;
 - leaves registered without triggers or skip conditions.

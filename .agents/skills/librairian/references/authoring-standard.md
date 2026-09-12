@@ -226,6 +226,37 @@ Keep rationale adjacent to its rule. Do not repeat general motivation in every l
 
 Examples MUST clarify a boundary and MUST NOT introduce undeclared requirements.
 
+## Defaults and exceptions
+
+LibrAIrian prefers structural compression over semantic compression. Preserve the precise language of each rule. Remove repeated copies by defining stable shared behavior once and documenting intentional deviations.
+
+Use a default only when the shared rule:
+
+- applies unchanged across multiple narrower scopes;
+- has explicit applicability;
+- is stable enough to remain the common case;
+- has fewer and clearer exceptions than inherited cases;
+- reduces duplication without hiding necessary local context.
+
+Do not infer a default from repeated examples or similar implementation. Verify the rule and assign it one canonical owner.
+
+When another leaf owns the default, name the default and link its canonical source under `Inherited defaults`. The route or leaf dependency MUST cause that source to enter the selected context. Keep inheritance shallow enough that an agent can inspect the effective rule without reconstructing a long chain.
+
+For each exception or override, state:
+
+1. the default it modifies;
+2. its applicability;
+3. whether it replaces the inherited rule or extends it;
+4. the complete local rule;
+5. rationale when the deviation is surprising, risky, or likely to be challenged;
+6. exceptional-path verification when relevant.
+
+Do not invent exceptions for unusual cases. If two applicable defaults conflict without an explicit relationship, mark the knowledge ambiguous and resolve its authority before presenting either rule as current.
+
+For security, authorization, persistence, financial, destructive, or externally visible behavior, repeat the minimum safety-critical context locally and name the canonical default. This deliberate redundancy is preferable to an unsafe interpretation.
+
+Do not extract a default merely to save a few tokens. Keep behavior local when it changes frequently, has many exceptions, or becomes harder to understand through inheritance.
+
 ## Exceptions and failure behavior
 
 Document:
@@ -318,6 +349,9 @@ Before completion, verify:
 - canonical terms match domain and code;
 - normative strength is unambiguous;
 - conditions, exceptions, failure behavior, and prohibitions are explicit;
+- defaults have explicit applicability and are not inferred from repetition;
+- exceptions name the default they modify and overrides state `replaces` or `extends`;
+- inherited high-risk rules retain enough local context for safe interpretation;
 - vague language and synonym drift are removed.
 
 ### Granularity and context
@@ -325,6 +359,8 @@ Before completion, verify:
 - the leaf has an independent selection boundary;
 - always-co-selected material is not fragmented without reason;
 - repeated rules use canonical references;
+- inherited-default dependencies are explicit, shallow, and included by routing;
+- defaults remain in leaves rather than turning routers into rule owners;
 - routers contain selection logic, not leaf detail;
 - required content remains available under context constraints.
 

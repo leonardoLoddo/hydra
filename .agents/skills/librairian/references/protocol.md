@@ -26,6 +26,11 @@ Use these terms consistently:
 | concern | A behavior, responsibility, or risk recognizable in a task |
 | domain router | A router that selects knowledge inside a semantic boundary |
 | knowledge leaf | One coherent independently selectable knowledge unit |
+| structural compression | Removal of repeated rule copies through explicit scoped defaults and deviations without shortening their semantic content |
+| default | Stable shared rule inherited by declared narrower scopes |
+| applicability | Explicit scope in which a default, exception, or override governs behavior |
+| exception | Intentional scoped deviation from a named or structurally adjacent default |
+| override | Local rule that explicitly replaces an inherited rule or extends it with additional constraints |
 | consultation trigger | Positive condition requiring a route or leaf |
 | skip condition | A plausible near-match that does not require the route or leaf |
 | canonical owner | The only router responsible for registering a leaf |
@@ -105,10 +110,11 @@ The agent MUST:
 4. follow every matching route;
 5. traverse each router at most once;
 6. collect the union of selected leaves;
-7. read `required` knowledge before project-specific decisions;
-8. load `recommended` and `reference` knowledge only when its conditions hold;
-9. inspect relevant implementation evidence;
-10. report material conflicts or unresolved ambiguity.
+7. resolve every explicit inherited-default dependency of those leaves;
+8. read `required` knowledge before project-specific decisions;
+9. load `recommended` and `reference` knowledge only when its conditions hold;
+10. inspect relevant implementation evidence;
+11. report material conflicts or unresolved ambiguity.
 
 Routing is cumulative. No router MAY stop traversal merely because one route matched.
 
@@ -159,6 +165,34 @@ A leaf MUST:
 A leaf MUST NOT narrate source code, preserve task history, duplicate generic framework guidance, contain secrets or personal data, or encode speculation as fact.
 
 Detailed language, quality, and granularity rules are canonical in [authoring-standard.md](authoring-standard.md).
+
+## Structural compression
+
+LibrAIrian prefers structural compression over semantic compression. Authors SHOULD remove repeated rule copies by declaring stable shared behavior once. They MUST NOT make individual rules cryptic merely to reduce tokens.
+
+A default:
+
+- MUST state or inherit clear applicability;
+- SHOULD govern multiple narrower scopes without modification;
+- MUST remain a leaf rule, not routing detail;
+- MUST NOT be inferred from repetition, examples, or current implementation.
+
+A leaf that depends on a default owned elsewhere MUST identify the default and link its canonical source. The selected context MUST include that source. Repositories MAY mirror these relationships in maintained structured metadata, but optional metadata MUST NOT replace an understandable normative declaration.
+
+An exception MUST identify, by explicit reference or unambiguous adjacent structure, the default it modifies. It MUST state its applicability and contain enough rule context to be interpreted without guessing.
+
+An override MUST state whether it:
+
+- **replaces** the inherited rule within its applicability; or
+- **extends** the inherited rule with additional constraints.
+
+Within the same authority level, apply the most specific applicable documented override or exception before the nearest inherited default, then broader defaults. If applicable defaults conflict and no explicit override relationship resolves them, the knowledge is ambiguous. The agent MUST surface the conflict instead of choosing silently.
+
+Agents MUST NOT invent an exception because a case appears unusual. Descriptive evidence that contradicts an inherited rule is handled through the authority and evidence conflict rule; it does not silently become an exception.
+
+Inheritance SHOULD remain shallow and visible. If exceptions are numerous, unstable, or harder to understand than the inherited cases, authors SHOULD narrow the default or keep the rules local.
+
+Security, authorization, persistence boundaries, financial calculations, destructive operations, and externally visible behavior MAY use defaults. The local leaf MUST restate enough of the safety-critical rule and name its canonical source when inheritance alone would create material interpretation risk.
 
 ## Canonical ownership
 
@@ -228,9 +262,9 @@ Historical material MUST identify its current successor when one exists and MUST
 
 Validation is proportional to the change:
 
-- **structural:** files, links, reachability, ownership, cycles, paths, names, and version;
-- **routing:** representative tasks select all and only expected context;
-- **semantic:** changed claims match approved intent and current evidence;
+- **structural:** files, links, reachability, ownership, cycles, paths, names, version, and inherited-default references;
+- **routing:** representative tasks select all and only expected context, including required inherited defaults;
+- **semantic:** changed claims match approved intent and current evidence, and defaults, applicability, exceptions, and override effects are unambiguous;
 - **operational:** the instruction trigger, skill path, and repository-local fallback work in the real flow.
 
 Structural validation MUST NOT be reported as proof of semantic truth, freshness, routing completeness, or information value.

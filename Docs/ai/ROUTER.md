@@ -16,9 +16,10 @@ documentation maintenance or verification.
 3. Follow every matching route. Routes are cumulative.
 4. Process each router once.
 5. Read required knowledge before recommended or reference material.
-6. Combine selected knowledge with targeted code, tests, configuration,
+6. Resolve explicit inherited-default dependencies of selected leaves.
+7. Combine selected knowledge with targeted code, tests, configuration,
    version-control state, and runtime evidence.
-7. Report material conflicts or unresolved ambiguity.
+8. Report material conflicts or unresolved ambiguity.
 
 ## Controlled concern vocabulary
 

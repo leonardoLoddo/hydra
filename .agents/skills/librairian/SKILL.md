@@ -29,12 +29,13 @@ Read [references/templates.md](references/templates.md) only when installing or 
 2. If `Docs/ai/ROUTER.md` exists, open it before classifying the task against repository concerns.
 3. Follow every applicable route. Routing is cumulative, never first-match.
 4. Read required knowledge before making project-specific decisions. Load recommended and reference material only when its conditions hold.
-5. Combine selected knowledge with targeted code, test, configuration, schema, version-control, and runtime evidence.
-6. Separate normative authority from descriptive evidence. Report material conflicts instead of silently choosing one side.
-7. Persist only verified or explicitly uncertain knowledge that is reusable, non-obvious, durable, canonically owned, and worth its context and maintenance cost.
-8. Routers select. Leaves explain. Cross-links compose knowledge without copying authority.
-9. Preserve approved project policy, unrelated instructions, user authorization boundaries, and existing work.
-10. Do not add speculative capabilities, unapproved tooling, task logs, secrets, personal data, generic framework guidance, or cheaply derivable source structure to project knowledge.
+5. Resolve every explicit inherited-default dependency of the selected leaves. Apply documented local exceptions and overrides; do not infer missing ones.
+6. Combine selected knowledge with targeted code, test, configuration, schema, version-control, and runtime evidence.
+7. Separate normative authority from descriptive evidence. Report material conflicts instead of silently choosing one side.
+8. Persist only verified or explicitly uncertain knowledge that is reusable, non-obvious, durable, canonically owned, and worth its context and maintenance cost.
+9. Routers select. Leaves explain. Cross-links compose knowledge without copying authority.
+10. Preserve approved project policy, unrelated instructions, user authorization boundaries, and existing work.
+11. Do not add speculative capabilities, unapproved tooling, task logs, secrets, personal data, generic framework guidance, or cheaply derivable source structure to project knowledge.
 
 ## Completion contract
 
@@ -46,7 +47,7 @@ When knowledge changes:
 - remove or demote stale knowledge;
 - update affected owning and ancestor routers;
 - apply the authoring quality gate;
-- run repository-provided structural checks and focused routing and semantic verification;
+- run repository-provided structural checks and focused routing, inheritance, and semantic verification;
 - report implementation verification and knowledge verification separately.
 
 `No knowledge update required` is valid only with a concrete reason.

@@ -40,8 +40,9 @@ This is the single entry point for repository-local project knowledge.
 3. Follow every matching route; routes are cumulative.
 4. Process each router once.
 5. Read required knowledge before recommended or reference material.
-6. Combine selected knowledge with targeted implementation evidence.
-7. Report material conflicts or unresolved ambiguity.
+6. Resolve every explicit inherited-default dependency of selected leaves.
+7. Combine selected knowledge with targeted implementation evidence.
+8. Report material conflicts or unresolved ambiguity.
 
 ## Controlled concern vocabulary
 
@@ -120,13 +121,14 @@ Read this document for protocol adoption, routing or knowledge changes, document
 1. Open `Docs/ai/ROUTER.md` before classifying a task against repository concerns.
 2. Follow every applicable route. Routing is cumulative.
 3. Read required knowledge before making project-specific decisions.
-4. Combine selected knowledge with targeted implementation evidence.
-5. Separate normative authority from descriptive evidence and report conflicts.
-6. Routers select; leaves explain.
-7. Every active leaf has one canonical owner.
-8. Persist only verified or explicitly uncertain knowledge that is reusable, non-obvious, durable, and worth its cost.
-9. Update affected knowledge and routes in the same change as implementation.
-10. Perform the knowledge-impact check before completing every implementation task.
+4. Resolve explicit inherited-default dependencies and apply only documented exceptions or overrides.
+5. Combine selected knowledge with targeted implementation evidence.
+6. Separate normative authority from descriptive evidence and report conflicts.
+7. Routers select; leaves explain.
+8. Every active leaf has one canonical owner.
+9. Persist only verified or explicitly uncertain knowledge that is reusable, non-obvious, durable, and worth its cost.
+10. Update affected knowledge and routes in the same change as implementation.
+11. Perform the knowledge-impact check before completing every implementation task.
 
 ## Authority and evidence
 
@@ -142,6 +144,8 @@ Each leaf states status, scope, canonical owner, consultation trigger, applicabl
 
 Use canonical domain terms and exact code identifiers. Each durable rule has one canonical owner. Link instead of copying rules.
 
+Prefer structural compression over cryptic rule wording. Define stable repeated behavior as a scoped default in a knowledge leaf. A leaf that inherits it names and links the canonical default. Each exception identifies the default and applicability; each override says whether it replaces or extends the inherited rule. Do not infer exceptions. Preserve enough local context for high-risk rules.
+
 Create a leaf only when it has a distinct consultation trigger, coherent scope, independent lifecycle, and future value greater than its context and maintenance cost. Split by semantic trigger, not line count. Merge material always selected together.
 
 Remove decorative prose, task history, vague verification, synonym drift, code narration, generic framework behavior, secrets, personal data, and speculation presented as fact.
@@ -156,7 +160,7 @@ Update, move, consolidate, split, demote, or remove affected knowledge. `No know
 
 ## Validation
 
-Validate affected files, links, reachability, canonical ownership, route behavior, and changed claims against current evidence. Structural checks do not prove semantic truth, freshness, or route completeness.
+Validate affected files, links, reachability, canonical ownership, inherited-default references, route behavior, and changed claims against current evidence. Structural checks do not prove semantic truth, freshness, or route completeness.
 ```
 
 ## Domain router
@@ -208,17 +212,37 @@ This router canonically owns: <leaf list>. Update it when owned knowledge is cre
 
 <Only terms needed to avoid ambiguity.>
 
+## Inherited defaults
+
+- `<default-id>` from [<canonical source>](<relative-path>)
+
+<Omit when this leaf has no inherited rule dependencies.>
+
+## Defaults
+
+### `<default-id>`
+
+**Applies to:** <narrower scopes governed by this rule>
+
+<Precise stable shared rule. Omit this section when the leaf owns no defaults.>
+
 ## Rules and invariants
 
-<Normative rules, constraints, and prohibitions.>
+<Normative local rules, constraints, and prohibitions.>
 
 ## Decisions and rationale
 
 <Non-obvious approved intent. Omit if unnecessary.>
 
-## Exceptions and failure behavior
+## Exceptions, overrides, and failure behavior
 
-<Conditions, alternate behavior, rejection, retry, or fallback. Omit if irrelevant.>
+### `<exception-or-override-id>`
+
+**Modifies:** `<default-id>`
+**Applies to:** <narrow scope>
+**Effect:** replaces | extends
+
+<Complete local rule, alternate behavior, rejection, retry, or fallback. Add rationale and exceptional-path verification when useful. Omit this section if irrelevant.>
 
 ## Change impact
 
@@ -251,6 +275,8 @@ expected_routers:
   - Docs/ai/<domain>/ROUTER.md
 expected_required_leaves:
   - Docs/ai/<domain>/<leaf>.md
+expected_inherited_defaults:
+  - Docs/ai/<domain>/<defaults-leaf>.md#<default-id>
 excluded_leaves:
   - Docs/ai/<other>/<unrelated>.md
 rationale: <why the selection is complete and minimal>
