@@ -224,14 +224,14 @@ Release automation builds native archives for:
 
 Release automation is configured to verify Homebrew installation on both
 macOS and Linux architectures before updating the tap. WSL 2 uses the Linux
-Formula and remains preview evidence to exercise directly with a colleague;
-native Windows is tested with Git for Windows and Git Bash. Windows artifacts
-are published as both a versioned ZIP and the stable
+Formula and has been exercised directly during preview validation; native
+Windows has been exercised on Windows 11 with Git for Windows and Git Bash.
+Windows artifacts are published as both a versioned ZIP and the stable
 `hydra-windows-x86_64.zip` download. WSL 1 is not supported.
 
 The current Formula includes native archive metadata for Linux. WSL 2 uses
-that Linux Formula, while direct end-to-end WSL evidence remains part of the
-preview validation.
+that Linux Formula; its end-to-end Homebrew workflow has been directly
+exercised during preview validation.
 
 The preview build baseline is macOS 11 or newer, Linux distributions with
 glibc 2.35 or newer (including Ubuntu 22.04 or newer), and Windows 11 x86-64.

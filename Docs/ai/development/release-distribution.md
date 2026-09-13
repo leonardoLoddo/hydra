@@ -27,8 +27,9 @@ URLs for both macOS and Linux on ARM64 and x86-64. WSL 2 consumes the Linux
 Formula. Starting with `v0.2.0`, releases also publish native Windows x86-64 as
 a versioned checksummed ZIP containing `hydra.exe` and as the stable
 `hydra-windows-x86_64.zip` download. Release automation exercises that channel
-with Git for Windows and Git Bash. Direct clean-machine Windows and end-to-end
-WSL evidence remain part of preview validation.
+with Git for Windows and Git Bash. Direct preview validation has also exercised
+a clean installation without Rust, the published Windows ZIP on Windows 11
+through Git for Windows and Git Bash, and the complete Homebrew workflow on WSL 2.
 The intended audience remains a small group of colleagues who can exercise
 preview releases and report platform, installation, upgrade, and workflow
 defects before broader promotion.
@@ -159,8 +160,10 @@ application.
 
 A new provider or installation channel MUST NOT be described as supported until
 its package, installation procedure, update path, and representative activation
-workflow have been verified on that host. Keep unavailable channels explicitly
-planned and retain visible qualification gaps for existing preview adapters.
+workflow have been verified on that host. Representative installation,
+discovery, and activation have been exercised directly for Codex, Gemini CLI,
+Antigravity CLI, and the Antigravity app. Keep unavailable channels explicitly
+planned and revalidate an existing adapter when its host contract changes.
 
 ## Agent Skill Packaging
 
@@ -191,9 +194,9 @@ restart the app when a new or updated skill is not visible.
 The Antigravity CLI reference currently describes flat Markdown files while
 Google's Antigravity Skills Codelab demonstrates folder-based `SKILL.md`
 packages in the same global root. Hydra follows the Codelab layout to preserve
-the canonical portable package. Release verification must test that layout
-with the supported `agy` build and report the result; documentation must not
-silently imply that local runtime evidence exists when it does not.
+the canonical portable package. Direct discovery and activation have been
+exercised with the supported `agy` host. Release verification must revalidate
+that layout when the supported host contract changes.
 
 Skill installation must:
 
@@ -359,16 +362,6 @@ supported merely because a binary can start there.
 
 The following external evidence is still required before broader promotion:
 
-- verify a clean colleague installation without Rust;
-- install that published stable Windows ZIP on a clean Windows 11 x86-64
-  machine without Rust, verify its SHA-256 checksum and user `PATH`, and run the
-  native executable through Git for Windows and Git Bash. The real end-to-end
-  exercise must use disposable repositories in a dedicated directory and
-  cover initialization, Head creation and inspection, storage diagnostics,
-  working-tree isolation, integration or protected removal, and final Git and
-  filesystem state;
-- exercise the complete Homebrew workflow directly on WSL 2 before promoting
-  it beyond preview support;
 - verify the real Homebrew upgrade path from the previous published Formula to
   the current Formula on a clean preview machine.
 
