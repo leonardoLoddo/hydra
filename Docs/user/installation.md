@@ -236,3 +236,9 @@ versioned completion script into a personal directory.
 
 Read [Core concepts](concepts.md), then initialize a disposable or backed-up
 repository using [Head workflows](head-workflows.md).
+
+If `hydra init` is interrupted, rerun the same command. Hydra uses a locked
+local journal to resume only missing initialization artifacts and refuses
+changed or unexpected state. Do not delete partial directories or local
+metadata manually; see
+[Recovery and troubleshooting](recovery-and-troubleshooting.md).

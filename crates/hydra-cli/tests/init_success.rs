@@ -160,6 +160,7 @@ fn init_defaults_to_the_current_directory() {
     assert!(repository.join(".hydra.json").is_file());
     assert!(directory.path().join("SampleProject.heads").is_dir());
     assert!(repository.join(".git/hydra/project.json").is_file());
+    assert!(!repository.join(".git/hydra-init.json").exists());
     assert!(
         directory
             .path()
@@ -224,6 +225,54 @@ fn init_recovers_configuration_for_the_same_owned_heads_directory() {
         "recovered installation should be usable, stderr: {}",
         String::from_utf8_lossy(&status.stderr)
     );
+}
+
+#[test]
+fn init_resumes_an_exact_interrupted_initialization_journal() {
+    let directory = TestDirectory::new("resume-interrupted-init");
+    let repository = create_initialized_project(&directory);
+    let repository_root = common::canonical_path(&repository).expect("repository should resolve");
+    let heads = heads_directory(&repository);
+    let configuration_path = repository.join(".hydra.json");
+    let locator_path = repository.join(".git/hydra/project.json");
+    let marker_path = heads.join(".hydra/directory.json");
+    let inventory_path = heads.join(".hydra/heads.json");
+    let configuration = fs::read(&configuration_path).expect("configuration should be readable");
+    let locator = fs::read(&locator_path).expect("locator should be readable");
+    let marker = fs::read(&marker_path).expect("marker should be readable");
+    let inventory = fs::read(&inventory_path).expect("inventory should be readable");
+    fs::remove_file(&configuration_path).expect("configuration loss should be simulated");
+    fs::remove_file(&inventory_path).expect("partial initialization should be simulated");
+    let journal_path = repository.join(".git/hydra-init.json");
+    let journal = serde_json::json!({
+        "version": 1,
+        "repositoryRoot": repository_root,
+        "headsDirectory": heads,
+        "configuration": String::from_utf8(configuration.clone()).expect("configuration should be UTF-8"),
+        "locator": String::from_utf8(locator.clone()).expect("locator should be UTF-8"),
+        "marker": String::from_utf8(marker.clone()).expect("marker should be UTF-8"),
+        "inventory": String::from_utf8(inventory.clone()).expect("inventory should be UTF-8")
+    });
+    let mut journal_bytes = serde_json::to_vec_pretty(&journal).expect("journal should serialize");
+    journal_bytes.push(b'\n');
+    fs::write(&journal_path, journal_bytes).expect("interrupted journal should be written");
+
+    let output = hydra_command()
+        .arg("init")
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(
+        output.status.success(),
+        "initialization recovery should succeed, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(fs::read(configuration_path).unwrap(), configuration);
+    assert_eq!(fs::read(locator_path).unwrap(), locator);
+    assert_eq!(fs::read(marker_path).unwrap(), marker);
+    assert_eq!(fs::read(inventory_path).unwrap(), inventory);
+    assert!(!journal_path.exists());
 }
 
 #[test]

@@ -12,6 +12,8 @@ pub enum InitError {
     UnsupportedRepositoryPath(PathBuf),
     UnsupportedRepositoryName(PathBuf),
     AlreadyInitialized(PathBuf),
+    InitializationInProgress(PathBuf),
+    InterruptedInitializationMismatch(PathBuf),
     HeadsDirectoryExists(PathBuf),
     LocalStateExists(PathBuf),
     StateDirectoryExists(PathBuf),
@@ -81,6 +83,10 @@ impl fmt::Display for InitError {
                     path.display()
                 )
             }
+            error @ (Self::InitializationInProgress(_)
+            | Self::InterruptedInitializationMismatch(_)) => {
+                format_initialization_journal_error(formatter, error)
+            }
             Self::HeadsDirectoryExists(path) => write!(
                 formatter,
                 "Heads directory {} already exists and was not created by this initialization",
@@ -148,6 +154,25 @@ impl fmt::Display for InitError {
                 path.display()
             ),
         }
+    }
+}
+
+fn format_initialization_journal_error(
+    formatter: &mut fmt::Formatter<'_>,
+    error: &InitError,
+) -> fmt::Result {
+    match error {
+        InitError::InitializationInProgress(path) => write!(
+            formatter,
+            "Hydra initialization is already in progress at {}",
+            path.display()
+        ),
+        InitError::InterruptedInitializationMismatch(path) => write!(
+            formatter,
+            "interrupted Hydra initialization does not match the expected project at {}",
+            path.display()
+        ),
+        _ => unreachable!("only initialization-journal errors are routed here"),
     }
 }
 
@@ -235,6 +260,8 @@ impl Error for InitError {
             | Self::UnsupportedRepositoryPath(_)
             | Self::UnsupportedRepositoryName(_)
             | Self::AlreadyInitialized(_)
+            | Self::InitializationInProgress(_)
+            | Self::InterruptedInitializationMismatch(_)
             | Self::HeadsDirectoryExists(_)
             | Self::LocalStateExists(_)
             | Self::StateDirectoryExists(_)

@@ -294,6 +294,8 @@ first filesystem mutation.
 After discovery, validation, and serialization, the implementation performs:
 
 ```text
+atomically publish and OS-lock <git-common-dir>/hydra-init.json
+        ↓
 create Heads directory
         ↓
 probe clone and full-copy capability in Heads directory
@@ -310,11 +312,25 @@ atomically publish <git-common-dir>/hydra/project.json
         ↓
 atomically publish .hydra.json
         ↓
+remove the initialization journal and release its lock
+        ↓
 report success
 ```
 
 `.hydra.json` is published last. Its presence therefore means that all earlier
 steps returned successfully during the same process.
+
+The version-1 initialization journal contains the canonical repository and
+Heads paths plus the exact serialized configuration, locator, marker, and empty
+inventory. Hydra creates and locks a unique temporary inode before linking it
+to the final journal path, so another initializer cannot observe an unlocked
+new journal. A process crash releases the OS lock while preserving the intent.
+On the next `hydra init`, Hydra validates the journal schema, paths, internal
+identity, empty inventory, canonical configuration, existing file bytes, and
+allowed directory entries before creating anything. It then creates only
+missing directories or files, probes storage again, and removes the journal
+after the configuration is present. An active journal reports initialization
+in progress; malformed, unsupported, changed, or unexpected state is preserved.
 
 When the exact empty owned installation described above already exists, Hydra
 instead:
@@ -404,6 +420,8 @@ therefore diagnosable and never silently hidden.
 - existing Heads directory;
 - incomplete, changed, non-empty, or identity-inconsistent existing Hydra
   installation;
+- active, malformed, unsupported, changed, or path-inconsistent initialization
+  journal;
 - existing or unsafe local locator directory;
 - failed or invalid storage capability probe;
 - JSON serialization failure;
@@ -452,7 +470,11 @@ Coverage currently proves:
   conflicts;
 - removal of the new Heads directory when local metadata creation fails;
 - atomic no-clobber publication;
-- explicit diagnostics when rollback cannot remove an owned artifact.
+- explicit diagnostics when rollback cannot remove an owned artifact;
+- exact resumption of a partial journal-backed initialization without replacing
+  existing metadata;
+- preservation without mutation when journal metadata or existing artifacts
+  disagree.
 
 Tests must continue to assert externally observable files, exit status, stdout,
 and stderr rather than only internal calls.
@@ -464,16 +486,10 @@ and stderr rather than only internal calls.
 The following product requirements are not yet implemented by the current
 initialization workflow:
 
-1. **Crash reconciliation before complete local ownership publication.** File
-   publication is atomic, but an external
-   interruption between transaction steps can leave local metadata files or
-   empty directories before locator, marker, and empty inventory form the
-   complete evidence required for safe reuse. Initialization preserves but
-   does not resume those partial states.
-2. **Non-Unix directory durability.** Unix parent directories are synchronized
+1. **Non-Unix directory durability.** Unix parent directories are synchronized
    after metadata publication. The non-Unix implementation currently provides
    atomic visibility but does not claim the same power-loss durability.
-3. **Non-UTF-8 repository names.** Unix Git paths are preserved byte-for-byte,
+2. **Non-UTF-8 repository names.** Unix Git paths are preserved byte-for-byte,
    but a repository name that cannot be represented in JSON is rejected rather
    than encoded into a persistent surrogate.
 

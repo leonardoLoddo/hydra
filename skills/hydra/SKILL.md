@@ -54,6 +54,11 @@ Never modify a user's shell profile without explicit authorization.
    are empty. If existing Heads require configuration recovery, stop and
    recover the authoritative `.hydra.json` from version control or backup;
    never accept guessed defaults or edit ownership metadata.
+   If initialization was interrupted, rerun the same `hydra init [PATH]`.
+   Hydra resumes only from its unlocked, internally consistent journal and
+   byte-identical existing artifacts. Wait when initialization is active, and
+   preserve every named path when the journal or partial state is invalid or
+   mismatched; never edit or delete the journal or partial directories by hand.
 5. Run `hydra head list` and decide whether this task should resume an existing
    Head or create a new one. Never reuse a Head merely because its name looks
    related: inspect it with `hydra head status <name>` and stop if its ownership,

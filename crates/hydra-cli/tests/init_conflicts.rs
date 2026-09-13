@@ -161,6 +161,57 @@ fn init_rejects_an_incomplete_preexisting_owned_heads_directory() {
 }
 
 #[test]
+fn init_preserves_partial_state_when_the_interruption_journal_is_inconsistent() {
+    let directory = TestDirectory::new("inconsistent-init-journal");
+    let repository = create_initialized_project(&directory);
+    let repository_root = common::canonical_path(&repository).expect("repository should resolve");
+    let heads = heads_directory(&repository);
+    let configuration_path = repository.join(".hydra.json");
+    let locator_path = repository.join(".git/hydra/project.json");
+    let marker_path = heads.join(".hydra/directory.json");
+    let inventory_path = heads.join(".hydra/heads.json");
+    let configuration = fs::read(&configuration_path).expect("configuration should be readable");
+    let locator = fs::read(&locator_path).expect("locator should be readable");
+    let marker = fs::read(&marker_path).expect("marker should be readable");
+    let inventory = fs::read(&inventory_path).expect("inventory should be readable");
+    fs::remove_file(&configuration_path).expect("configuration loss should be simulated");
+    fs::remove_file(&inventory_path).expect("partial initialization should be simulated");
+    let mut inconsistent_locator: serde_json::Value =
+        serde_json::from_slice(&locator).expect("locator should be valid JSON");
+    inconsistent_locator["projectId"] = serde_json::json!("other-project");
+    let mut inconsistent_locator =
+        serde_json::to_vec_pretty(&inconsistent_locator).expect("locator should serialize");
+    inconsistent_locator.push(b'\n');
+    let journal_path = repository.join(".git/hydra-init.json");
+    let journal = serde_json::json!({
+        "version": 1,
+        "repositoryRoot": repository_root,
+        "headsDirectory": heads,
+        "configuration": String::from_utf8(configuration).expect("configuration should be UTF-8"),
+        "locator": String::from_utf8(inconsistent_locator).expect("locator should be UTF-8"),
+        "marker": String::from_utf8(marker.clone()).expect("marker should be UTF-8"),
+        "inventory": String::from_utf8(inventory).expect("inventory should be UTF-8")
+    });
+    let mut journal_bytes = serde_json::to_vec_pretty(&journal).expect("journal should serialize");
+    journal_bytes.push(b'\n');
+    fs::write(&journal_path, &journal_bytes).expect("interrupted journal should be written");
+
+    let output = hydra_command()
+        .arg("init")
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("interrupted Hydra initialization"));
+    assert!(!configuration_path.exists());
+    assert!(!inventory_path.exists());
+    assert_eq!(fs::read(locator_path).unwrap(), locator);
+    assert_eq!(fs::read(marker_path).unwrap(), marker);
+    assert_eq!(fs::read(journal_path).unwrap(), journal_bytes);
+}
+
+#[test]
 fn init_does_not_guess_lost_configuration_for_an_owned_directory_with_heads() {
     let directory = TestDirectory::new("owned-heads-with-state");
     let repository = create_initialized_project(&directory);

@@ -146,6 +146,16 @@ and evidence and report the exact diagnostics.
 
 ## Common errors
 
+### Interrupted `hydra init`
+
+Run the same `hydra init [PATH]` command again. Hydra keeps an initialization
+journal in the Git common directory and resumes only when its process lock is
+free and every existing path and metadata byte still matches the recorded
+intent. Do not edit or remove the journal or partially created directories.
+If Hydra reports initialization still in progress, wait for that process to
+finish. If it reports a mismatch or invalid journal, preserve the paths named
+in the error for diagnosis; automatic recovery intentionally stops.
+
 ### `Hydra is already initialized`
 
 The canonical parent already has `.hydra.json`. Do not delete metadata or run

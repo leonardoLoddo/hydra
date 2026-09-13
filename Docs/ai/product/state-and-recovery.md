@@ -20,6 +20,7 @@ Recovery MUST preserve Git work and MUST NOT invent missing intent.
 | Artifact | Role | Versioned in the project |
 |---|---|---|
 | `.hydra.json` at the canonical parent | Shared project policy | Yes |
+| `<git-common-dir>/hydra-init.json` | Exact in-progress initialization intent and metadata | No |
 | `<git-common-dir>/hydra/project.json` | Local locator: project and installation identities, canonical parent and Heads paths | No |
 | `<heads-directory>/.hydra/directory.json` | Ownership marker matching the locator | No |
 | `<heads-directory>/.hydra/heads.json` | Physical local Head inventory | No |
@@ -65,9 +66,16 @@ After a process interruption, an abandoned current-format marker is distinguishe
 from an active lock by reacquiring the OS guard, not by guessing from a PID.
 Malformed and unsupported lock formats are errors. Active locks are preserved.
 
+Fresh initialization publishes and locks an exact journal in the Git common
+directory before creating project artifacts. A later `hydra init` may resume
+only when the OS lock is free, journal paths and metadata are internally
+consistent, every existing file matches byte-for-byte, and every directory
+contains only planned entries. Active, malformed, changed, or mismatched state
+is preserved. The journal is removed only after `.hydra.json` is durable.
+
 Atomic file visibility does not prove identical power-loss durability on every
-platform. Initialization interrupted before complete ownership publication can
-remain report-only; do not promise automatic recovery for that state.
+platform. Non-Unix directory synchronization therefore remains a documented
+durability limitation rather than an implied guarantee.
 
 ## Guided repair
 

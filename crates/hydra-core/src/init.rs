@@ -2,6 +2,7 @@ mod artifacts;
 mod configuration;
 mod error;
 mod git;
+mod journal;
 mod persistence;
 mod recovery;
 pub(crate) mod storage;
@@ -15,8 +16,11 @@ use serde::Deserialize;
 
 use configuration::{serialize_initial_metadata, serialize_project_configuration};
 use git::{Repository, discover_repository, repository_name_as_str};
-use persistence::{InitialFiles, create_initial_files, write_atomic};
-use recovery::{ExistingInstallationPaths, load_existing_installation};
+use journal::InitializationJournal;
+use persistence::{InitialFiles, create_initial_files, resume_initial_files, write_atomic};
+use recovery::{
+    ExistingInstallationPaths, load_existing_installation, validate_initialization_journal_metadata,
+};
 
 pub use error::{CleanupFailure, InitError};
 pub use storage::StorageBackend;
@@ -28,6 +32,7 @@ const HEADS_METADATA_DIRECTORY_NAME: &str = ".hydra";
 const DIRECTORY_MARKER_FILE_NAME: &str = "directory.json";
 const STATE_FILE_NAME: &str = "heads.json";
 const SUPPORTED_LOCAL_METADATA_VERSION: u32 = 1;
+const INITIALIZATION_JOURNAL_FILE_NAME: &str = "hydra-init.json";
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -75,11 +80,19 @@ pub fn initialize(path: &Path) -> Result<InitializedProject, InitError> {
     let heads_metadata_directory = heads_directory.join(HEADS_METADATA_DIRECTORY_NAME);
     let marker_path = heads_metadata_directory.join(DIRECTORY_MARKER_FILE_NAME);
     let inventory_path = heads_metadata_directory.join(STATE_FILE_NAME);
+    let journal_path = repository
+        .git_common_directory
+        .join(INITIALIZATION_JOURNAL_FILE_NAME);
 
-    if path_entry_exists(&configuration_path, "inspect project configuration")? {
-        return Err(InitError::AlreadyInitialized(configuration_path));
-    }
-
+    let files = InitialFiles {
+        heads_directory: &heads_directory,
+        heads_metadata_directory: &heads_metadata_directory,
+        marker_path: &marker_path,
+        inventory_path: &inventory_path,
+        state_directory: &state_directory,
+        locator_path: &locator_path,
+        configuration_path: &configuration_path,
+    };
     let existing_paths = ExistingInstallationPaths {
         repository_root: &repository_root,
         heads_directory: &heads_directory,
@@ -89,6 +102,25 @@ pub fn initialize(path: &Path) -> Result<InitializedProject, InitError> {
         marker_path: &marker_path,
         inventory_path: &inventory_path,
     };
+
+    if InitializationJournal::exists(&journal_path)? {
+        let journal =
+            InitializationJournal::acquire(&journal_path, &repository_root, &heads_directory)?;
+        let metadata = journal.metadata();
+        validate_initialization_journal_metadata(&metadata, &existing_paths, &journal_path)?;
+        let storage_backend = resume_initial_files(&files, &metadata)?;
+        journal.release()?;
+        return Ok(InitializedProject {
+            repository_root,
+            heads_directory,
+            storage_backend,
+        });
+    }
+
+    if path_entry_exists(&configuration_path, "inspect project configuration")? {
+        return Err(InitError::AlreadyInitialized(configuration_path));
+    }
+
     if let Some(existing) = load_existing_installation(&existing_paths)? {
         let configuration = serialize_project_configuration(existing.project_id())?;
         let storage_backend = storage::probe_storage(&heads_directory)?;
@@ -109,16 +141,21 @@ pub fn initialize(path: &Path) -> Result<InitializedProject, InitError> {
     )?;
 
     let metadata = serialize_initial_metadata(repository_name, &repository_root, &heads_directory)?;
-    let files = InitialFiles {
-        heads_directory: &heads_directory,
-        heads_metadata_directory: &heads_metadata_directory,
-        marker_path: &marker_path,
-        inventory_path: &inventory_path,
-        state_directory: &state_directory,
-        locator_path: &locator_path,
-        configuration_path: &configuration_path,
+    let journal = InitializationJournal::create(
+        &journal_path,
+        &repository_root,
+        &heads_directory,
+        &metadata,
+    )?;
+    let storage_backend = match create_initial_files(&files, &metadata) {
+        Ok(storage_backend) => storage_backend,
+        Err(error @ InitError::RollbackFailed { .. }) => return Err(error),
+        Err(error) => {
+            journal.release()?;
+            return Err(error);
+        }
     };
-    let storage_backend = create_initial_files(&files, &metadata)?;
+    journal.release()?;
 
     Ok(InitializedProject {
         repository_root,

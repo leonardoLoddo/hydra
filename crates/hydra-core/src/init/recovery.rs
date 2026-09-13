@@ -10,6 +10,7 @@ use serde::Deserialize;
 use super::{
     DIRECTORY_MARKER_FILE_NAME, HEADS_METADATA_DIRECTORY_NAME, InitError, LOCATOR_FILE_NAME,
     STATE_FILE_NAME, SUPPORTED_LOCAL_METADATA_VERSION,
+    configuration::{InitialMetadata, serialize_project_configuration},
 };
 
 #[derive(Deserialize)]
@@ -154,6 +155,38 @@ pub(super) fn load_existing_installation(
         heads_metadata_directory: paths.heads_metadata_directory.to_path_buf(),
         state_directory: paths.state_directory.to_path_buf(),
     }))
+}
+
+pub(super) fn validate_initialization_journal_metadata(
+    metadata: &InitialMetadata,
+    paths: &ExistingInstallationPaths<'_>,
+    journal_path: &Path,
+) -> Result<(), InitError> {
+    let locator: ProjectLocator =
+        deserialize_local_metadata(&metadata.locator, "journal project locator", journal_path)?;
+    let marker: DirectoryMarker = deserialize_local_metadata(
+        &metadata.marker,
+        "journal directory ownership marker",
+        journal_path,
+    )?;
+    let inventory: HeadInventory =
+        deserialize_local_metadata(&metadata.inventory, "journal Head inventory", journal_path)?;
+    validate_local_metadata_version("journal project locator", locator.version)?;
+    validate_local_metadata_version("journal directory ownership marker", marker.version)?;
+    validate_local_metadata_version("journal Head inventory", inventory.version)?;
+    let expected_configuration = serialize_project_configuration(&locator.project_id)?;
+    if locator.project_root != paths.repository_root
+        || locator.heads_directory != paths.heads_directory
+        || locator.project_id != marker.project_id
+        || locator.installation_id != marker.installation_id
+        || !inventory.heads.is_empty()
+        || metadata.configuration != expected_configuration
+    {
+        return Err(InitError::InterruptedInitializationMismatch(
+            journal_path.to_path_buf(),
+        ));
+    }
+    Ok(())
 }
 
 fn validate_reusable_directory_contents(

@@ -137,6 +137,141 @@ pub(super) fn create_initial_files(
     Ok(storage_backend)
 }
 
+pub(super) fn resume_initial_files(
+    files: &InitialFiles<'_>,
+    metadata: &InitialMetadata,
+) -> Result<StorageBackend, InitError> {
+    validate_directory_if_present(files.heads_directory, &[".hydra"])?;
+    validate_directory_if_present(
+        files.heads_metadata_directory,
+        &["directory.json", "heads.json"],
+    )?;
+    validate_directory_if_present(files.state_directory, &["project.json"])?;
+    validate_file_if_present(files.marker_path, &metadata.marker)?;
+    validate_file_if_present(files.inventory_path, &metadata.inventory)?;
+    validate_file_if_present(files.locator_path, &metadata.locator)?;
+    validate_file_if_present(files.configuration_path, &metadata.configuration)?;
+
+    ensure_directory(files.heads_directory, "resume Heads directory")?;
+    let storage_backend = probe_storage(files.heads_directory)?;
+    ensure_directory(
+        files.heads_metadata_directory,
+        "resume Heads metadata directory",
+    )?;
+    ensure_directory(files.state_directory, "resume state directory")?;
+    ensure_file(files.marker_path, &metadata.marker)?;
+    ensure_file(files.inventory_path, &metadata.inventory)?;
+    ensure_file(files.locator_path, &metadata.locator)?;
+    ensure_file(files.configuration_path, &metadata.configuration)?;
+    Ok(storage_backend)
+}
+
+fn validate_directory_if_present(path: &Path, allowed: &[&str]) -> Result<(), InitError> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.is_dir() && !metadata.file_type().is_symlink() => {
+            validate_directory_contents(path, allowed)
+        }
+        Ok(_) => Err(InitError::InterruptedInitializationMismatch(
+            path.to_path_buf(),
+        )),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(source) => Err(InitError::FileSystem {
+            action: "inspect interrupted initialization directory",
+            path: path.to_path_buf(),
+            source,
+        }),
+    }
+}
+
+fn validate_file_if_present(path: &Path, expected: &[u8]) -> Result<(), InitError> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.is_file() && !metadata.file_type().is_symlink() => {
+            let current = fs::read(path).map_err(|source| InitError::FileSystem {
+                action: "read interrupted initialization metadata",
+                path: path.to_path_buf(),
+                source,
+            })?;
+            if current == expected {
+                Ok(())
+            } else {
+                Err(InitError::InterruptedInitializationMismatch(
+                    path.to_path_buf(),
+                ))
+            }
+        }
+        Ok(_) => Err(InitError::InterruptedInitializationMismatch(
+            path.to_path_buf(),
+        )),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(source) => Err(InitError::FileSystem {
+            action: "inspect interrupted initialization metadata",
+            path: path.to_path_buf(),
+            source,
+        }),
+    }
+}
+
+fn ensure_directory(path: &Path, action: &'static str) -> Result<(), InitError> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.is_dir() && !metadata.file_type().is_symlink() => Ok(()),
+        Ok(_) => Err(InitError::InterruptedInitializationMismatch(
+            path.to_path_buf(),
+        )),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => create_directory(path, action),
+        Err(source) => Err(InitError::FileSystem {
+            action,
+            path: path.to_path_buf(),
+            source,
+        }),
+    }
+}
+
+fn validate_directory_contents(path: &Path, allowed: &[&str]) -> Result<(), InitError> {
+    for entry in fs::read_dir(path).map_err(|source| InitError::FileSystem {
+        action: "inspect interrupted initialization directory",
+        path: path.to_path_buf(),
+        source,
+    })? {
+        let entry = entry.map_err(|source| InitError::FileSystem {
+            action: "inspect interrupted initialization entry",
+            path: path.to_path_buf(),
+            source,
+        })?;
+        if !allowed.iter().any(|name| entry.file_name() == *name) {
+            return Err(InitError::InterruptedInitializationMismatch(entry.path()));
+        }
+    }
+    Ok(())
+}
+
+fn ensure_file(path: &Path, expected: &[u8]) -> Result<(), InitError> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.is_file() && !metadata.file_type().is_symlink() => {
+            let current = fs::read(path).map_err(|source| InitError::FileSystem {
+                action: "read interrupted initialization metadata",
+                path: path.to_path_buf(),
+                source,
+            })?;
+            if current == expected {
+                Ok(())
+            } else {
+                Err(InitError::InterruptedInitializationMismatch(
+                    path.to_path_buf(),
+                ))
+            }
+        }
+        Ok(_) => Err(InitError::InterruptedInitializationMismatch(
+            path.to_path_buf(),
+        )),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => write_atomic(path, expected),
+        Err(source) => Err(InitError::FileSystem {
+            action: "inspect interrupted initialization metadata",
+            path: path.to_path_buf(),
+            source,
+        }),
+    }
+}
+
 fn create_directory(path: &Path, action: &'static str) -> Result<(), InitError> {
     fs::create_dir(path).map_err(|source| InitError::FileSystem {
         action,
@@ -236,7 +371,7 @@ fn cleanup_failed_temporary_link_removal(
 }
 
 #[cfg(unix)]
-fn sync_parent_directory(path: &Path) -> io::Result<()> {
+pub(super) fn sync_parent_directory(path: &Path) -> io::Result<()> {
     let parent = path.parent().ok_or_else(|| {
         io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -248,7 +383,7 @@ fn sync_parent_directory(path: &Path) -> io::Result<()> {
 
 #[cfg(not(unix))]
 #[allow(clippy::unnecessary_wraps)]
-fn sync_parent_directory(_path: &Path) -> io::Result<()> {
+pub(super) fn sync_parent_directory(_path: &Path) -> io::Result<()> {
     Ok(())
 }
 

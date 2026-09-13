@@ -390,6 +390,14 @@ la configurazione predefinita con lo stesso `projectId`. Revisiona e versiona
 anche questa configurazione. Una directory estranea, incompleta, non vuota o
 con ownership discordante viene preservata e rifiutata.
 
+Se `hydra init` viene interrotto, esegui di nuovo lo stesso comando. Hydra
+conserva nel Git common directory un journal locale protetto da lock e completa
+soltanto directory o file mancanti quando percorsi, identità, contenuti già
+presenti e voci delle directory coincidono esattamente. Non modificare né
+eliminare il journal o gli artefatti parziali: un processo ancora attivo, un
+journal non valido o qualsiasi divergenza interrompono il recupero senza
+sovrascrivere lo stato.
+
 ### 4.3 Crea una Head
 
 Per creare una Head dal `HEAD` corrente:
@@ -1529,6 +1537,7 @@ Hydra separa:
 
 ```text
 <git-common-dir>/hydra/project.json
+<git-common-dir>/hydra-init.json (solo durante init)
 <heads-directory>/.hydra/directory.json
 <heads-directory>/.hydra/heads.json
 <heads-directory>/.hydra/pending-<name>.json
@@ -1537,6 +1546,8 @@ Hydra separa:
 ```
 
 - `project.json` individua l’installazione locale da qualunque worktree;
+- `hydra-init.json` conserva e protegge con lock l'intento e i metadati esatti
+  finché la configurazione condivisa non è stata pubblicata;
 - `directory.json` prova l’ownership tramite `projectId` e `installationId` e,
   senza cambiarne il contenuto, fornisce il target stabile del guard OS;
 - `heads.json` contiene l’inventario fisico delle Head locali;
