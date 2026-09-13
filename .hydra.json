@@ -11,7 +11,8 @@
   },
   "overlay": {
     "copy": [
-      "... .gitignore"
+      "... .gitignore",
+      "!/target/"
     ]
   }
 }
