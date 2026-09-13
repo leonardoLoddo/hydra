@@ -122,8 +122,42 @@ pub fn apply_untracked_head_recovery(
         });
     }
 
+    let recovery_records = (|| {
+        let pending_by_name = recovery::read_pending_creations(&heads_directory)?
+            .into_iter()
+            .map(|pending| (pending.name().to_owned(), pending))
+            .collect::<BTreeMap<_, _>>();
+        let mut completed_pending = Vec::new();
+        for (name, metadata) in &recovered {
+            if recovery::read_central_recovery(&heads_directory, name)?.is_none() {
+                recovery::create_central_recovery(&heads_directory, name, metadata)?;
+            }
+            if recovery::read_manifest(&repository, Path::new(metadata.worktree_path()))?.is_none()
+            {
+                recovery::create_manifest(
+                    &repository,
+                    Path::new(metadata.worktree_path()),
+                    name,
+                    metadata,
+                )?;
+            }
+            if let Some(pending) = pending_by_name.get(name) {
+                completed_pending.push(pending.path().to_path_buf());
+            }
+        }
+        Ok::<_, HeadError>(completed_pending)
+    })();
+    let completed_pending = match recovery_records {
+        Ok(paths) => paths,
+        Err(error) => return Err(transaction.abort(error)),
+    };
+
     let recovered_heads = plan.recoverable_untracked_heads;
     transaction.commit_many(recovered)?;
+    for path in completed_pending {
+        recovery::remove_pending_creation(&path)
+            .map_err(|error| HeadError::HeadCommittedWithCleanupFailure(Box::new(error)))?;
+    }
     Ok(InventoryRecoveryResult { recovered_heads })
 }
 
@@ -178,6 +212,21 @@ pub fn apply_pending_creation_recovery(
             let pending = pending_by_name.get(name).ok_or_else(|| {
                 HeadError::ConcurrentStateChange(pending_journal_path(&heads_directory, name))
             })?;
+            if !transaction.contains_head(name)
+                && pending.metadata().is_none()
+                && git::registered_worktrees(&repository)?
+                    .iter()
+                    .any(|worktree| {
+                        worktree.path == pending.intent().worktree_path()
+                            && worktree.branch.as_deref() == Some(pending.intent().head_ref())
+                    })
+            {
+                git::remove_registered_worktree(
+                    &repository,
+                    pending.intent().worktree_path(),
+                    true,
+                )?;
+            }
             if !transaction.contains_head(name)
                 && git::ref_exists(&repository, pending.intent().head_ref())?
             {

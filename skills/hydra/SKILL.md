@@ -261,12 +261,15 @@ that are not integrated, and its output must be reported.
   it before authorizing any other proposal. Repair does not justify editing
   recovery records or lock markers, rewriting ownership or locator data,
   replacing malformed inventory, or reconstructing ambiguous metadata by hand.
-- Authorize pending-creation cleanup only when Hydra reports no associated
-  worktree or managed path and an absent or unchanged private branch at the
-  recorded base commit. Hydra revalidates under lock and deletes that ref with
-  compare-and-swap. Preserve and report any pending creation with a present
-  worktree, filesystem entry, or advanced branch; never delete its journal,
-  branch, or directory manually.
+- For an interrupted `head create`, run `hydra repair`. Authorize cleanup only
+  when Hydra identifies either no worktree/path residue or one exact incomplete
+  worktree at the recorded managed path and private branch. Hydra revalidates
+  under lock, removes only that confirmed incomplete worktree, and deletes an
+  unchanged ref with compare-and-swap. Authorize adoption of a finalized Head
+  only when Hydra reports it recoverable from matching journal, worktree, ref,
+  base commit, clean status, and any other recovery records. Preserve and
+  report mismatches, dirty state, or advanced branches; never edit or delete
+  journals, branches, recovery records, or directories manually.
 
 Preserve recoverability over convenience: leave the Head and its private branch
 in place whenever safe integration or removal cannot be proven.

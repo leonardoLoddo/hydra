@@ -322,6 +322,8 @@ materialize confirmed overlays
         ↓
 verify a clean Git worktree
         ↓
+atomically finalize pending intent with exact Head metadata
+        ↓
 create the central recovery record
         ↓
 create the private recovery manifest
@@ -349,8 +351,10 @@ record. If the process terminates, the record proves creation intent that Git
 alone cannot distinguish from a user-created branch. A confirmed `repair` may
 remove a pre-worktree residue only when no managed path or registered worktree
 exists and the private ref is absent or still points to the recorded base
-commit. Branch deletion uses compare-and-swap; advanced refs and every present
-worktree or directory are preserved.
+commit. Before finalization, a confirmed `repair` may also remove the exact
+registered worktree at the recorded managed path and private ref, then delete
+the unchanged branch with compare-and-swap. A mismatched path or ref and every
+advanced branch are preserved.
 
 ---
 
@@ -373,8 +377,12 @@ Successful creation adds version-1 metadata containing:
 - aggregate `materializationBackend` (`cow` or `copy`);
 - UTC RFC 3339 `createdAt`.
 
-Before publishing the shared inventory, Hydra writes the same exact Head
-identity and intent to two versioned, no-clobber recovery records: central
+After clean-worktree verification, Hydra atomically adds the complete Head
+metadata to the pending journal. That finalized journal is recovery evidence
+for an interrupted creation only while its intent, metadata, current worktree,
+symbolic branch, base commit, and clean status all agree. Before publishing the
+shared inventory, Hydra writes the same exact Head identity and intent to two
+versioned, no-clobber recovery records: central
 `<heads-directory>/.hydra/recovery-<name>.json` and private
 `hydra-head.json` inside the linked worktree's Git administrative directory.
 Neither file is placed in the project working tree. The independent records
@@ -492,15 +500,9 @@ cargo test --release -p hydra-cli \
    working tree when its tracked state matches `baseCommit`, while overlays
    clone from that same workspace. Hydra does not yet search existing Heads or
    a persistent content cache for another matching source.
-2. **Post-registration partial creation reconciliation.** A durable pending
-   record now makes pre-worktree branch cleanup deterministic. Termination
-   after worktree registration but before the central recovery record is
-   finalized still preserves the worktree and branch for diagnosis rather than
-   adopting or removing them automatically. After that record is published,
-   losing the private manifest no longer prevents exact recovery.
-3. **Cross-platform symlinks and durability.** Tracked and overlay symlink
+2. **Cross-platform symlinks and durability.** Tracked and overlay symlink
    materialization is implemented only on Unix. Direct runtime evidence for
    this workflow currently comes from the development platform and does not
    establish macOS-and-Linux completion by itself.
-4. **Submodule population.** Gitlink entries receive an empty directory only;
+3. **Submodule population.** Gitlink entries receive an empty directory only;
    submodule initialization and network access are intentionally not implicit.

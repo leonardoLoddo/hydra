@@ -143,20 +143,28 @@ Missing or semantically inconsistent recovery evidence leaves the worktree
 report-only. A malformed, non-regular, or unsupported record is a validation
 error and remains untouched.
 
-### Interrupted pre-worktree creation
+### Interrupted Head creation
 
 Head creation publishes a versioned pending-intent record inside the owned
 Heads metadata directory before it creates the private branch. Repair validates
 that the record filename, Head name, managed path, configured branch prefix,
 base commit, and private ref agree.
 
-The residue is automatically repairable only when no registered worktree and
-no filesystem entry exists for the managed path. An absent private ref permits
-removal of the journal alone. A present private ref permits cleanup only when
-it still points to the exact recorded base commit; deletion uses Git
-compare-and-swap so a concurrent advance cannot be discarded. A pending record
-left after successful inventory publication is cleaned without changing the
-recorded Head or its branch.
+Before materialization completes, the residue is repairable when no worktree or
+path exists, or when exactly one worktree is registered at both the recorded
+managed path and private ref. The latter cleanup forcibly removes only that
+confirmed incomplete worktree. An absent private ref permits removal of the
+journal alone. A present private ref permits cleanup only when it still points
+to the exact recorded base commit; deletion uses Git compare-and-swap so a
+concurrent advance cannot be discarded.
+
+After clean-worktree verification, creation atomically finalizes the journal
+with the exact inventory metadata. Repair may adopt that Head when the journal
+intent and metadata agree, the registered path and symbolic ref are exact, the
+worktree is clean and still at `baseCommit`, and any central or private recovery
+records agree. Before inventory publication, repair recreates either missing
+recovery record. A pending record left after successful inventory publication
+is cleaned without changing the recorded Head or its branch.
 
 After confirmation, Hydra reacquires the normal state lock and rebuilds the
 complete candidate set. It deletes an unchanged private ref before removing
@@ -238,8 +246,9 @@ applied or that another state operation owns it.
 
 Relocated worktrees are restored before inventory publication. Stale entries
 are removed together through one atomic state replacement. Only confirmed
-cleanup of an exact pending pre-worktree creation may delete a private branch,
-and only with compare-and-swap at its recorded base commit. No repair path
+cleanup of exact unfinished creation may remove its registered worktree and may
+delete its private branch only with compare-and-swap at the recorded base commit.
+No repair path
 recursively removes a directory, edits tracked project code, or invokes a
 shell.
 
@@ -275,7 +284,7 @@ Disposable-repository tests prove:
 - missing or inconsistent recovery evidence does not authorize adoption, and
   an evidence change after planning cancels publication without leaving a
   lock;
-- interrupted pre-worktree creation cleanup requires confirmation, preserves a
+- interrupted creation cleanup requires confirmation, preserves a
   branch changed after planning, and leaves a durable journal when safe cleanup
   cannot be proven;
 - stale inventory requires confirmation;

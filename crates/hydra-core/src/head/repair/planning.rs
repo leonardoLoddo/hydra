@@ -37,6 +37,7 @@ pub(super) fn build_present_repair_state(
     let mut recoverable_untracked_heads = Vec::new();
     let mut recovered_untracked_heads = BTreeMap::new();
     let expected_head_refs: BTreeSet<&str> = heads.values().map(HeadMetadata::head_ref).collect();
+    let pending_creations = recovery::read_pending_creations(heads_directory)?;
 
     for (name, metadata) in heads {
         let head_plan = plan_recorded_head(
@@ -77,6 +78,9 @@ pub(super) fn build_present_repair_state(
             name,
             head_ref,
             worktree,
+            pending_creations
+                .iter()
+                .find(|pending| pending.name() == name),
         )?;
         issues.push(issue);
         if let Some(metadata) = recovered {
@@ -91,6 +95,7 @@ pub(super) fn build_present_repair_state(
         branch_prefix,
         heads,
         &worktrees,
+        &pending_creations,
     )?;
     issues.extend(pending_issues);
 
@@ -116,6 +121,7 @@ fn plan_untracked_hydra_worktree(
     name: &str,
     head_ref: &str,
     worktree: &RegisteredWorktree,
+    pending: Option<&recovery::PendingCreation>,
 ) -> Result<(RepairIssue, Option<HeadMetadata>), HeadError> {
     let report_only = || {
         (
@@ -142,7 +148,8 @@ fn plan_untracked_hydra_worktree(
             });
         }
     }
-    let Some(recovered) = read_head_recovery(repository, heads_directory, name, &worktree.path)?
+    let Some(recovered) =
+        read_head_recovery(repository, heads_directory, name, &worktree.path, pending)?
     else {
         return Ok(report_only());
     };
@@ -202,7 +209,7 @@ pub(super) fn build_missing_inventory_state(
             continue;
         }
         let Some(recovered) =
-            read_head_recovery(repository, heads_directory, name, &worktree.path)?
+            read_head_recovery(repository, heads_directory, name, &worktree.path, None)?
         else {
             all_recoverable = false;
             issues.push(RepairIssue::UntrackedHydraWorktree {
@@ -259,18 +266,46 @@ fn read_head_recovery(
     heads_directory: &Path,
     name: &str,
     worktree: &Path,
+    pending: Option<&recovery::PendingCreation>,
 ) -> Result<Option<recovery::RecoveredHead>, HeadError> {
     let private = recovery::read_manifest(repository, worktree)?;
     let central = recovery::read_central_recovery(heads_directory, name)?;
-    match (private, central) {
-        (Some(private), Some(central))
-            if private.name == central.name && private.metadata == central.metadata =>
-        {
-            Ok(Some(private))
-        }
-        (Some(recovered), None) | (None, Some(recovered)) => Ok(Some(recovered)),
-        (None, None) | (Some(_), Some(_)) => Ok(None),
+    let finalized = pending.and_then(|pending| {
+        pending
+            .metadata()
+            .filter(|metadata| pending_matches_metadata(pending, metadata))
+            .map(|metadata| recovery::RecoveredHead {
+                name: pending.name().to_owned(),
+                metadata: metadata.clone(),
+            })
+    });
+    let mut evidence = [private, central, finalized].into_iter().flatten();
+    let Some(recovered) = evidence.next() else {
+        return Ok(None);
+    };
+    if evidence.any(|other| other.name != recovered.name || other.metadata != recovered.metadata) {
+        return Ok(None);
     }
+    if pending.is_some()
+        && (git::worktree_commit(worktree)? != recovered.metadata.base_commit()
+            || !git::worktree_changes(worktree)?.is_clean())
+    {
+        return Ok(None);
+    }
+    Ok(Some(recovered))
+}
+
+fn pending_matches_metadata(pending: &recovery::PendingCreation, metadata: &HeadMetadata) -> bool {
+    metadata.worktree_path()
+        == pending
+            .intent()
+            .worktree_path()
+            .to_str()
+            .unwrap_or_default()
+        && metadata.head_ref() == pending.intent().head_ref()
+        && metadata.base_ref() == pending.intent().base_ref()
+        && metadata.base_commit() == pending.intent().base_commit()
+        && metadata.target_ref() == pending.intent().target_ref()
 }
 
 fn plan_pending_creations(
@@ -279,10 +314,11 @@ fn plan_pending_creations(
     branch_prefix: &str,
     heads: &BTreeMap<String, HeadMetadata>,
     worktrees: &[RegisteredWorktree],
+    pending_creations: &[recovery::PendingCreation],
 ) -> Result<(Vec<RepairIssue>, Vec<String>), HeadError> {
     let mut issues = Vec::new();
     let mut recoverable = Vec::new();
-    for pending in recovery::read_pending_creations(heads_directory)? {
+    for pending in pending_creations {
         super::super::validate_head_name(pending.name())?;
         let expected_path = heads_directory.join(pending.name());
         let expected_ref = format!("refs/heads/{branch_prefix}{}", pending.name());
@@ -294,16 +330,28 @@ fn plan_pending_creations(
             ));
         }
         let already_recorded = heads.contains_key(pending.name());
-        let has_worktree = worktrees.iter().any(|worktree| {
-            worktree.path == expected_path || worktree.branch.as_deref() == Some(&expected_ref)
-        });
-        let path_exists = expected_path
-            .try_exists()
-            .map_err(|source| HeadError::FileSystem {
-                action: "inspect pending Head path",
-                path: expected_path.clone(),
-                source,
-            })?;
+        let matching_worktrees: Vec<&RegisteredWorktree> = worktrees
+            .iter()
+            .filter(|worktree| {
+                worktree.path == expected_path || worktree.branch.as_deref() == Some(&expected_ref)
+            })
+            .collect();
+        let has_worktree = !matching_worktrees.is_empty();
+        let has_exact_worktree = matching_worktrees.len() == 1
+            && matching_worktrees[0].path == expected_path
+            && matching_worktrees[0].branch.as_deref() == Some(&expected_ref);
+        let path_metadata = match fs::symlink_metadata(&expected_path) {
+            Ok(metadata) => Some(metadata),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(source) => {
+                return Err(HeadError::FileSystem {
+                    action: "inspect pending Head path",
+                    path: expected_path.clone(),
+                    source,
+                });
+            }
+        };
+        let path_exists = path_metadata.is_some();
         let branch_exists = git::ref_exists(repository, &expected_ref)?;
         let branch_is_unchanged = !branch_exists
             || git::commit_for_ref(repository, &expected_ref)? == pending.intent().base_commit();
@@ -312,7 +360,14 @@ fn plan_pending_creations(
             path: expected_path,
             head_ref: expected_ref,
         });
-        if already_recorded || (!has_worktree && !path_exists && branch_is_unchanged) {
+        let registered_incomplete = pending.metadata().is_none()
+            && has_exact_worktree
+            && path_metadata.is_some_and(|metadata| metadata.is_dir())
+            && branch_is_unchanged;
+        if already_recorded
+            || (!has_worktree && !path_exists && branch_is_unchanged)
+            || registered_incomplete
+        {
             recoverable.push(pending.name().to_owned());
         }
     }

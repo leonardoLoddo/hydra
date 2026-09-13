@@ -848,10 +848,10 @@ Hydra può proporti sei correzioni deterministiche:
 - aggiungere a un inventario esistente una Head omessa dopo un crash, ma solo
   quando la worktree registrata e il suo manifest coincidono esattamente per
   nome, percorso gestito e branch;
-- ripulire una creazione interrotta prima della registrazione della worktree,
-  ma soltanto quando il journal durevole coincide con nome, percorso, ref e
-  commit di base, non esistono directory o worktree associate e il branch non
-  è avanzato;
+- ripulire una creazione interrotta, anche dopo la registrazione della
+  worktree, ma soltanto quando il journal durevole coincide con nome, percorso,
+  ref e commit di base, l'eventuale worktree usa esattamente quel percorso e
+  branch e il branch non è avanzato;
 - rimuovere dall’inventario una Head la cui directory e registrazione Git non
   esistono più, conservando sempre il branch privato;
 - riportare nel percorso gestito una worktree spostata, quando Git associa in
@@ -904,11 +904,18 @@ manifest, Git o l'inventario cambiano durante la conferma, non adotta nessuna
 Head. L'assenza di entrambi i record o la loro incoerenza lascia la worktree in
 sola segnalazione e non autorizza metadati dedotti.
 
-Per una creazione interrotta prima della worktree, Hydra mostra il nome e
-richiede conferma. Ricontrolla quindi tutto sotto lock e rimuove l'eventuale
-branch soltanto se punta ancora esattamente al commit di base registrato nel
-journal. Se il branch è avanzato o sono comparsi path o worktree, non elimina
+Per una creazione interrotta, Hydra mostra il nome e richiede conferma. Se la
+materializzazione non era terminata, ricontrolla tutto sotto lock, rimuove
+soltanto l'eventuale worktree registrata nell'esatto percorso e branch previsti,
+quindi elimina il branch solo se punta ancora al commit di base del journal.
+Se il percorso o la ref non coincidono o il branch è avanzato, non elimina
 nulla e richiede diagnosi.
+
+Dopo aver verificato una worktree pulita, Hydra completa atomicamente il
+journal con tutti i metadati della Head. Se il processo termina prima della
+pubblicazione nell'inventario, `hydra repair` può adottare la Head e ricreare i
+record di recupero mancanti soltanto quando journal, worktree, branch, commit
+di base e ogni altra evidenza coincidono e la worktree è ancora pulita.
 
 Altre incoerenze vengono soltanto segnalate: worktree Hydra senza evidenza di
 recupero verificabile, directory registrate ma mancanti, directory non registrate,
@@ -1534,7 +1541,9 @@ Hydra separa:
   senza cambiarne il contenuto, fornisce il target stabile del guard OS;
 - `heads.json` contiene l’inventario fisico delle Head locali;
 - ogni `pending-<name>.json` conserva l'intento di una creazione non ancora
-  pubblicata e viene normalmente rimosso al successo o durante il rollback;
+  pubblicata; dopo la materializzazione pulita acquisisce atomicamente anche i
+  metadati completi necessari al recupero e viene normalmente rimosso al
+  successo o durante il rollback;
 - ogni coppia `recovery-<name>.json` e `hydra-head.json` conserva gli stessi
   metadati esatti della singola Head; una copia valida può consentire il
   recupero se l'altra viene persa, mentre due copie presenti devono coincidere.

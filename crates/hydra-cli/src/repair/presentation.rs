@@ -131,6 +131,10 @@ pub(super) fn request_pending_creation_confirmation(
     output: &mut impl Write,
     count: usize,
 ) -> io::Result<bool> {
+    writeln!(
+        output,
+        "Cleanup can remove exact incomplete worktrees and unchanged private branches."
+    )?;
     if count == 1 {
         write!(output, "Clean up 1 incomplete Head creation? [y/N] ")?;
     } else {

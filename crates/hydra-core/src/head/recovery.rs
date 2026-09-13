@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use super::{
     HeadError,
     git::{self, Repository},
-    persistence::create_file_atomically,
+    persistence::{create_file_atomically, replace_state_atomically},
     state::HeadMetadata,
     validate_head_name,
 };
@@ -56,6 +56,8 @@ pub(super) struct PendingCreation {
     path: PathBuf,
     name: String,
     intent: PendingCreationIntent,
+    metadata: Option<HeadMetadata>,
+    serialized: Vec<u8>,
 }
 
 impl PendingCreationIntent {
@@ -67,8 +69,16 @@ impl PendingCreationIntent {
         &self.head_ref
     }
 
+    pub(super) fn base_ref(&self) -> &str {
+        &self.base_ref
+    }
+
     pub(super) fn base_commit(&self) -> &str {
         &self.base_commit
+    }
+
+    pub(super) fn target_ref(&self) -> &str {
+        &self.target_ref
     }
 }
 
@@ -83,6 +93,10 @@ impl PendingCreation {
 
     pub(super) fn intent(&self) -> &PendingCreationIntent {
         &self.intent
+    }
+
+    pub(super) fn metadata(&self) -> Option<&HeadMetadata> {
+        self.metadata.as_ref()
     }
 }
 
@@ -116,7 +130,27 @@ pub(super) fn create_pending_creation(
         path,
         name: name.to_owned(),
         intent,
+        metadata: None,
+        serialized: contents,
     })
+}
+
+pub(super) fn finalize_pending_creation(
+    pending: &mut PendingCreation,
+    metadata: &HeadMetadata,
+) -> Result<(), HeadError> {
+    let record = PendingCreationRecord {
+        version: RECOVERY_VERSION,
+        name: pending.name.clone(),
+        intent: pending.intent.clone(),
+        metadata: Some(metadata.clone()),
+    };
+    let mut replacement = serde_json::to_vec_pretty(&record).map_err(HeadError::SerializeState)?;
+    replacement.push(b'\n');
+    replace_state_atomically(pending.path(), &pending.serialized, &replacement)?;
+    pending.metadata = Some(metadata.clone());
+    pending.serialized = replacement;
+    Ok(())
 }
 
 pub(super) fn read_pending_creations(
@@ -195,6 +229,8 @@ fn read_pending_creation(path: PathBuf, expected_name: &str) -> Result<PendingCr
         path,
         name: record.name,
         intent: record.intent,
+        metadata: record.metadata,
+        serialized: contents,
     })
 }
 

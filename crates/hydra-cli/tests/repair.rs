@@ -7,6 +7,9 @@ use std::{
     process::{Output, Stdio},
 };
 
+#[cfg(unix)]
+use std::{env, os::unix::fs::PermissionsExt};
+
 use common::{
     TestDirectory, create_initialized_project, head_state_lock_path, head_state_path,
     heads_directory, hydra_command, run_git,
@@ -119,6 +122,48 @@ fn write_pending_creation(repository: &Path, name: &str) -> PathBuf {
     path
 }
 
+#[cfg(unix)]
+fn interrupt_creation_before_private_recovery(
+    directory: &TestDirectory,
+    repository: &Path,
+    name: &str,
+) {
+    let wrapper_directory = directory.path().join("git-wrapper");
+    fs::create_dir(&wrapper_directory).expect("Git wrapper directory should be created");
+    let wrapper = wrapper_directory.join("git");
+    fs::write(
+        &wrapper,
+        concat!(
+            "#!/bin/sh\n",
+            "case \" $* \" in\n",
+            "  *\" rev-parse --path-format=absolute --git-path hydra-head.json \"*) kill -KILL \"$PPID\"; exit 1 ;;\n",
+            "esac\n",
+            "exec \"$HYDRA_TEST_REAL_GIT\" \"$@\"\n"
+        ),
+    )
+    .expect("Git wrapper should be written");
+    fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o755))
+        .expect("Git wrapper should be executable");
+    let original_path = env::var_os("PATH").expect("test PATH should exist");
+    let real_git = env::split_paths(&original_path)
+        .map(|directory| directory.join("git"))
+        .find(|candidate| candidate.is_file())
+        .expect("real Git should be present on PATH");
+    let wrapped_path =
+        env::join_paths(std::iter::once(wrapper_directory).chain(env::split_paths(&original_path)))
+            .expect("wrapped PATH should be valid");
+
+    let output = hydra_command()
+        .args(["head", "create", name])
+        .current_dir(repository)
+        .env("PATH", wrapped_path)
+        .env("HYDRA_TEST_REAL_GIT", real_git)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(!output.status.success(), "fixture should terminate Hydra");
+}
+
 fn remove_head_from_inventory(repository: &Path, name: &str) -> (Vec<u8>, Vec<u8>) {
     let state_path = head_state_path(repository);
     let original = fs::read(&state_path).expect("inventory should be readable");
@@ -165,6 +210,119 @@ fn repair_requires_confirmation_before_adopting_a_manifest_backed_head() {
     assert!(!head_state_lock_path(&repository).exists());
 }
 
+#[cfg(unix)]
+#[test]
+fn repair_completes_a_head_interrupted_before_private_recovery() {
+    let directory = TestDirectory::new("repair-finalized-pending-head");
+    let repository = create_initialized_project(&directory);
+    interrupt_creation_before_private_recovery(&directory, &repository, "payment");
+    let head = heads_directory(&repository).join("payment");
+    let journal = heads_directory(&repository).join(".hydra/pending-payment.json");
+    let central = central_recovery_path(&repository, "payment");
+
+    assert!(
+        head.is_dir(),
+        "interrupted worktree should remain accessible"
+    );
+    assert!(
+        journal.is_file(),
+        "finalized pending intent should remain durable"
+    );
+    assert!(
+        central.is_file(),
+        "fixture should reach central recovery publication"
+    );
+    assert!(!head_is_recorded(&repository, "payment"));
+    fs::remove_file(&central)
+        .expect("fixture should leave pending intent as sole recovery evidence");
+
+    let lock_repair = run_repair(&repository, b"yes\n");
+    assert!(lock_repair.status.success());
+    assert!(!head_state_lock_path(&repository).exists());
+
+    let recovery = run_repair(&repository, b"yes\n");
+
+    assert!(
+        recovery.status.success(),
+        "pending recovery should succeed, stderr: {}",
+        String::from_utf8_lossy(&recovery.stderr)
+    );
+    let stdout = String::from_utf8(recovery.stdout).expect("stdout should be UTF-8");
+    assert!(stdout.contains("Recoverable untracked Head: payment"));
+    assert!(stdout.ends_with("Added 1 recovered Head to the inventory.\n"));
+    assert!(head_is_recorded(&repository, "payment"));
+    assert!(head.is_dir());
+    assert!(branch_exists(&repository, "payment"));
+    assert!(
+        central.is_file(),
+        "repair should restore central recovery evidence"
+    );
+    assert!(
+        recovery_manifest_path(&repository, "payment").is_file(),
+        "repair should restore private recovery evidence"
+    );
+    assert!(
+        !journal.exists(),
+        "repair should remove completed pending intent"
+    );
+    assert!(!head_state_lock_path(&repository).exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn repair_does_not_adopt_a_dirty_finalized_pending_head() {
+    let directory = TestDirectory::new("repair-dirty-finalized-pending-head");
+    let repository = create_initialized_project(&directory);
+    interrupt_creation_before_private_recovery(&directory, &repository, "payment");
+    let head = heads_directory(&repository).join("payment");
+    fs::remove_file(central_recovery_path(&repository, "payment"))
+        .expect("pending intent should be the sole recovery evidence");
+    fs::write(head.join("after-crash.txt"), b"preserve me\n")
+        .expect("post-crash work should be writable");
+    assert!(run_repair(&repository, b"yes\n").status.success());
+
+    let output = run_repair(&repository, b"yes\n");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    assert!(stdout.contains("Untracked Hydra worktree: payment"));
+    assert!(stdout.contains("No automatic repairs available"));
+    assert!(!head_is_recorded(&repository, "payment"));
+    assert_eq!(
+        fs::read(head.join("after-crash.txt")).expect("user work should remain"),
+        b"preserve me\n"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn repair_does_not_adopt_inconsistent_finalized_pending_metadata() {
+    let directory = TestDirectory::new("repair-inconsistent-finalized-pending-head");
+    let repository = create_initialized_project(&directory);
+    interrupt_creation_before_private_recovery(&directory, &repository, "payment");
+    fs::remove_file(central_recovery_path(&repository, "payment"))
+        .expect("pending intent should be the sole recovery evidence");
+    let journal = heads_directory(&repository).join(".hydra/pending-payment.json");
+    let mut record: serde_json::Value =
+        serde_json::from_slice(&fs::read(&journal).expect("pending journal should be readable"))
+            .expect("pending journal should be valid JSON");
+    record["metadata"]["targetRef"] = serde_json::Value::String("refs/heads/other".to_owned());
+    let mut contents =
+        serde_json::to_vec_pretty(&record).expect("pending journal should serialize");
+    contents.push(b'\n');
+    fs::write(&journal, contents).expect("pending journal fixture should be writable");
+    assert!(run_repair(&repository, b"yes\n").status.success());
+
+    let output = run_repair(&repository, b"yes\n");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    assert!(stdout.contains("Untracked Hydra worktree: payment"));
+    assert!(stdout.contains("No automatic repairs available"));
+    assert!(!head_is_recorded(&repository, "payment"));
+    assert!(journal.is_file());
+}
+
 #[test]
 fn repair_requires_confirmation_before_cleaning_a_pre_worktree_creation() {
     let directory = TestDirectory::new("repair-pending-creation-declined");
@@ -205,14 +363,55 @@ fn confirmed_repair_cleans_a_pre_worktree_creation_with_an_unchanged_branch() {
         "confirmed cleanup should succeed, stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
+    assert!(
+        stdout.contains(
+            "Cleanup can remove exact incomplete worktrees and unchanged private branches."
+        )
+    );
+    assert!(stdout.ends_with("Cleaned up 1 incomplete Head creation.\n"));
+    assert!(!journal.exists());
+    assert!(!branch_exists(&repository, "payment"));
+    assert!(!heads_directory(&repository).join("payment").exists());
+    assert!(!head_is_recorded(&repository, "payment"));
+    assert!(!head_state_lock_path(&repository).exists());
+}
+
+#[test]
+fn confirmed_repair_cleans_a_registered_incomplete_worktree() {
+    let directory = TestDirectory::new("repair-registered-incomplete-creation");
+    let repository = create_initialized_project(&directory);
+    let journal = write_pending_creation(&repository, "payment");
+    let head = heads_directory(&repository).join("payment");
+    let output = run_git(&repository, &["branch", "hydra/payment", "HEAD"]);
+    assert!(output.status.success());
+    let output = run_git(
+        &repository,
+        &[
+            "worktree",
+            "add",
+            "--no-checkout",
+            head.to_str().expect("Head path should be UTF-8"),
+            "hydra/payment",
+        ],
+    );
+    assert!(output.status.success());
+
+    let output = run_repair(&repository, b"yes\n");
+
+    assert!(
+        output.status.success(),
+        "confirmed cleanup should succeed, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     assert!(
         String::from_utf8(output.stdout)
             .expect("stdout should be UTF-8")
             .ends_with("Cleaned up 1 incomplete Head creation.\n")
     );
     assert!(!journal.exists());
+    assert!(!head.exists());
     assert!(!branch_exists(&repository, "payment"));
-    assert!(!heads_directory(&repository).join("payment").exists());
     assert!(!head_is_recorded(&repository, "payment"));
     assert!(!head_state_lock_path(&repository).exists());
 }

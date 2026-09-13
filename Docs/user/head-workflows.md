@@ -365,3 +365,7 @@ hydra repair
 deterministic mutation. Many ambiguous conditions are intentionally
 report-only. Continue with
 [Recovery and troubleshooting](recovery-and-troubleshooting.md).
+
+For an interrupted `head create`, rerun `hydra repair`: it can remove an exact
+unfinished registered worktree or adopt a clean finalized Head, but only after
+showing the planned action and receiving confirmation.

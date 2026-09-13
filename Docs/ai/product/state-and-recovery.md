@@ -66,9 +66,8 @@ from an active lock by reacquiring the OS guard, not by guessing from a PID.
 Malformed and unsupported lock formats are errors. Active locks are preserved.
 
 Atomic file visibility does not prove identical power-loss durability on every
-platform. Initialization interrupted before complete ownership publication and
-creation interrupted after worktree registration but before recovery publication
-can remain report-only; do not promise automatic recovery for those states.
+platform. Initialization interrupted before complete ownership publication can
+remain report-only; do not promise automatic recovery for that state.
 
 ## Guided repair
 
@@ -79,7 +78,8 @@ repair classes are:
 - remove an abandoned current-version lock after reacquiring its guard;
 - reconstruct a missing inventory from a complete set of exact recovery records;
 - adopt an omitted registered Head with matching recovery evidence;
-- clean safe interrupted pre-worktree creation intent;
+- clean safe interrupted Head creation intent, including an exact registered
+  worktree that has not reached final metadata publication;
 - remove stale inventory entries while preserving private branches;
 - restore an unambiguously relocated worktree to its original managed path.
 
@@ -90,11 +90,15 @@ inventory. Malformed inventories are never replaced by this recovery action.
 Adoption preserves existing entries and requires the complete approved candidate
 set to remain unchanged under the mutation lock.
 
-Pending-intent cleanup may delete a private branch only when no associated path
-or worktree exists and the branch is absent or still at its recorded base commit.
-Deletion uses compare-and-swap. Advanced branches, present paths, registered
-worktrees, and ambiguous records remain preserved. A journal left after committed
-creation can be removed without changing the registered Head.
+Pending-intent cleanup may delete a private branch only when the branch is absent
+or still at its recorded base commit. Before metadata finalization, an exact
+worktree registered at the recorded managed path and private ref may also be
+removed after confirmation; any path/ref disagreement or advanced branch remains
+preserved. Deletion uses compare-and-swap. After clean materialization, the
+journal atomically gains complete Head metadata and can recover the Head when
+inventory or either recovery record is missing. Dirty, advanced, or inconsistent
+finalized creations remain report-only. A journal left after committed creation
+can be removed without changing the registered Head.
 
 Relocation repair moves the worktree back to the managed path; it does not retarget
 ownership toward arbitrary paths. Stale inventory removal requires absent path,

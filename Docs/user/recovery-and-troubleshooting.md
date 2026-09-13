@@ -87,19 +87,26 @@ After confirmation, Hydra revalidates the complete approved candidate set and
 atomically adds it without changing existing entries, worktrees, or branches.
 Without authoritative evidence, the worktree remains report-only.
 
-### Interrupted creation before worktree registration
+### Interrupted Head creation
 
 Head creation writes durable pending intent before branch and worktree
-mutation. Repair can clean a pre-worktree residue only when:
+mutation. Before materialization finishes, repair can clean a residue when:
 
-- no registered worktree exists;
-- the managed filesystem path is absent;
+- neither a worktree nor managed path exists; or exactly one worktree uses both
+  the recorded managed path and private branch;
 - the private branch is absent or still points exactly to the recorded base
   commit.
 
-An unchanged private branch is deleted with compare-and-swap before the
-journal is removed. An advanced branch, present path, or present worktree is
+Confirmed cleanup removes the exact incomplete worktree when present. An
+unchanged private branch is then deleted with compare-and-swap before the
+journal is removed. A mismatched worktree or path and an advanced branch are
 preserved for diagnosis.
+
+After the new worktree is clean, Hydra finalizes the journal with complete Head
+metadata. If a crash occurs before inventory publication, `hydra repair` can
+adopt the Head and restore missing recovery records only when the journal,
+worktree, branch, base commit, and any other recovery evidence agree exactly.
+Changes made after the crash deliberately disable automatic adoption.
 
 ### Stale inventory entry
 
@@ -121,7 +128,8 @@ Hydra reports but does not invent a mutation for:
 
 - a Hydra-prefixed worktree missing from inventory without matching recovery
   evidence;
-- a pending creation with a present path, worktree, or advanced branch;
+- a pending creation with mismatched path or worktree, an advanced branch, or
+  dirty or inconsistent finalized state;
 - a registered worktree whose directory is missing;
 - a present managed directory not registered with Git;
 - a non-directory entry at a managed Head path;

@@ -132,7 +132,7 @@ pub fn create_head_with_progress(
         Err(error) => return Err(transaction.abort(error)),
     };
 
-    let pending = match recovery::create_pending_creation(
+    let mut pending = match recovery::create_pending_creation(
         &prepared.heads_directory,
         &options.name,
         &prepared.head_path,
@@ -148,13 +148,12 @@ pub fn create_head_with_progress(
     if let Err(error) = git::create_branch(&repository, &prepared.branch, &prepared.base_commit) {
         return Err(transaction.abort(remove_pending_after_error(&pending, error)));
     }
-    let creation = create_worktree(
+    let storage_backend = match create_worktree(
         &repository,
         &prepared,
         options.confirmed_full_copy,
         &mut report_progress,
-    );
-    let storage_backend = match creation {
+    ) {
         Ok(backend) => backend,
         Err(error) => {
             let error =
@@ -178,6 +177,9 @@ pub fn create_head_with_progress(
             return Err(transaction.abort(remove_pending_after_error(&pending, error)));
         }
     };
+    if let Err(error) = finalize_creation(&repository, &prepared, &mut pending, &metadata) {
+        return Err(transaction.abort(error));
+    }
     let central_recovery = match recovery::create_central_recovery(
         &prepared.heads_directory,
         &options.name,
@@ -219,6 +221,18 @@ pub fn create_head_with_progress(
         storage_backend,
         overlay_files: prepared.overlay_plan.file_count(),
         overlay_bytes: prepared.overlay_plan.total_bytes(),
+    })
+}
+
+fn finalize_creation(
+    repository: &git::Repository,
+    prepared: &PreparedHead,
+    pending: &mut recovery::PendingCreation,
+    metadata: &HeadMetadata,
+) -> Result<(), HeadError> {
+    recovery::finalize_pending_creation(pending, metadata).map_err(|error| {
+        let error = rollback_worktree(repository, &prepared.head_path, &prepared.branch, error);
+        remove_pending_after_error(pending, error)
     })
 }
 
