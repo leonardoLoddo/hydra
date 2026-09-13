@@ -20,7 +20,11 @@ The following rules extend that default with materialization requirements.
 Git worktrees provide independent Git state while sharing the object database.
 A separate Materializer creates normal visible files. Hydra SHOULD avoid a full
 standard checkout before writing those files; the implemented workflow registers
-a worktree without checkout and initializes its index separately.
+a worktree without checkout and initializes its index separately. If a platform
+requires another sequence, its observable Git result MUST remain equivalent.
+Hydra MUST NOT duplicate the Git object database for each Head. Its space-efficiency
+goal is that native CoW initially allocates mainly differences while each Head
+still exposes complete normal files; full copy remains an explicit safe fallback.
 
 CoW is an optimization, while write isolation is mandatory. Hydra MUST use native
 CoW when supported by the selected storage policy and actual volume, or a safe
@@ -29,7 +33,11 @@ or an editor watcher as a substitute for filesystem write isolation.
 
 Tracked content is identified by the Git blob expected at `baseCommit`.
 Overlay identity is computed from the selected source bytes. Reuse MUST validate
-content rather than trusting names, sizes, or timestamps. A source changed after
+content rather than trusting names, sizes, or timestamps. A Head MUST NOT retain a
+writable dependency on a particular source path. The content-reuse model permits a
+verified identical source in the parent or another Head; otherwise tracked content
+comes from Git and overlays from their selected source. The current cross-Head
+search limitation below does not revoke that model. A source changed after
 a verified CoW clone cannot invalidate the already isolated destination.
 
 Current tracked-source reuse requires the parent project's complete tracked state

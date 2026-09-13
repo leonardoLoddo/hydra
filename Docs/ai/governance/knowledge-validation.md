@@ -110,6 +110,8 @@ exceptions applied. Add or revise a case when a change creates a difficult bound
 | Case | Expected required context | Excluded context and reason |
 |---|---|---|
 | Change native storage-probe cleanup without changing init or create | Product storage plus inherited core safety; Architecture doctor; Development working agreements and Rust; Governance impact check at completion | Roadmap, close, and recipes do not govern diagnostic cleanup |
+| Review Rust code without editing it | Development working agreements and Rust; Product and Architecture only for the reviewed contracts | Read-only review still makes engineering judgments; absence of a diff does not skip Rust/TDD rules |
+| Propose a different persistence technology for Head state | Architecture system boundary; Product state and inherited core safety; Development working agreements and dependency rules | A technology proposal does not authorize migration or change existing persisted formats |
 | Reformat a Rust source without behavior changes | Development working agreements and Rust; Governance impact check | Product behavior and Architecture workflow leaves have no changed contract |
 | Change persistent unsafe-overlay exclusions | Product configuration, storage, lifecycle, state, CLI, inherited core safety; Architecture creation and materialization; Development working agreements, Rust, Hydra skill; Governance maintenance | Roadmap is not authorization to add overlay profiles or recipes |
 | Change protected removal used by close | Product lifecycle and state plus inherited safety; Architecture removal and close; Development working agreements, Rust, Hydra skill; Governance maintenance | Open adapter and future assisted merging remain unrelated |
@@ -121,13 +123,20 @@ exceptions applied. Add or revise a case when a change creates a difficult bound
 
 For inherited rules, additionally verify that a missing source or conflicting
 applicability is surfaced, not silently ignored. Check force removal only replaces
-the clean-worktree requirement, and unsafe-symlink exclusion changes selected policy
+the clean-worktree and prior-integration preconditions for worktree removal while
+preserving unintegrated branches; private-branch deletion still requires integration.
+Verify that unsafe-symlink exclusion changes selected policy
 without weakening the rejection of unsafe copied entries.
 
 ## Semantic and historical review
 
 For each rewritten or moved unit, compare its old content from Git history and
-record internally where every durable requirement, exception, and known gap went.
+record where every durable requirement, exception, rationale, future design
+constraint, and known gap went. Use a source-to-destination table for a substantial
+rewrite, including each numbered acceptance criterion and each edge-case list.
+Classify each unit as retained, moved, deliberately excluded with a reason, or
+missing. Do not equate availability in Git history with preservation in active
+knowledge. Keep the task-specific audit outside the active knowledge graph.
 Removing duplication is valid only when a reachable canonical owner retains the
 rule. Keep historical task records and superseded examples outside active routes.
 

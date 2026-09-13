@@ -8,7 +8,8 @@
 
 Read this leaf for every Rust code or test change, bug fix, refactor,
 dependency change, Cargo change, unsafe boundary, platform-specific behavior,
-or regression assessment.
+or regression assessment. Also read it for code review without implementation:
+regressions and missing TDD evidence remain review concerns.
 
 ## Purpose
 

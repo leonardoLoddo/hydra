@@ -31,15 +31,26 @@ in advance as a post-1.0 roadmap of 0.x releases.
 | Cloud collaboration | Not a current priority or core dependency |
 | Tauri desktop application | Only if real usage justifies it |
 | Virtual filesystem | Only if guaranteed CoW on incompatible volumes becomes necessary |
-| Immutable-content hard links | Not a general materialization backend; mutable hard links remain forbidden |
+| Immutable-content hard links | Only for content explicitly immutable and protected read-only; not a general materialization backend |
+| Lost-locator reconnection and installation relocation | Future explicit ownership-validated recovery, never silent path reinterpretation |
 | Additional crates or persistent content cache | Require demonstrated boundaries or reuse needs; no prebuilt architecture |
 | Short command aliases and JSON output | Potential interfaces, not current syntax contracts |
 
+## Locator reconnection and relocation proposal
+
+The original storage model permits a future repair to reconnect a lost locator
+using the ownership marker of a directory explicitly identified by the user.
+Moving the parent project or the whole Heads directory requires explicit verified
+relocation, not silently resolving a new path. Current repair does not implement
+these operations; this proposal does not authorize manual metadata edits or relaxing
+project and installation identity checks.
+
 ## Head Recipe proposal
 
-A physical Head is local and not versioned. A future recipe could transport a
-reproducible source, target, name, overlay profile, and lifecycle intent to another
-device. It MUST NOT transport local absolute paths, backend selection, locks,
+A physical Head is local and not versioned. A future recipe could be authored
+directly or created by promoting a local Head through a dedicated command. It
+could transport a reproducible source, target, name, overlay profile, and lifecycle
+intent to another device. It MUST NOT transport local absolute paths, backend selection, locks,
 operational timestamps, uncommitted content, or overlay secrets.
 
 Promotion of a local Head would require proving that shared content is reachable
@@ -51,6 +62,20 @@ A future ephemeral recipe could request deletion after successful close. Because
 a versioned recipe is a Git file, that deletion would need an explicit close
 transaction: no dirtying another worktree silently, no deletion after failed close,
 and no unauthorized implicit commit.
+
+The original design sketch names the intended fields below. This is a proposed
+shape, not an accepted schema, supported configuration, or executable workflow:
+
+```json
+{
+  "version": 1,
+  "name": "payment",
+  "source": "feature/payment",
+  "target": "main",
+  "overlayProfile": "default",
+  "lifecycle": {"removeRecipeOnClose": true}
+}
+```
 
 ## Product hypothesis and admission
 

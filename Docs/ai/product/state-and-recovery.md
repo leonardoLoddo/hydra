@@ -27,6 +27,11 @@ Recovery MUST preserve Git work and MUST NOT invent missing intent.
 | `recovery-<name>.json` in the Heads metadata directory | Central recovery evidence | No |
 | `hydra-head.json` in the private linked-worktree Git directory | Independent copy of exact recovery evidence | No |
 
+`projectId` identifies the shared project across devices and MUST NOT depend only
+on its directory name. Collaborators share it through configuration, while each
+local initialization has its own locator, physical Heads directory, and
+`installationId`. Same-named repositories at different paths are not interchangeable.
+
 A matching project identity with a different installation identity does not
 establish ownership. Locator and marker MUST agree before mutation. Local paths
 are canonicalized and validated against the owned directory and registered

@@ -53,6 +53,10 @@ The default is the sibling suffix `.heads`. Heads MUST remain outside the parent
 working tree and every other worktree. Hydra MUST NOT reuse another project's
 owned directory or create nested Heads. This avoids recursive materialization,
 accidental tracking, and indexing every Head from the parent project.
+A sibling directory also keeps the project-to-Heads relationship visible. A global
+container such as `.hydra-heads/<project>/` is not the default: it adds a namespace
+layer unnecessary for one project's lifecycle and obscures that relationship.
+Projects in one parent directory retain independent sibling Heads directories.
 
 A suffix is a non-empty filename fragment. Unicode, spaces, and punctuation are
 allowed; control characters, `/`, and `\` are rejected. There is no required

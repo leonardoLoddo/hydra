@@ -11,7 +11,7 @@ Rust engineering rules.
 
 | Conditions | Priority | Read | Skip when |
 |---|---|---|---|
-| any: crate boundary, dependency direction, CLI versus core responsibility | required | [system-architecture.md](system-architecture.md) | no structural responsibility changes or decisions are involved |
+| any: crate boundary, dependency direction, CLI versus core responsibility, persistence technology choice | required | [system-architecture.md](system-architecture.md) | no structural responsibility changes or decisions are involved |
 | any: `hydra init`, repository discovery, initial configuration or state, Heads directory, initialization rollback | required | [project-initialization.md](project-initialization.md) | initialization cannot be affected |
 | any: `hydra head create`, Head name, base or target ref, private branch, worktree registration, materialization transaction ordering, creation lock, rollback or cleanup | required | [head-creation.md](head-creation.md) | Head creation cannot be affected |
 | any: tracked materialization, overlay matching or materialization, Git blob streaming, content-source reuse, hash batching, permissions, symlink recreation | required | [materialization.md](materialization.md) | naming, ref selection, terminal wording, or state publication cannot affect file content |

@@ -36,7 +36,7 @@ documentation maintenance or verification.
 |---|---|---|---|
 | any: product identity, Head lifecycle or semantics, configuration or overlay policy, storage or platform, state or recovery, CLI interaction, compatibility, safety guarantee, roadmap boundary | required | [product/ROUTER.md](product/ROUTER.md) | the task is purely internal and cannot affect product behavior or scope |
 | any: crate boundary, Git or filesystem workflow, initialization, Head command internals, storage, persistence, rollback, inspection, or repair | required | [architecture/ROUTER.md](architecture/ROUTER.md) | the task changes only product policy or engineering process |
-| any: implementation task, repository change, engineering workflow, Rust code or test, bug fix, refactor, dependency, quality gate, commit or history operation, release or distribution, Hydra Agent Skill | required | [development/ROUTER.md](development/ROUTER.md) | read-only consultation with no repository change or engineering decision |
+| any: implementation task, repository change, engineering workflow, Rust code or test, code review, bug fix, refactor, dependency, quality gate, commit or history operation, release or distribution, Hydra Agent Skill | required | [development/ROUTER.md](development/ROUTER.md) | read-only consultation with no repository change or engineering decision |
 | any: implementation completion, protocol adoption, router or leaf change, knowledge authoring or review, audit, upgrade, fallback operation, knowledge-impact check | required | [governance/ROUTER.md](governance/ROUTER.md) | initial implementation investigation before knowledge maintenance or completion |
 
 ## Cross-context composition

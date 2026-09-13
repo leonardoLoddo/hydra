@@ -11,7 +11,7 @@ architecture, or development rules.
 | Conditions | Priority | Read | Skip when |
 |---|---|---|---|
 | any: implementation completion, knowledge-impact check, protocol adoption, router change, knowledge maintenance, AI-knowledge authoring or review, audit, upgrade, fallback operation | required | [librairian-protocol.md](librairian-protocol.md) | initial implementation investigation before knowledge maintenance or completion |
-| any: knowledge change, protocol installation, audit, routing or inheritance change, fallback verification | required | [knowledge-validation.md](knowledge-validation.md) | a completed impact check identifies no changed knowledge with a concrete reason |
+| any: knowledge change, protocol installation, audit, knowledge-preservation review, routing or inheritance change, fallback verification | required | [knowledge-validation.md](knowledge-validation.md) | a completed impact check identifies no changed knowledge with a concrete reason |
 
 ## Cross-context composition
 

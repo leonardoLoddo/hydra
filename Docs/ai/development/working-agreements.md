@@ -52,9 +52,12 @@ stop the affected decision, and preserve unrelated work. Do not encode an
 unresolved assumption as current policy.
 
 Verify exact external APIs, versions, flags, and platform behavior with official
-documentation when local evidence is insufficient. Before dependency changes,
-check standard-library and existing-dependency alternatives, portability,
-maintenance, installation, security, and native-build costs. Never invent an API
+documentation when local evidence is insufficient. Before adding or changing a
+dependency, verify its exact API and compatibility using official documentation;
+local examples do not waive that requirement. Inspect the existing package manager,
+runtime version, and dependency conventions, and check standard-library and
+existing-dependency alternatives, portability, maintenance, installation, security,
+and native-build costs. Keep the dependency scope minimal. Never invent an API
 or supported platform from memory when it can be verified.
 
 ## High-risk changes
@@ -65,7 +68,8 @@ interruption, cleanup, command execution, user input, and shared services as
 high risk. Assess affected refs, paths, state, commands, consumers, and irreversible
 failure modes. Verify both the changed contract and neighboring behavior.
 
-A shared abstraction changes only when the root cause belongs there, meaningful
+Shared helpers, services, adapters, and cross-command abstractions are stable
+contracts by default. A shared abstraction changes only when the root cause belongs there, meaningful
 consumers have been inspected, the broader behavior is intentional, and
 representative regression coverage exists. Prefer local adaptation and existing
 interfaces to speculative shared flexibility. Avoid unrelated formatting churn.

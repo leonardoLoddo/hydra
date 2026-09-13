@@ -54,9 +54,12 @@ integration and protected branch cleanup are governed by
 [lifecycle.md](lifecycle.md); ordinary direct Git commands remain available.
 
 Commits created in a Head are immediately available in the shared repository.
-Loss of Hydra metadata MUST NOT make committed work dependent on a proprietary
-patch format or prevent normal Git recovery. Git owns refs, commits, worktree
-registration, and observed changes. Hydra records intent Git cannot reconstruct;
+Loss or corruption of Hydra metadata MUST NOT make branches or surviving working
+trees inaccessible through ordinary Git and filesystem tools. This includes local
+uncommitted files still present in a Head; their accessibility MUST NOT require a
+proprietary patch format. This is not a promise to restore files already deleted
+by an authorized destructive action or to reconstruct missing intent without evidence.
+Git owns refs, commits, worktree registration, and observed changes. Hydra records intent Git cannot reconstruct;
 [state-and-recovery.md](state-and-recovery.md) defines the recovery boundary.
 
 Hydra MUST validate paths, ownership, refs, and external state before mutation.
@@ -95,6 +98,28 @@ Changes MUST preserve these observable outcomes:
   and the installable operational Hydra skill.
 - Verify lifecycle success, refusal, interruption, recovery, and isolation on
   disposable repositories; distinguish native-platform evidence from assumptions.
+
+## Minimum edge-case obligations
+
+The core MUST handle the following cases predictably. A safe rejection or a
+reported limitation is valid only within the applicable contract; this table is
+an acceptance obligation, not a claim that every case has complete test coverage.
+
+| Cases | Required contract to consult |
+|---|---|
+| Standard repository; repository accessed through a linked worktree; detached parent | [lifecycle.md](lifecycle.md) |
+| Same-named repositories at different paths; another project's existing sibling directory | [state-and-recovery.md](state-and-recovery.md), [configuration-and-overlays.md](configuration-and-overlays.md) |
+| Local source branch; explicit ref or commit; duplicate Head name; existing private branch or destination | [lifecycle.md](lifecycle.md) |
+| Heads policy inside the project or another Head | [configuration-and-overlays.md](configuration-and-overlays.md) |
+| Git-locked worktree; manually removed worktree or directory; direct ref changes | [state-and-recovery.md](state-and-recovery.md), [lifecycle.md](lifecycle.md) |
+| Submodules; large ignored files; symlinks | [storage-and-platforms.md](storage-and-platforms.md), [configuration-and-overlays.md](configuration-and-overlays.md) |
+| Unsupported CoW volume; cross-volume source and Head; CoW failure midway through materialization; source changed during verification | [storage-and-platforms.md](storage-and-platforms.md) |
+| Interrupted creation or copy; lost state file | [state-and-recovery.md](state-and-recovery.md) |
+| Target advanced since creation; target checked out in another worktree; close conflict; non-zero custom-adapter exit; successful merge followed by failed removal | [lifecycle.md](lifecycle.md) |
+
+Platform acceptance includes completing the principal flows on macOS, Linux, and
+native Windows x86-64. A single-platform test run does not satisfy that entire
+obligation. Keep known architecture and preview-validation gaps visible.
 
 ## Evidence and verification
 

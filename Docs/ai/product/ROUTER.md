@@ -10,7 +10,7 @@ and distribution procedures belong to Development.
 
 | Conditions | Priority | Read | Skip when |
 |---|---|---|---|
-| any: product identity, isolation, Git compatibility, core acceptance, SemVer baseline, maturity, inherited Head safety default | required | [hydra-mvp-context.md](hydra-mvp-context.md) | no product invariant or dependent product leaf is selected |
+| any: product identity, isolation, Git compatibility, core acceptance, minimum edge cases, SemVer baseline, maturity, inherited Head safety default | required | [hydra-mvp-context.md](hydra-mvp-context.md) | no product invariant or dependent product leaf is selected |
 | any: .hydra.json, directory strategy, branch prefix, overlay selection, rule expansion, unsafe-symlink exclusions, storage policy | required | [configuration-and-overlays.md](configuration-and-overlays.md) | configuration and overlay selection cannot be affected |
 | any: materialization, CoW, content-source reuse, storage probe, full-copy fallback, performance, platform, symlink, submodule | required | [storage-and-platforms.md](storage-and-platforms.md) | physical storage, isolation, and platform boundaries cannot be affected |
 | any: init, Head creation or inspection, base or target semantics, parent context, open or close adapter, integration, removal | required | [lifecycle.md](lifecycle.md) | no lifecycle behavior or configured process contract is involved |

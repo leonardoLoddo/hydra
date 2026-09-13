@@ -7,8 +7,8 @@
 ## Consult when
 
 Read this leaf before adding a crate, moving responsibilities across crates,
-changing dependency direction, or deciding whether behavior belongs in the
-CLI or core.
+changing dependency direction, choosing persistence technology, or deciding
+whether behavior belongs in the CLI or core.
 
 ## Inherited defaults
 
@@ -200,6 +200,14 @@ crate, the new crate should own only the Git adapter and Git-specific data
 translation. Product decisions must remain in `hydra-core`.
 
 ---
+
+## Persistence technology decision
+
+JSON files with atomic publication are sufficient for the core MVP baseline.
+Do not add SQLite or another persistence runtime merely to represent local Head
+state. Additional native dependencies are not required by that baseline except
+for the minimal adapters needed by platform CoW primitives. A new requirement
+must justify revisiting this decision through the Development dependency rules.
 
 ## Filesystem and Persistence Boundary
 

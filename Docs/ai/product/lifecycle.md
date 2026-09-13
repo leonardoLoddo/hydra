@@ -115,12 +115,16 @@ phases separately and preserves recoverable state.
 `head remove` refuses dirty, untracked, unintegrated, missing, or inconsistent
 Heads. Worktree removal alone MUST NOT authorize deleting recoverable commits.
 
-**Force exception:** `head remove --force` replaces the clean-worktree requirement
-only: it authorizes discarding tracked, staged, and untracked changes. It does not
-bypass ownership, path, branch, registration, or target validation. Unintegrated
-commits keep their private ref, whose name is reported. Delete a private branch
-only after current target reachability and expected-object comparison protect it.
-Close does not silently force removal.
+**Force exception:** `head remove --force` replaces two ordinary preconditions for
+worktree removal: the worktree must be clean, and its commits must already be
+integrated. It explicitly authorizes discarding tracked, staged, and untracked
+changes and removing an unintegrated Head's worktree and inventory entry while
+preserving its private ref. The preserved ref's name MUST be reported.
+
+This exception does not bypass ownership, path, branch, registration, or target
+validation. It never waives the integration requirement for private-branch deletion:
+delete that branch only after current target reachability and expected-object
+comparison protect it. Close does not silently force removal.
 
 ## Evidence and verification
 

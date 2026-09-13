@@ -157,6 +157,11 @@ non-interactive choices equivalent to installing the selected provider copy or
 skipping it. It must never infer consent from the presence of an agent
 application.
 
+A new provider or installation channel MUST NOT be described as supported until
+its package, installation procedure, update path, and representative activation
+workflow have been verified on that host. Keep unavailable channels explicitly
+planned and retain visible qualification gaps for existing preview adapters.
+
 ## Agent Skill Packaging
 
 Every release derives the installable skill from the canonical
