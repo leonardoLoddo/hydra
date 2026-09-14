@@ -12,7 +12,7 @@ pub(super) fn run() -> ExitCode {
     let plan = match hydra_core::plan_repairs(Path::new(".")) {
         Ok(plan) => plan,
         Err(error) => {
-            eprintln!("error: {error}");
+            crate::guidance::report_repair_error(&error);
             return ExitCode::FAILURE;
         }
     };
@@ -37,7 +37,7 @@ pub(super) fn run() -> ExitCode {
         return repair_untracked_heads(&plan);
     }
     if plan.stale_inventory.is_empty() && plan.moved_worktrees.is_empty() {
-        println!("No automatic repairs available; manual recovery required.");
+        print_manual_recovery_guidance(&plan);
         return ExitCode::SUCCESS;
     }
 
@@ -55,7 +55,7 @@ pub(super) fn run() -> ExitCode {
         ) {
             Ok(confirmed) => confirmed,
             Err(error) => {
-                eprintln!("error: failed to read repair confirmation: {error}");
+                crate::guidance::report_input_error("repair confirmation", &error);
                 return ExitCode::FAILURE;
             }
         }
@@ -70,7 +70,7 @@ pub(super) fn run() -> ExitCode {
         ) {
             Ok(confirmed) => confirmed,
             Err(error) => {
-                eprintln!("error: failed to read repair confirmation: {error}");
+                crate::guidance::report_input_error("repair confirmation", &error);
                 return ExitCode::FAILURE;
             }
         }
@@ -107,7 +107,7 @@ pub(super) fn run() -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(error) => {
-            eprintln!("error: {error}");
+            crate::guidance::report_repair_error(&error);
             ExitCode::FAILURE
         }
     }
@@ -139,11 +139,13 @@ fn repair_pending_creations(plan: &hydra_core::RepairPlan) -> ExitCode {
                 ExitCode::SUCCESS
             }
             Ok(_) => {
-                println!("No repairs applied; pending creation state changed during confirmation.");
+                println!(
+                    "No repairs applied; pending creation state changed during confirmation. Rerun `hydra repair`."
+                );
                 ExitCode::SUCCESS
             }
             Err(error) => {
-                eprintln!("error: {error}");
+                crate::guidance::report_repair_error(&error);
                 ExitCode::FAILURE
             }
         },
@@ -152,7 +154,7 @@ fn repair_pending_creations(plan: &hydra_core::RepairPlan) -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(error) => {
-            eprintln!("error: failed to read repair confirmation: {error}");
+            crate::guidance::report_input_error("repair confirmation", &error);
             ExitCode::FAILURE
         }
     }
@@ -184,11 +186,13 @@ fn repair_untracked_heads(plan: &hydra_core::RepairPlan) -> ExitCode {
                 ExitCode::SUCCESS
             }
             Ok(_) => {
-                println!("No repairs applied; Head recovery changed during confirmation.");
+                println!(
+                    "No repairs applied; Head recovery changed during confirmation. Rerun `hydra repair`."
+                );
                 ExitCode::SUCCESS
             }
             Err(error) => {
-                eprintln!("error: {error}");
+                crate::guidance::report_repair_error(&error);
                 ExitCode::FAILURE
             }
         },
@@ -197,7 +201,7 @@ fn repair_untracked_heads(plan: &hydra_core::RepairPlan) -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(error) => {
-            eprintln!("error: failed to read repair confirmation: {error}");
+            crate::guidance::report_input_error("repair confirmation", &error);
             ExitCode::FAILURE
         }
     }
@@ -215,11 +219,13 @@ fn repair_abandoned_state_lock() -> ExitCode {
                 ExitCode::SUCCESS
             }
             Ok(false) => {
-                println!("No repairs applied; state-lock recovery changed during confirmation.");
+                println!(
+                    "No repairs applied; state-lock recovery changed during confirmation. Rerun `hydra repair`."
+                );
                 ExitCode::SUCCESS
             }
             Err(error) => {
-                eprintln!("error: {error}");
+                crate::guidance::report_repair_error(&error);
                 ExitCode::FAILURE
             }
         },
@@ -228,7 +234,7 @@ fn repair_abandoned_state_lock() -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(error) => {
-            eprintln!("error: failed to read repair confirmation: {error}");
+            crate::guidance::report_input_error("repair confirmation", &error);
             ExitCode::FAILURE
         }
     }
@@ -236,7 +242,7 @@ fn repair_abandoned_state_lock() -> ExitCode {
 
 fn repair_missing_inventory(plan: &hydra_core::RepairPlan) -> ExitCode {
     if plan.recoverable_inventory.is_empty() {
-        println!("No automatic repairs available; manual recovery required.");
+        print_manual_recovery_guidance(plan);
         return ExitCode::SUCCESS;
     }
     let stdin = io::stdin();
@@ -250,7 +256,7 @@ fn repair_missing_inventory(plan: &hydra_core::RepairPlan) -> ExitCode {
     ) {
         Ok(confirmed) => confirmed,
         Err(error) => {
-            eprintln!("error: failed to read repair confirmation: {error}");
+            crate::guidance::report_input_error("repair confirmation", &error);
             return ExitCode::FAILURE;
         }
     };
@@ -271,12 +277,30 @@ fn repair_missing_inventory(plan: &hydra_core::RepairPlan) -> ExitCode {
             ExitCode::SUCCESS
         }
         Ok(_) => {
-            println!("No repairs applied; recovery state changed during confirmation.");
+            println!(
+                "No repairs applied; recovery state changed during confirmation. Rerun `hydra repair`."
+            );
             ExitCode::SUCCESS
         }
         Err(error) => {
-            eprintln!("error: {error}");
+            crate::guidance::report_repair_error(&error);
             ExitCode::FAILURE
         }
+    }
+}
+
+fn print_manual_recovery_guidance(plan: &hydra_core::RepairPlan) {
+    if plan
+        .issues
+        .iter()
+        .any(|issue| matches!(issue, hydra_core::RepairIssue::ActiveStateLock { .. }))
+    {
+        println!(
+            "No automatic repairs available while another Hydra operation is active. Wait for it to finish, then rerun `hydra repair`."
+        );
+    } else {
+        println!(
+            "No automatic repairs available. Preserve the reported Git and Hydra state, inspect it without editing local metadata, and recover authoritative configuration or commits before rerunning `hydra repair`."
+        );
     }
 }

@@ -74,6 +74,8 @@ fn doctor_storage_requires_an_initialized_hydra_project() {
         .expect("Hydra CLI should start");
 
     assert!(!output.status.success());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("not initialized"));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("not initialized"));
+    assert!(stderr.contains("next: Run `hydra init [PATH]`"));
     assert!(!directory.path().join(".hydra.json").exists());
 }

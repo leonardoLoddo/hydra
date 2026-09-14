@@ -352,7 +352,9 @@ fn codex_install_preserves_an_existing_unknown_skill() {
         fs::read(destination.join("SKILL.md")).expect("existing skill should remain"),
         b"local skill\n"
     );
-    assert!(String::from_utf8_lossy(&output.stderr).contains("already exists"));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("already exists"));
+    assert!(stderr.contains("next: Run `hydra skill status <PROVIDER>`"));
 }
 
 #[test]

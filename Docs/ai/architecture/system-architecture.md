@@ -96,6 +96,12 @@ the selected core repair result into terminal output and exit status. Its
 `main.rs` retains only command definition and dispatch; repair classification,
 validation, and mutation remain in `hydra-core`.
 
+The private `guidance.rs` CLI module maps typed core and skill errors to one
+actionable next step. It owns presentation only: error classification and safe
+recovery boundaries remain in the originating domain type. Command adapters use
+this shared mapping so equivalent failures do not offer conflicting recovery
+advice.
+
 The private `skill.rs` CLI module is a narrow distribution adapter rather than
 Hydra repository-domain behavior. It resolves each supported provider's
 documented personal skill location, renders default-negative confirmations,

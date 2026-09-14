@@ -52,7 +52,9 @@ fn head_open_requires_an_explicit_configured_command_without_mutation() {
         .expect("Hydra CLI should start");
 
     assert!(!output.status.success());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("open command is not configured"));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("open command is not configured"));
+    assert!(stderr.contains("next: Review `commands.open` in `.hydra.json`"));
     assert_eq!(
         fs::read(head_state_path(&repository)).expect("state should remain readable"),
         state_before

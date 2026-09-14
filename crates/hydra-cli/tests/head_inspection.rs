@@ -340,7 +340,7 @@ fn inspection_rejects_an_unknown_head_without_changing_state() {
         assert!(output.stdout.is_empty());
         assert_eq!(
             String::from_utf8(output.stderr).expect("error output should be UTF-8"),
-            "error: Head \"missing\" does not exist\n"
+            "error: Head \"missing\" does not exist\nnext: Run `hydra head list` and retry with an existing Head name.\n"
         );
     }
     assert_eq!(

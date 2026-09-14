@@ -77,7 +77,9 @@ fn head_create_preserves_a_preexisting_destination() {
         .expect("Hydra CLI should start");
 
     assert!(!output.status.success());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("already exists"));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("already exists"));
+    assert!(stderr.contains("next: Run `hydra repair`"));
     assert_eq!(
         fs::read(destination.join("preserve.txt")).expect("content should be preserved"),
         b"owned elsewhere\n"

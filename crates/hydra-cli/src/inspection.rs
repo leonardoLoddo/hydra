@@ -117,6 +117,7 @@ pub(super) fn show_head_path(name: &str) -> ExitCode {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(error) => {
                     eprintln!("error: failed to show the Head path: {error}");
+                    eprintln!("next: Check the stdout destination and rerun `hydra head path`.");
                     ExitCode::FAILURE
                 }
             }
@@ -147,7 +148,7 @@ fn write_raw_path(output: &mut impl Write, path: &Path) -> io::Result<()> {
 }
 
 fn fail(error: &hydra_core::HeadError) -> ExitCode {
-    eprintln!("error: {error}");
+    crate::guidance::report_head_error(error);
     ExitCode::FAILURE
 }
 

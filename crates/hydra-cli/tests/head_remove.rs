@@ -143,6 +143,9 @@ fn head_remove_rejects_uncommitted_changes_without_mutation() {
 
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("uncommitted changes"));
+    assert!(String::from_utf8_lossy(&output.stderr).contains(
+        "next: Commit or stash the Head changes, or rerun with `--force` only to discard them."
+    ));
     assert!(head.is_dir());
     assert!(head_is_recorded(&repository, "payment"));
     assert!(branch_exists(&repository, "payment"));

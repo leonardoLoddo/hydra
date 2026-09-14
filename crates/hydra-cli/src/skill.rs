@@ -434,6 +434,9 @@ fn replace_managed(provider: Provider, destination: &Path) -> Result<(), SkillEr
     }
     if let Err(source) = backup.close() {
         eprintln!("warning: updated the skill but could not remove its temporary backup: {source}");
+        eprintln!(
+            "next: Verify the installed skill, then remove only the reported temporary backup if it still exists."
+        );
     }
     Ok(())
 }

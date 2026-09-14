@@ -64,7 +64,7 @@ fn init_from_a_head_reports_the_canonical_parent_as_already_initialized() {
     assert_eq!(
         String::from_utf8_lossy(&output.stderr),
         format!(
-            "error: Hydra is already initialized at {}\n",
+            "error: Hydra is already initialized at {}\nnext: Run `hydra status` to inspect the existing project.\n",
             parent_configuration.display()
         )
     );
@@ -204,6 +204,10 @@ fn init_preserves_partial_state_when_the_interruption_journal_is_inconsistent() 
 
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("interrupted Hydra initialization"));
+    assert!(
+        String::from_utf8_lossy(&output.stderr)
+            .contains("next: Preserve the reported paths; do not edit local Hydra metadata.")
+    );
     assert!(!configuration_path.exists());
     assert!(!inventory_path.exists());
     assert_eq!(fs::read(locator_path).unwrap(), locator);

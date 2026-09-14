@@ -161,6 +161,9 @@ Removes only an unmodified, Hydra-managed copy. Supports mutually exclusive
 ## Output and composition notes
 
 - Operational errors use a non-zero exit status and are written to `stderr`.
+- After command parsing, operational errors are followed by a `next:` line with
+  the relevant safe action. Follow that action before retrying; `hydra repair`
+  is suggested only for local Git/Hydra state that it can inspect or reconcile.
 - Interactive Head creation progress is written to `stderr`; redirected
   execution omits it.
 - `head path` preserves the exact path for non-terminal pipelines while human

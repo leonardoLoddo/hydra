@@ -563,7 +563,9 @@ fn repair_does_not_adopt_a_head_when_recovery_records_disagree() {
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
     assert!(stdout.contains("Untracked Hydra worktree: payment"));
-    assert!(stdout.ends_with("No automatic repairs available; manual recovery required.\n"));
+    assert!(stdout.ends_with(
+        "No automatic repairs available. Preserve the reported Git and Hydra state, inspect it without editing local metadata, and recover authoritative configuration or commits before rerunning `hydra repair`.\n"
+    ));
     assert_eq!(
         fs::read(head_state_path(&repository)).expect("inventory should remain readable"),
         interrupted_inventory
@@ -676,7 +678,9 @@ fn repair_preserves_an_active_current_state_lock() {
         "Active Hydra state lock: {}",
         displayed_lock.display()
     )));
-    assert!(stdout.ends_with("No automatic repairs available; manual recovery required.\n"));
+    assert!(stdout.ends_with(
+        "No automatic repairs available while another Hydra operation is active. Wait for it to finish, then rerun `hydra repair`.\n"
+    ));
     assert!(lock_path.is_file(), "active lock must remain untouched");
     assert!(heads_directory(&repository).join("payment").is_dir());
     assert!(branch_exists(&repository, "payment"));
@@ -890,7 +894,9 @@ fn repair_does_not_rebuild_when_a_head_has_no_recovery_evidence() {
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
     assert!(stdout.contains("Untracked Hydra worktree: payment"));
-    assert!(stdout.ends_with("No automatic repairs available; manual recovery required.\n"));
+    assert!(stdout.ends_with(
+        "No automatic repairs available. Preserve the reported Git and Hydra state, inspect it without editing local metadata, and recover authoritative configuration or commits before rerunning `hydra repair`.\n"
+    ));
     assert!(!state_path.exists());
     assert!(head.is_dir());
     assert!(branch_exists(&repository, "payment"));

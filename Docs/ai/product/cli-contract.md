@@ -34,6 +34,19 @@ Messages MUST be concise, declarative, and outcome-oriented. Success uses stdout
 operational failures use stderr and non-zero exit status. Output MUST distinguish
 completed actions from remaining cleanup or recovery work.
 
+Every operational failure emitted after command parsing MUST pair the diagnostic
+with a concise `next:` action on stderr. The action MUST be specific to the typed
+failure: correct input or configuration, preserve and inspect ambiguous evidence,
+retry the interrupted operation, or run `hydra repair` when local Git/Hydra state
+can be reconciled. Do not recommend `repair` for unrelated syntax, provider,
+program, or storage problems. A failed `repair` tells the user what prerequisite
+to resolve before rerunning it. Clap syntax errors retain their generated usage,
+and an explicit default-negative cancellation is not an operational failure.
+
+Warnings for an action that completed with residue MUST state both the completed
+outcome and the exact follow-up. Guidance cannot imply that an ambiguous or
+report-only state is safe to mutate manually.
+
 Creation reports the concrete absolute path and actual backend only after commit.
 Compatible interactive terminals can receive a safe local path hyperlink.
 Creation phase progress goes only to interactive stderr, not redirected streams.
@@ -69,8 +82,8 @@ help or new user-facing workflows.
 
 ## Evidence and verification
 
-Inspect `crates/hydra-cli/src/main.rs`, `head_create.rs`, `inspection.rs`, and
-`output.rs` under that source root. Run CLI `cli_contract`, `head_inspection`,
+Inspect `crates/hydra-cli/src/main.rs`, `guidance.rs`, `head_create.rs`,
+`inspection.rs`, and `output.rs` under that source root. Run CLI `cli_contract`, `head_inspection`,
 `completions`, and affected command targets. Check help matches implemented parsers, raw path
 output remains composable, redirected output contains no terminal sequences or
 progress, and invalid completion state produces no mutations or prompts.

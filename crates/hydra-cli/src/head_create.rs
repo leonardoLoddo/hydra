@@ -39,8 +39,9 @@ pub(super) fn run(name: &str, from: Option<&str>, target: Option<&str>) -> ExitC
             let confirmed = match confirmed {
                 Ok(confirmed) => confirmed,
                 Err(error) => {
-                    eprintln!(
-                        "error: failed to read unsafe-symlink exclusion confirmation: {error}"
+                    crate::guidance::report_input_error(
+                        "unsafe-symlink exclusion confirmation",
+                        &error,
                     );
                     return ExitCode::FAILURE;
                 }
@@ -68,7 +69,7 @@ pub(super) fn run(name: &str, from: Option<&str>, target: Option<&str>) -> ExitC
             let confirmed = match confirmed {
                 Ok(confirmed) => confirmed,
                 Err(error) => {
-                    eprintln!("error: failed to read full-copy confirmation: {error}");
+                    crate::guidance::report_input_error("full-copy confirmation", &error);
                     return ExitCode::FAILURE;
                 }
             };
@@ -126,6 +127,7 @@ fn finish(
                 write_created_head_path(&mut stdout.lock(), &head.path, hyperlinks_enabled)
             {
                 eprintln!("error: failed to show the created Head path: {error}");
+                eprintln!("next: Check the stdout destination; the Head was created successfully.");
                 return ExitCode::FAILURE;
             }
             match head.storage_backend {
@@ -142,7 +144,7 @@ fn finish(
             ExitCode::SUCCESS
         }
         Err(error) => {
-            eprintln!("error: {error}");
+            crate::guidance::report_head_error(&error);
             ExitCode::FAILURE
         }
     }

@@ -1573,6 +1573,14 @@ metadata symlinkate e destinazioni annidate dentro altre worktree.
 
 ## 12. Risoluzione dei problemi
 
+Gli errori operativi successivi al parsing del comando mostrano su `stderr` una
+riga `next:` con la prima azione sicura da eseguire. Hydra suggerisce `hydra
+repair` quando il problema può riguardare residui del lifecycle o incoerenze tra
+Git e stato Hydra; per input, configurazione, programmi configurati, provider e
+storage indica invece il prerequisito specifico. Se `repair` lascia uno stato in
+sola segnalazione, conserva le evidenze indicate e non modificare i metadati a
+mano.
+
 ### “Hydra is already initialized”
 
 Esiste già `.hydra.json`. Non eseguire nuovamente `hydra init` e non cancellare

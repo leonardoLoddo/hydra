@@ -7,6 +7,13 @@ preserve Head intent that Git cannot reconstruct by itself.
 Do not edit local Hydra metadata, delete a lock, remove a Head directory, or
 run destructive `git worktree` commands to make an error disappear.
 
+Operational failures include a `next:` line on stderr. Treat it as the safe
+first action for that specific failure. Hydra recommends `hydra repair` when
+the problem can involve lifecycle residue or disagreement between Git and
+Hydra state; input, configuration, configured-program, provider, and storage
+failures instead name their own prerequisite. If repair leaves a condition
+report-only, preserve the reported evidence rather than editing metadata.
+
 ## Start with read-only evidence
 
 Run:

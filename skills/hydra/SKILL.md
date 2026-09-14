@@ -137,7 +137,9 @@ Creation may pause for confirmation:
 
 If creation fails, do not substitute `git worktree add`, manual directory
 copying, or metadata edits. Inspect `hydra status`, `git worktree list`, and the
-reported error, then stop if ownership or state is ambiguous.
+reported error. Follow Hydra's `next:` action when present: it is selected from
+the typed failure. Run `hydra repair` when instructed for lifecycle residue,
+then stop if repair leaves ownership or state ambiguous.
 
 If Hydra reports failure while normalizing the target ref, verify that the
 explicit `--target` names an existing local branch. If it reports a versioned
@@ -226,6 +228,10 @@ that are not integrated, and its output must be reported.
 
 ## Handle inconsistencies safely
 
+- Treat an emitted `next:` line as the first recovery action for that exact
+  failure. Do not replace specific input, configuration, provider, program, or
+  storage guidance with a generic repair attempt. If `hydra repair` itself
+  fails, resolve the reported prerequisite and rerun it.
 - Treat `hydra status`, `hydra head status <name>`, `hydra head list`, and
   `hydra head path <name>` as the read-only inspection surface.
 - Never edit `.git/hydra`, the Heads directory's `.hydra` files, locator,

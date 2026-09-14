@@ -14,6 +14,7 @@ use clap_complete::{
     env::{Bash, EnvCompleter, Fish, Shells, Zsh},
 };
 
+mod guidance;
 mod head_create;
 mod inspection;
 mod output;
@@ -265,7 +266,7 @@ fn main() -> ExitCode {
                 ExitCode::SUCCESS
             }
             Err(error) => {
-                eprintln!("error: {error}");
+                guidance::report_init_error(&error);
                 ExitCode::FAILURE
             }
         },
@@ -332,7 +333,7 @@ fn run_skill(command: &SkillCommand) -> ExitCode {
     match skill::run(action, provider, confirmation) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
-            eprintln!("error: {error}");
+            guidance::report_skill_error(&error);
             ExitCode::FAILURE
         }
     }
@@ -492,7 +493,7 @@ fn doctor_storage() -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(error) => {
-            eprintln!("error: {error}");
+            guidance::report_doctor_error(&error);
             ExitCode::FAILURE
         }
     }
@@ -509,7 +510,7 @@ fn open_head(name: &str) -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(error) => {
-            eprintln!("error: {error}");
+            guidance::report_head_error(&error);
             ExitCode::FAILURE
         }
     }
@@ -562,7 +563,7 @@ fn close_head(name: &str) -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(error) => {
-            eprintln!("error: {error}");
+            guidance::report_head_error(&error);
             ExitCode::FAILURE
         }
     }
@@ -571,6 +572,7 @@ fn close_head(name: &str) -> ExitCode {
 fn remove_head(name: &str, force: bool) -> ExitCode {
     if let Err(error) = leave_head_worktree_before_removal(name) {
         eprintln!("error: {error}");
+        eprintln!("next: Change to the parent project worktree and retry the removal.");
         return ExitCode::FAILURE;
     }
     match hydra_core::remove_head(
@@ -588,7 +590,7 @@ fn remove_head(name: &str, force: bool) -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(error) => {
-            eprintln!("error: {error}");
+            guidance::report_head_error(&error);
             ExitCode::FAILURE
         }
     }
