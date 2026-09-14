@@ -73,30 +73,138 @@ command -v hydra
 
 ## Quick start
 
-Run these commands in an existing Git repository with at least one commit:
+Hydra begins with a repository and a first commit.
+
+From there, you can awaken the beast, grow an isolated Head, enter its workspace, and bring its work back when it is ready.
+
+> Run the following commands inside an existing Git repository with at least one commit.
+
+### I. Awaken the Hydra
+
+<p align="center">
+  <img src="assets/hydra-init.png" alt="hydra init — awaken the Hydra" />
+</p>
+
+Every Hydra starts from a single repository.
 
 ```bash
 hydra init
+```
+
+This prepares the repository for Hydra and establishes the root from which isolated Heads can grow.
+
+---
+
+### II. Grow a Head
+
+<p align="center">
+  <img src="assets/hydra-head-create.png" alt="hydra head create — grow a new isolated Head" />
+</p>
+
+Create a Head for the work you want to isolate:
+
+```bash
 hydra head create payment --from main --target main
+```
+
+`--from main` defines where the Head begins.
+
+`--target main` defines where its work will eventually return.
+
+Each Head gets its own isolated workspace while remaining part of the same repository.
+
+You can ask Hydra where that workspace lives:
+
+```bash
 hydra head path payment
+```
+
+Then move your editor, terminal, or coding agent into the printed path.
+
+At any point, inspect the Head:
+
+```bash
 hydra head status payment
 ```
 
-Move your editor, terminal, or agent into the path printed by `head path`.
-When the work is committed and ready to integrate, inspect it, return to the
-parent project with the target branch checked out, and run:
+From there, work normally: edit files, run commands, test ideas, and commit the result inside the Head.
+
+---
+
+### III. Bring the Head Home
+
+<p align="center">
+  <img src="assets/hydra-head-close.png" alt="hydra head close — reconcile a Head with its target" />
+</p>
+
+When the implementation is committed and ready to return, go back to the parent project with the target branch checked out and close the Head:
 
 ```bash
 hydra head close payment
 ```
 
-Native close runs an ordinary `git merge` in the parent worktree and prints
-Git's output directly. If Git reports conflicts, resolve and commit them there
-while Hydra waits; Hydra then resumes protected Head removal automatically.
-Running `git merge --abort` aborts the close and preserves the Head.
+Closing a Head brings its committed work back to its target branch.
 
-Use `hydra --help` and `hydra <command> --help` for the complete installed
-syntax.
+Hydra performs an ordinary Git merge in the parent worktree and exposes Git's output directly.
+
+If Git finds conflicts, resolve and commit them in the parent project while Hydra waits. Once reconciliation succeeds, Hydra resumes and safely removes the isolated Head.
+
+If you decide the reconciliation should not continue:
+
+```bash
+git merge --abort
+```
+
+The close is aborted and the Head is preserved.
+
+---
+
+### IV. Sever a Head
+
+<p align="center">
+  <img src="assets/hydra-head-remove.png" alt="hydra head remove — sever an isolated Head" />
+</p>
+
+Not every Head is meant to return.
+
+Experiments fail. Ideas change. Some paths are simply not worth keeping.
+
+When a Head should disappear without reconciling its work:
+
+```bash
+hydra head remove payment
+```
+
+Its isolated work is discarded and the parent project remains untouched.
+
+---
+
+### Teach your agents Hydra
+
+<p align="center">
+  <img src="assets/hydra-skill-install.png" alt="hydra skill install — teach an AI agent how to use Hydra autonomously" />
+</p>
+
+Hydra can teach supported AI coding agents how to use it autonomously:
+
+```bash
+hydra skill install <provider>
+```
+
+This installs the Hydra Skill for the selected provider, giving the agent the knowledge it needs to recognize when Hydra is useful and operate Heads as part of its normal workflow.
+
+---
+
+### Know your Hydra
+
+For the complete installed syntax:
+
+```bash
+hydra --help
+hydra <command> --help
+```
+
+Use these whenever you need to inspect available commands, options, or provider-specific behavior.
 
 ## Hydra Arts
 
