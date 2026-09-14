@@ -43,8 +43,8 @@ If the packaged file is unavailable, generate the registration dynamically:
 source <(hydra completions bash)
 ```
 
-The optional Codex skill is installed explicitly after the executable is on
-your `PATH`:
+The optional Codex skill, including Arena, Augury, and Gauntlet guidance, is
+installed explicitly after the executable is on your `PATH`:
 
 ```bash
 hydra skill install codex

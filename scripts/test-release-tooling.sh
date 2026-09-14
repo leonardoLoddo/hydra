@@ -189,6 +189,9 @@ for expected in \
   ./hydra-art.txt \
   ./skills/hydra/SKILL.md \
   ./skills/hydra/agents/openai.yaml \
+  ./skills/hydra/references/arena.md \
+  ./skills/hydra/references/augury.md \
+  ./skills/hydra/references/gauntlet.md \
   ./LICENSE \
   ./LICENSE-MIT \
   ./LICENSE-APACHE \

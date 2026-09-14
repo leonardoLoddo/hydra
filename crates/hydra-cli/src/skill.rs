@@ -12,7 +12,19 @@ use sha2::{Digest as _, Sha256};
 
 const SKILL_MD: &[u8] = include_bytes!("../../../skills/hydra/SKILL.md");
 const OPENAI_YAML: &[u8] = include_bytes!("../../../skills/hydra/agents/openai.yaml");
+const ARENA_MD: &[u8] = include_bytes!("../../../skills/hydra/references/arena.md");
+const AUGURY_MD: &[u8] = include_bytes!("../../../skills/hydra/references/augury.md");
+const GAUNTLET_MD: &[u8] = include_bytes!("../../../skills/hydra/references/gauntlet.md");
 const MANIFEST_NAME: &str = ".hydra-skill.json";
+const SKILL_FILES: [(&str, &[u8]); 5] = [
+    ("SKILL.md", SKILL_MD),
+    ("agents/openai.yaml", OPENAI_YAML),
+    ("references/arena.md", ARENA_MD),
+    ("references/augury.md", AUGURY_MD),
+    ("references/gauntlet.md", GAUNTLET_MD),
+];
+const LEGACY_SKILL_FILES: [(&str, &[u8]); 2] =
+    [("SKILL.md", SKILL_MD), ("agents/openai.yaml", OPENAI_YAML)];
 
 #[derive(Clone, Copy, Debug)]
 pub enum Provider {
@@ -98,6 +110,26 @@ enum InstalledState {
     Absent,
     Managed(Manifest),
     Modified(String),
+}
+
+#[derive(Clone, Copy)]
+enum SkillLayout {
+    Current,
+    Legacy,
+}
+
+impl SkillLayout {
+    fn files(self) -> &'static [(&'static str, &'static [u8])] {
+        match self {
+            Self::Current => &SKILL_FILES,
+            Self::Legacy => &LEGACY_SKILL_FILES,
+        }
+    }
+}
+
+enum LayoutInspection {
+    Known(SkillLayout),
+    Modified(&'static str),
 }
 
 #[derive(Debug)]
@@ -450,14 +482,17 @@ fn stage_skill(provider: Provider, parent: &Path) -> Result<tempfile::TempDir, S
             path: parent.to_path_buf(),
             source,
         })?;
-    let agents = staged.path().join("agents");
-    fs::create_dir(&agents).map_err(|source| SkillError::Io {
-        operation: "create",
-        path: agents.clone(),
-        source,
-    })?;
-    write_file(&staged.path().join("SKILL.md"), SKILL_MD)?;
-    write_file(&agents.join("openai.yaml"), OPENAI_YAML)?;
+    for directory in ["agents", "references"] {
+        let path = staged.path().join(directory);
+        fs::create_dir(&path).map_err(|source| SkillError::Io {
+            operation: "create",
+            path,
+            source,
+        })?;
+    }
+    for (relative, contents) in SKILL_FILES {
+        write_file(&staged.path().join(relative), contents)?;
+    }
     let mut manifest_bytes =
         serde_json::to_vec_pretty(&current_manifest(provider)).map_err(|source| {
             SkillError::Manifest {
@@ -503,27 +538,18 @@ fn inspect(provider: Provider, destination: &Path) -> Result<InstalledState, Ski
         ));
     }
 
-    let expected_root = BTreeSet::from([
-        MANIFEST_NAME.to_owned(),
-        "SKILL.md".to_owned(),
-        "agents".to_owned(),
-    ]);
-    if directory_names(destination)? != expected_root {
-        return Ok(InstalledState::Modified(
-            "the installed directory contains missing or extra entries".to_owned(),
-        ));
-    }
-    let agents = destination.join("agents");
-    if directory_names(&agents)? != BTreeSet::from(["openai.yaml".to_owned()]) {
-        return Ok(InstalledState::Modified(
-            "the agents directory contains missing or extra entries".to_owned(),
-        ));
-    }
-    for path in [
-        destination.join("SKILL.md"),
-        destination.join("agents/openai.yaml"),
-        destination.join(MANIFEST_NAME),
-    ] {
+    let layout = match inspect_layout(destination)? {
+        LayoutInspection::Known(layout) => layout,
+        LayoutInspection::Modified(reason) => {
+            return Ok(InstalledState::Modified(reason.to_owned()));
+        }
+    };
+    let installed_files = layout.files();
+    for path in installed_files
+        .iter()
+        .map(|(relative, _)| destination.join(relative))
+        .chain([destination.join(MANIFEST_NAME)])
+    {
         let Some(metadata) = symlink_metadata(&path)? else {
             return Ok(InstalledState::Modified(format!(
                 "{} is missing",
@@ -555,7 +581,10 @@ fn inspect(provider: Provider, destination: &Path) -> Result<InstalledState, Ski
             provider.display_name()
         )));
     }
-    let expected_files = BTreeSet::from(["SKILL.md", "agents/openai.yaml"]);
+    let expected_files = installed_files
+        .iter()
+        .map(|(relative, _)| *relative)
+        .collect::<BTreeSet<_>>();
     if manifest
         .files
         .keys()
@@ -576,6 +605,52 @@ fn inspect(provider: Provider, destination: &Path) -> Result<InstalledState, Ski
         }
     }
     Ok(InstalledState::Managed(manifest))
+}
+
+fn inspect_layout(destination: &Path) -> Result<LayoutInspection, SkillError> {
+    let current_root = BTreeSet::from([
+        MANIFEST_NAME.to_owned(),
+        "SKILL.md".to_owned(),
+        "agents".to_owned(),
+        "references".to_owned(),
+    ]);
+    let legacy_root = BTreeSet::from([
+        MANIFEST_NAME.to_owned(),
+        "SKILL.md".to_owned(),
+        "agents".to_owned(),
+    ]);
+    let actual_root = directory_names(destination)?;
+    let current_layout = actual_root == current_root;
+    if !current_layout && actual_root != legacy_root {
+        return Ok(LayoutInspection::Modified(
+            "the installed directory contains missing or extra entries",
+        ));
+    }
+    let agents = destination.join("agents");
+    if directory_names(&agents)? != BTreeSet::from(["openai.yaml".to_owned()]) {
+        return Ok(LayoutInspection::Modified(
+            "the agents directory contains missing or extra entries",
+        ));
+    }
+    if current_layout {
+        let references = destination.join("references");
+        if directory_names(&references)?
+            != BTreeSet::from([
+                "arena.md".to_owned(),
+                "augury.md".to_owned(),
+                "gauntlet.md".to_owned(),
+            ])
+        {
+            return Ok(LayoutInspection::Modified(
+                "the references directory contains missing or extra entries",
+            ));
+        }
+    }
+    Ok(LayoutInspection::Known(if current_layout {
+        SkillLayout::Current
+    } else {
+        SkillLayout::Legacy
+    }))
 }
 
 fn directory_names(path: &Path) -> Result<BTreeSet<String>, SkillError> {
@@ -624,10 +699,10 @@ fn current_manifest(provider: Provider) -> Manifest {
         schema_version: 1,
         provider: provider.id().to_owned(),
         hydra_version: env!("CARGO_PKG_VERSION").to_owned(),
-        files: BTreeMap::from([
-            ("SKILL.md".to_owned(), sha256_hex(SKILL_MD)),
-            ("agents/openai.yaml".to_owned(), sha256_hex(OPENAI_YAML)),
-        ]),
+        files: SKILL_FILES
+            .iter()
+            .map(|(relative, contents)| ((*relative).to_owned(), sha256_hex(contents)))
+            .collect(),
     }
 }
 

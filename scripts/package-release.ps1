@@ -30,6 +30,7 @@ $packageRoot = Join-Path $stagingRoot "package"
 
 try {
     New-Item -ItemType Directory -Path (Join-Path $packageRoot "skills\hydra\agents") -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $packageRoot "skills\hydra\references") -Force | Out-Null
     $completionDirectory = Join-Path $packageRoot "completions"
     New-Item -ItemType Directory -Path $completionDirectory -Force | Out-Null
 
@@ -67,6 +68,9 @@ try {
     Copy-Item -LiteralPath (Join-Path $repositoryRoot "hydra-art.txt") -Destination $packageRoot
     Copy-Item -LiteralPath (Join-Path $repositoryRoot "skills\hydra\SKILL.md") -Destination (Join-Path $packageRoot "skills\hydra")
     Copy-Item -LiteralPath (Join-Path $repositoryRoot "skills\hydra\agents\openai.yaml") -Destination (Join-Path $packageRoot "skills\hydra\agents")
+    Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "skills\hydra\references") -Filter "*.md" | ForEach-Object {
+        Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $packageRoot "skills\hydra\references")
+    }
     foreach ($fileName in @("LICENSE", "LICENSE-MIT", "LICENSE-APACHE", "CHANGELOG.md")) {
         Copy-Item -LiteralPath (Join-Path $repositoryRoot $fileName) -Destination $packageRoot
     }

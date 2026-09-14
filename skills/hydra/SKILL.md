@@ -1,12 +1,42 @@
 ---
 name: hydra
-description: Use Hydra's Git-native CLI to create and operate isolated development Heads for parallel AI-agent or human work. Use when an agent must start a task without sharing a working tree or index, move work into an existing Hydra Head, inspect Head state, or safely finish, integrate, repair, or remove a Head without bypassing Hydra's protections.
+description: Use Hydra's Git-native CLI to create and operate isolated development Heads, or apply Hydra Arts for competitive implementation, experimental design, and adversarial validation. Use when work needs an independent working tree and index, parallel or disposable exploration, safe lifecycle management, or evidence from multiple isolated realities.
 ---
 
 # Hydra
 
 Use Hydra as the workspace boundary for one task. Keep Git as the source of
 truth and use only documented Hydra commands for Head lifecycle operations.
+
+## Hydra Arts
+
+Hydra Arts are adaptive strategies built on isolated, disposable Heads. They
+may be explicitly requested, suggested when their expected value is plausible,
+or invoked autonomously when prerequisites are clear, uncertainty or risk is
+materially reduced, and the extra work is proportionate. If the value is
+uncertain, suggest the Art before running it.
+
+Hydra Arts are intent-driven, not step-driven. Use the lightest execution that
+preserves the Art's intent and invariants. Skip actions that do not materially
+improve the result. Never invoke an Art ceremonially or perform a step only
+because it appears in an example.
+
+- **Arena — Competitive Implementation:** use when at least two materially
+  different implementations are credible and real comparison would resolve an
+  important trade-off. Read [references/arena.md](references/arena.md).
+- **Augury — Experimental Design:** use during design or brainstorming when a
+  disposable experiment can test important assumptions more cheaply than more
+  theory. Read [references/augury.md](references/augury.md).
+- **Gauntlet — Adversarial Validation:** use on an existing implementation when
+  stronger confidence requires active attempts to expose defects, weak tests,
+  risky assumptions, or needless complexity. Read
+  [references/gauntlet.md](references/gauntlet.md).
+
+Arts may compose when evidence justifies it, but they are not a mandatory
+sequence. Preserve all authorization and safety boundaries below. An Art does
+not itself authorize integration, target-ref mutation, forced removal, or
+discarding identified work unless the user's request clearly includes that
+action.
 
 On native Windows, operate the native `hydra.exe` through Git Bash with Git for
 Windows on `PATH`. Treat copy-on-write as volume-dependent: compatible ReFS

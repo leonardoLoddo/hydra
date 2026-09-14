@@ -1,9 +1,9 @@
 # Hydra User Guide
 
-Hydra is a Git-native workspace manager for isolated development **Heads**.
-Each Head is a real Git worktree with its own working tree, index, and private
-branch. Humans, editors, and AI agents can work on several tasks without
-sharing uncommitted files.
+Hydra gives AI coding agents and humans isolated, disposable working realities
+inside a Git project. Each **Head** is a real Git worktree with its own working
+tree, index, and private branch. Parallel work, experiments, and validation do
+not share uncommitted files.
 
 This is the entry point for Hydra's maintained English user documentation.
 The documentation describes only behavior available in the current binary.
@@ -158,7 +158,8 @@ Hydra currently manages:
   Bash script in the native Windows ZIP, with portable manual registration
   when automatic activation is unavailable;
 - an optional Agent Skill for Codex, Gemini CLI, Antigravity CLI, and the
-  Antigravity app.
+  Antigravity app, including the Arena, Augury, and Gauntlet adaptive
+  strategies.
 
 ## Getting help
 

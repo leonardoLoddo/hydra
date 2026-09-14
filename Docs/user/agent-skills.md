@@ -1,8 +1,9 @@
 # Optional Agent Skills
 
 Hydra ships one portable Agent Skill that teaches an AI agent to use the Hydra
-CLI without bypassing its safety boundaries. The same canonical artifact is
-available through provider-specific installation adapters.
+CLI without bypassing its safety boundaries and to apply the Hydra Arts. The
+same canonical artifact is available through provider-specific installation
+adapters.
 
 The skill is optional. Homebrew installs the executable and packaged skill
 source, but it never writes to a personal agent directory without a separate
@@ -107,6 +108,11 @@ Hydra safely refuses to overwrite or delete:
 Do not bypass this refusal with recursive deletion or a manual copy. Inspect
 and preserve local customizations first.
 
+The release that introduces Hydra Arts can update an unmodified managed copy
+from the earlier two-file layout. Hydra recognizes that exact legacy manifest
+and tree, then replaces it atomically with the complete skill including the Art
+references. A locally changed legacy copy is still preserved.
+
 ## Invoke the skill
 
 Ask the agent explicitly to use Hydra when automatic matching does not select
@@ -137,9 +143,46 @@ from it.
 The skill does not automatically run `hydra head close`, force removal, edit
 Hydra's local metadata, or delete a worktree manually.
 
+## Hydra Arts
+
+Hydra Arts are adaptive strategies that turn isolated, disposable Heads into
+higher-level agent capabilities. They are intent-driven rather than fixed
+pipelines: the agent uses only the work needed to preserve the Art's purpose
+and invariants.
+
+| Art | Purpose | Use it when |
+|---|---|---|
+| Arena — Competitive Implementation | Compare real independent implementations and crown the strongest overall trade-off. | At least two materially different approaches are credible and implementation evidence can resolve the choice. |
+| Augury — Experimental Design | Build just enough of a possible future to learn whether and how it should be implemented. | A design, UX, dependency, or architecture contains an important assumption that a disposable experiment can test cheaply. |
+| Gauntlet — Adversarial Validation | Attack an existing implementation and return reproducible weaknesses or hardening artifacts. | Happy-path tests and ordinary review do not provide enough confidence for the important risks. |
+
+You can request an Art directly:
+
+```text
+Use Arena.
+Run Augury.
+Put this through Gauntlet.
+```
+
+The skill may also suggest an Art when the benefit is plausible, or select one
+autonomously when prerequisites are clear and the reduction in uncertainty or
+risk justifies the extra work. Arts are not mandatory stages and can be
+combined only when useful.
+
+Arena keeps contenders isolated until evaluation and salvages useful findings
+from losing Heads. Augury optimizes for information gained and does not promote
+prototype code merely because it exists. Gauntlet prioritizes attacks by risk
+and prefers proof such as a regression test, benchmark, surviving mutation, or
+minimal counterexample.
+
+All normal lifecycle protections still apply. Selecting an Art does not by
+itself authorize integration, target-branch changes, forced removal, or
+discarding identified work unless the request clearly includes that action.
+
 ## Canonical artifact
 
 The maintained portable source lives in the repository at `skills/hydra/`.
-Provider adapters install that same tree and add only their own provenance
-manifest. Provider metadata may improve presentation, but it does not redefine
-Hydra's workflow.
+Its `SKILL.md` routes each Art to a dedicated file under `references/` so an
+agent loads detailed guidance only when needed. Provider adapters install that
+same complete tree and add only their own provenance manifest. Provider
+metadata may improve presentation, but it does not redefine Hydra's workflow.

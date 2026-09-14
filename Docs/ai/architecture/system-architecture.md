@@ -105,8 +105,9 @@ advice.
 The private `skill.rs` CLI module is a narrow distribution adapter rather than
 Hydra repository-domain behavior. It resolves each supported provider's
 documented personal skill location, renders default-negative confirmations,
-stages the canonical embedded skill, and owns its provider-specific provenance
-manifest. Provider destinations and exact ownership checks are canonical in
+stages every file in the canonical embedded skill tree, and owns its
+provider-specific provenance manifest. Provider destinations and exact
+ownership checks are canonical in
 [../development/release-distribution.md](../development/release-distribution.md);
 load that contract for adapter changes. Unknown or locally modified installed
 content remains protected. It does not read or mutate a Hydra

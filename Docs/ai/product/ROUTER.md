@@ -16,6 +16,7 @@ and distribution procedures belong to Development.
 | any: init, Head creation or inspection, base or target semantics, parent context, open or close adapter, integration, removal | required | [lifecycle.md](lifecycle.md) | no lifecycle behavior or configured process contract is involved |
 | any: state, schema compatibility, ownership, inventory, lock, recovery record, interruption, repair | required | [state-and-recovery.md](state-and-recovery.md) | persisted intent, ownership, and recovery cannot be affected |
 | any: command hierarchy, help, prompt, terminal rendering, exit status, machine output, completion | required | [cli-contract.md](cli-contract.md) | only internal implementation changes with unchanged interaction contracts |
+| any: Hydra Art, Arena, Augury, Gauntlet, adaptive agent strategy, disposable-reality positioning | required | [hydra-arts.md](hydra-arts.md) | ordinary Head lifecycle work that does not use or change an Art |
 | any: explicit future design, roadmap, scope expansion, proposed capability | reference | [roadmap.md](roadmap.md) | implementing or documenting existing behavior without a roadmap question |
 
 ## Cross-context composition
@@ -39,6 +40,6 @@ and distribution procedures belong to Development.
 
 ## Ownership and maintenance
 
-This router canonically owns all seven leaves registered above. Other domains
+This router canonically owns all eight leaves registered above. Other domains
 may depend on them without taking ownership. Update this router and
 [../ROUTER.md](../ROUTER.md) when ownership, paths, or selection boundaries change.

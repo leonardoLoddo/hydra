@@ -30,8 +30,8 @@ perimetro in pagine tematiche navigabili.
 
 ## 1. Concetti essenziali
 
-Hydra crea più directory di lavoro isolate, chiamate **Head**, a partire dallo
-stesso repository Git.
+Hydra offre ad agenti AI e persone realtà di lavoro isolate e usa-e-getta
+all'interno dello stesso progetto Git. Queste directory sono chiamate **Head**.
 
 Ogni Head:
 
@@ -293,6 +293,12 @@ devono modificare lo stato; `--yes` e `--no` sono disponibili per automazioni.
 Una skill sconosciuta, un symlink, un file aggiuntivo o un checksum diverso
 causano un rifiuto sicuro senza sovrascrittura o cancellazione.
 
+La release che introduce le Hydra Arts può aggiornare una copia gestita e non
+modificata dal precedente layout a due file. Hydra riconosce soltanto quel
+manifest e quella struttura esatti, quindi li sostituisce atomicamente con la
+skill completa di riferimenti alle Arts. Una copia legacy modificata localmente
+rimane protetta.
+
 Codex rileva normalmente le modifiche automaticamente. Gemini CLI può
 riscansionare le skill con `/skills reload`. In Antigravity CLI usa `/skills`
 per verificare le skill caricate e riavvia l'host se la nuova copia non è
@@ -314,6 +320,43 @@ revisione. Non esegue automaticamente `hydra head close`,
 `hydra head remove --force`, modifiche ai metadati locali o cancellazioni
 manuali di worktree. Integrazione e scarto di file richiedono
 un'autorizzazione esplicita.
+
+### 3.2 Hydra Arts
+
+Le Hydra Arts sono strategie adattive che trasformano le Head isolate e
+usa-e-getta in capacità di problem solving per gli agenti AI. Sono guidate
+dall'intento, non da una pipeline rigida: l'agente esegue soltanto il lavoro
+necessario a preservare lo scopo e gli invarianti dell'Art.
+
+| Art | Scopo | Quando usarla |
+|---|---|---|
+| Arena — Competitive Implementation | Confrontare implementazioni reali e indipendenti e incoronare il compromesso complessivamente più forte. | Esistono almeno due approcci materialmente diversi e l'evidenza implementativa può risolvere la scelta. |
+| Augury — Experimental Design | Costruire quanto basta di un futuro possibile per capire se e come implementarlo. | Un design, una UX, una dipendenza o un'architettura contiene un'ipotesi importante che un esperimento usa-e-getta può verificare a basso costo. |
+| Gauntlet — Adversarial Validation | Attaccare un'implementazione esistente e riportare debolezze riproducibili o artefatti di irrobustimento. | I test happy-path e la normale review non danno abbastanza fiducia sui rischi importanti. |
+
+Puoi richiedere direttamente un'Art:
+
+```text
+Usa Arena.
+Esegui Augury.
+Sottoponi questa implementazione a Gauntlet.
+```
+
+La skill può anche suggerire un'Art quando il beneficio è plausibile oppure
+selezionarla autonomamente quando i prerequisiti sono chiari e la riduzione di
+incertezza o rischio giustifica il lavoro aggiuntivo. Le Arts non sono fasi
+obbligatorie e si combinano soltanto quando serve.
+
+Arena mantiene i contendenti isolati fino alla valutazione e recupera le
+scoperte utili dalle Head perdenti. Augury ottimizza l'informazione ottenuta e
+non promuove codice sperimentale soltanto perché esiste già. Gauntlet assegna
+priorità agli attacchi in base al rischio e preferisce prove come regression
+test, benchmark, mutazioni sopravvissute o controesempi minimi.
+
+Restano valide tutte le normali protezioni del ciclo di vita. Selezionare un'Art
+non autorizza di per sé integrazione, modifiche al branch target, rimozione
+forzata o scarto di lavoro identificato, salvo che la richiesta includa
+chiaramente quell'azione.
 
 ---
 

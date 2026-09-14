@@ -28,17 +28,23 @@ The skill contains only files needed by an agent at runtime:
 ```text
 skills/hydra/
 ├── SKILL.md
-└── agents/
-    └── openai.yaml
+├── agents/
+│   └── openai.yaml
+└── references/
+    ├── arena.md
+    ├── augury.md
+    └── gauntlet.md
 ```
 
 - `SKILL.md` owns triggering metadata and vendor-neutral operating guidance.
 - `agents/openai.yaml` owns Codex-facing display metadata and a default prompt.
+- `references/` owns detailed, independently selected Hydra Art guidance;
+  `SKILL.md` owns the routing condition for each reference.
 - Maintainer documentation, installation guides, test logs, and changelogs do
   not belong inside the skill directory.
-- Add scripts, references, or assets only when repeated use demonstrates a
-  concrete runtime need. Do not duplicate canonical project documentation as a
-  bundled reference.
+- Add scripts, references, or assets only when a concrete runtime need justifies
+  progressive loading or reusable execution. Do not duplicate canonical project
+  documentation as a bundled reference.
 
 Keep the skill concise. It must tell an agent how to operate Hydra safely, not
 teach general Git usage or preserve implementation history.
@@ -143,6 +149,11 @@ For every skill change:
    built `hydra --help` hierarchy;
 5. confirm that the English and Italian user documentation describe only
    currently supported workflows and agree with product documentation.
+
+When the skill contains references, install it into a temporary provider home
+and verify that every routed file is present, checksummed in the provenance
+manifest, protected from local-modification overwrite or removal, and included
+in Unix and Windows release-package tests.
 
 When operating workflow or safety guidance changes, also exercise the affected
 path in a newly created temporary Git repository. Verify both the intended

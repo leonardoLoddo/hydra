@@ -29,12 +29,13 @@ mkdir -p "$output_directory"
 staging_root=$(mktemp -d "${TMPDIR:-/tmp}/hydra-release.XXXXXX")
 trap 'rm -rf "$staging_root"' EXIT
 package_root="$staging_root/package"
-mkdir -p "$package_root/skills/hydra/agents"
+mkdir -p "$package_root/skills/hydra/agents" "$package_root/skills/hydra/references"
 
 cp "$binary" "$package_root/hydra"
 cp "$repository_root/hydra-art.txt" "$package_root/hydra-art.txt"
 cp "$repository_root/skills/hydra/SKILL.md" "$package_root/skills/hydra/SKILL.md"
 cp "$repository_root/skills/hydra/agents/openai.yaml" "$package_root/skills/hydra/agents/openai.yaml"
+cp "$repository_root"/skills/hydra/references/*.md "$package_root/skills/hydra/references/"
 cp "$repository_root/LICENSE" "$package_root/LICENSE"
 cp "$repository_root/LICENSE-MIT" "$package_root/LICENSE-MIT"
 cp "$repository_root/LICENSE-APACHE" "$package_root/LICENSE-APACHE"
