@@ -5,9 +5,10 @@
 [![CI](https://github.com/leonardoLoddo/hydra/actions/workflows/ci.yml/badge.svg)](https://github.com/leonardoLoddo/hydra/actions/workflows/ci.yml)
 [![License: MIT or Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 
-Hydra is a Git-native workspace manager for isolated development **Heads**.
-Each Head has its own working tree, index, and private branch, so humans and AI
-agents can work in parallel without sharing uncommitted files.
+Hydra gives AI coding agents and humans isolated, disposable working realities
+inside a Git project. Each **Head** has its own working tree, index, and private
+branch, so parallel work, experiments, and validation do not share uncommitted
+files.
 
 > [!IMPORTANT]
 > Hydra 1.x is the current SemVer compatibility line for the documented core.
@@ -97,6 +98,66 @@ Running `git merge --abort` aborts the close and preserves the Head.
 Use `hydra --help` and `hydra <command> --help` for the complete installed
 syntax.
 
+## Hydra Arts
+
+<p align="center">
+  <img src="assets/hydra-arts.png" alt="Hydra Arts: Arena, Augury, and Gauntlet">
+</p>
+
+Hydra does more than create isolated workspaces. Its portable Agent Skill
+teaches AI coding agents how to turn those disposable realities into adaptive
+problem-solving strategies. The Arts are intent-driven, not rigid pipelines:
+use the lightest execution that preserves their purpose and skip work that does
+not improve the result.
+
+### Arena — Competitive Implementation
+
+<p align="center">
+  <img src="assets/hydra-art-arena.png" alt="Arena: independent implementation strategies competing from the same baseline">
+</p>
+
+> **Let the heads compete. Crown the strongest.**
+
+When several materially different implementations are credible, build them in
+independent Heads from the same baseline and choose from actual results instead
+of theory. Arena adapts the number of contenders to the real alternatives,
+compares them against the task's important criteria, and salvages useful tests
+or discoveries from losing Heads before cleanup.
+
+### Augury — Experimental Design
+
+<p align="center">
+  <img src="assets/hydra-art-augury.png" alt="Augury: exploring a possible implementation future through a disposable prototype">
+</p>
+
+> **Walk the future. Return with knowledge.**
+
+When a feature or architecture contains assumptions that discussion cannot
+settle cheaply, build only enough of it in a disposable Head to inspect, run,
+and challenge the idea. Augury optimizes for information gained, stops as soon
+as the decision is clear, and carries evidence forward rather than promoting a
+prototype by inertia.
+
+### Gauntlet — Adversarial Validation
+
+<p align="center">
+  <img src="assets/hydra-art-gauntlet.png" alt="Gauntlet: an implementation surviving deliberate adversarial attacks">
+</p>
+
+> **Make the implementation earn its survival.**
+
+Green tests are a starting point, not a coronation. Gauntlet attacks an
+existing implementation in an isolated Head using the most relevant ideas from
+mutation testing, property-based testing, fuzzing, fault injection, stress
+testing, and simplification review. It prefers reproducible failures and brings
+back proof artifacts such as regression tests or benchmarks without damaging
+the working branch.
+
+Invoke an Art directly (`Use Arena`, `Run Augury`, `Put this through
+Gauntlet`), let an agent suggest one when the value is plausible, or allow the
+skill to select one when the benefit clearly justifies the cost. Arts can
+compose, but they are never ceremonial steps or a mandatory lifecycle.
+
 ## Documentation
 
 The complete [English user guide](Docs/user/hydra-user-guide.md) explains the
@@ -122,8 +183,8 @@ maintained alongside the English documentation.
 ## Optional Agent Skill
 
 Hydra ships one portable Agent Skill that teaches supported AI agents the safe
-Head workflow. Homebrew never installs it silently. Choose the provider whose
-personal skill directory you want Hydra to manage:
+Head workflow and the Hydra Arts. Homebrew never installs it silently. Choose
+the provider whose personal skill directory you want Hydra to manage:
 
 <p align="center">
   <img src="assets/hydra-codex-skill.png" alt="Codex prompt using the Hydra skill to create an isolated workflow for a payment feature">
