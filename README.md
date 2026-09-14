@@ -305,6 +305,10 @@ hydra skill install agy
 hydra skill install antigravity
 ```
 
+<p align="center">
+  <img src="assets/hydra-skill-arts" alt="Codex prompt using the Hydra skill to test a new feature trough Gauntlet art">
+</p>
+
 For unattended setup, make the choice explicit:
 
 ```bash
