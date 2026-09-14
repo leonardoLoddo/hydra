@@ -5,6 +5,20 @@ All notable changes to Hydra will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0](https://github.com/leonardoLoddo/hydra/compare/v1.0.0...v1.1.0) (2026-09-14)
+
+
+### Features
+
+* **skill:** add Hydra Arts ([83bd060](https://github.com/leonardoLoddo/hydra/commit/83bd06015fbd8ff4a3b822b2dbd2aa422d6fa2f4))
+
+
+### Bug Fixes
+
+* **cli:** add actionable failure guidance ([2a9b6b3](https://github.com/leonardoLoddo/hydra/commit/2a9b6b3081768eefdc6b5a4bbe020b737c100d38))
+* **head:** reconcile interrupted creation ([06e8c0a](https://github.com/leonardoLoddo/hydra/commit/06e8c0aa806e39f1ed13df249038d93512cef851))
+* **init:** resume interrupted initialization ([02d08a0](https://github.com/leonardoLoddo/hydra/commit/02d08a07efb9d32cbbd5b531a77cebffece90550))
+
 ## [1.0.0](https://github.com/leonardoLoddo/hydra/compare/v0.2.0...v1.0.0) (2026-08-31)
 
 
