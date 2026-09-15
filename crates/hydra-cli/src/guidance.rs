@@ -217,5 +217,8 @@ fn skill_next_step(error: &crate::skill::SkillError) -> &'static str {
         SkillError::Io { .. } => {
             "Resolve the reported path, permission, or storage problem, then retry the same skill command."
         }
+        SkillError::JsonOutput(_) => {
+            "Fix the reported JSON output problem and rerun `hydra skill status <PROVIDER> --json`."
+        }
     }
 }

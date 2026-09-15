@@ -4,6 +4,14 @@ use std::{fs, path::Path, process::Command};
 
 use common::{TestDirectory, hydra_command};
 
+fn assert_single_line_json_output(output: &[u8]) {
+    let (terminator, content) = output
+        .split_last()
+        .expect("JSON output should contain a value and a newline");
+    assert_eq!(*terminator, b'\n');
+    assert!(!content.contains(&b'\n'));
+}
+
 fn isolated_hydra(home: &Path) -> Command {
     let mut command = hydra_command();
     command.env("HOME", home).env_remove("USERPROFILE");
@@ -408,6 +416,75 @@ fn codex_status_reports_a_current_managed_installation() {
 
     assert!(output.status.success());
     assert!(String::from_utf8_lossy(&output.stdout).contains("current"));
+}
+
+#[test]
+fn codex_status_emits_current_and_update_available_json() {
+    let directory = TestDirectory::new("skill-status-json");
+    install_skill(directory.path());
+    let destination = skill_path(directory.path());
+
+    let current = isolated_hydra(directory.path())
+        .args(["skill", "status", "codex", "--json"])
+        .output()
+        .expect("Hydra CLI should start");
+    assert!(
+        current.status.success(),
+        "JSON skill status should succeed, stderr: {}",
+        String::from_utf8_lossy(&current.stderr)
+    );
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&current.stdout)
+            .expect("skill status should be valid JSON"),
+        serde_json::json!({
+            "schemaVersion": 1,
+            "provider": "codex",
+            "displayName": "Codex",
+            "destination": destination.to_str().expect("test path should be Unicode"),
+            "state": "current",
+            "installedHydraVersion": env!("CARGO_PKG_VERSION"),
+            "availableHydraVersion": env!("CARGO_PKG_VERSION")
+        })
+    );
+    assert_single_line_json_output(&current.stdout);
+
+    let manifest_path = destination.join(".hydra-skill.json");
+    let mut manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(&manifest_path).expect("manifest should exist"))
+            .expect("manifest should be JSON");
+    manifest["hydraVersion"] = serde_json::Value::String("0.0.0".to_owned());
+    fs::write(
+        manifest_path,
+        serde_json::to_vec_pretty(&manifest).expect("manifest should serialize"),
+    )
+    .expect("older manifest should be written");
+
+    let outdated = isolated_hydra(directory.path())
+        .args(["skill", "status", "codex", "--json"])
+        .output()
+        .expect("Hydra CLI should start");
+    assert!(outdated.status.success());
+    let json: serde_json::Value =
+        serde_json::from_slice(&outdated.stdout).expect("skill status should be valid JSON");
+    assert_eq!(json["state"], "updateAvailable");
+    assert_eq!(json["installedHydraVersion"], "0.0.0");
+    assert_eq!(json["availableHydraVersion"], env!("CARGO_PKG_VERSION"));
+}
+
+#[test]
+fn json_skill_status_errors_keep_stdout_empty_and_human_guidance_on_stderr() {
+    let directory = TestDirectory::new("skill-status-json-absent");
+
+    let output = isolated_hydra(directory.path())
+        .args(["skill", "status", "codex", "--json"])
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr).expect("error output should be UTF-8");
+    assert!(stderr.contains("is not installed"));
+    assert!(stderr.contains("next: Run `hydra skill install <PROVIDER>`"));
 }
 
 #[test]

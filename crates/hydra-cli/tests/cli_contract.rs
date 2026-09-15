@@ -139,15 +139,69 @@ fn help_exposes_the_complete_inspection_syntax() {
 
     let stdout = String::from_utf8(output.stdout).expect("help output should be UTF-8");
     for syntax in [
-        "hydra status",
+        "hydra status [--json]",
         "hydra repair",
-        "hydra head list",
-        "hydra head status <NAME>",
-        "hydra head path <NAME>",
+        "hydra doctor storage [--json]",
+        "hydra skill status <PROVIDER> [--json]",
+        "hydra head list [--json]",
+        "hydra head status <NAME> [--json]",
+        "hydra head path <NAME> [--json]",
     ] {
         assert!(
             stdout.contains(syntax),
             "top-level help should expose {syntax:?}, got: {stdout:?}"
+        );
+    }
+}
+
+#[test]
+fn inspection_help_exposes_json_only_on_read_only_data_commands() {
+    for arguments in [
+        vec!["status", "--help"],
+        vec!["head", "list", "--help"],
+        vec!["head", "status", "--help"],
+        vec!["head", "path", "--help"],
+        vec!["doctor", "storage", "--help"],
+        vec!["skill", "status", "--help"],
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_hydra"))
+            .args(&arguments)
+            .output()
+            .expect("Hydra CLI should start");
+        assert!(
+            output.status.success(),
+            "help should succeed for {arguments:?}"
+        );
+        let stdout = String::from_utf8(output.stdout).expect("help output should be UTF-8");
+        assert!(
+            stdout.contains("--json") && stdout.contains("JSON"),
+            "help should document JSON for {arguments:?}, got: {stdout:?}"
+        );
+    }
+
+    for arguments in [
+        vec!["init", "--help"],
+        vec!["repair", "--help"],
+        vec!["head", "create", "--help"],
+        vec!["head", "open", "--help"],
+        vec!["head", "close", "--help"],
+        vec!["head", "remove", "--help"],
+        vec!["skill", "install", "--help"],
+        vec!["skill", "update", "--help"],
+        vec!["skill", "remove", "--help"],
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_hydra"))
+            .args(&arguments)
+            .output()
+            .expect("Hydra CLI should start");
+        assert!(
+            output.status.success(),
+            "help should succeed for {arguments:?}"
+        );
+        let stdout = String::from_utf8(output.stdout).expect("help output should be UTF-8");
+        assert!(
+            !stdout.contains("--json"),
+            "mutating command {arguments:?} must not advertise JSON, got: {stdout:?}"
         );
     }
 }

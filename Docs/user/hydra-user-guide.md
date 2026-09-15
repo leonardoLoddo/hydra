@@ -149,6 +149,7 @@ Hydra currently manages:
 - isolated Head creation with private branches;
 - tracked-file and selected-overlay materialization;
 - read-only project and Head inspection;
+- versioned JSON output for project, Head, storage, and managed-skill inspection;
 - configured opening commands;
 - native or configured close workflows;
 - protected removal;

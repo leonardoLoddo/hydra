@@ -62,6 +62,60 @@ fn doctor_storage_runs_a_real_probe_and_cleans_every_artifact() {
 }
 
 #[test]
+fn doctor_storage_emits_versioned_json_and_cleans_every_artifact() {
+    let directory = TestDirectory::new("doctor-storage-json");
+    let repository = create_initialized_project(&directory);
+    let heads = heads_directory(&repository);
+    let entries_before = directory_entries(&heads);
+
+    let output = hydra_command()
+        .args(["doctor", "storage", "--json"])
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(
+        output.status.success(),
+        "JSON storage diagnostics should succeed, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("storage diagnostics should be valid JSON");
+    assert_eq!(json["schemaVersion"], 1);
+    assert!(matches!(
+        json["storageBackend"].as_str(),
+        Some("copyOnWrite" | "fullCopy")
+    ));
+    assert!(matches!(
+        json["nativePrimitive"].as_str(),
+        Some(
+            "apfsClone" | "linuxReflink" | "windowsReFsBlockClone" | "nativeClone" | "unavailable"
+        )
+    ));
+    assert!(matches!(
+        json["environment"].as_str(),
+        Some("native" | "windowsSubsystemForLinux")
+    ));
+    assert!(json["filesystem"].is_null() || json["filesystem"].is_string());
+    assert!(json["copyOnWriteGuidance"].is_null() || json["copyOnWriteGuidance"].is_string());
+    assert_eq!(json["fullCopyFallbackVerified"], true);
+    assert_eq!(json["mutableHardLinksEnabled"], false);
+    assert_eq!(json["isolationSupported"], true);
+    assert_eq!(
+        json.as_object().expect("report should be an object").len(),
+        9
+    );
+    let (terminator, content) = output
+        .stdout
+        .split_last()
+        .expect("JSON output should contain a value and a newline");
+    assert_eq!(*terminator, b'\n');
+    assert!(!content.contains(&b'\n'));
+    assert_eq!(directory_entries(&heads), entries_before);
+    assert!(!head_state_lock_path(&repository).exists());
+}
+
+#[test]
 fn doctor_storage_requires_an_initialized_hydra_project() {
     let directory = TestDirectory::new("doctor-storage-uninitialized");
     let initialized = run_git(directory.path(), &["init", "--quiet"]);

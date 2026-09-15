@@ -109,6 +109,12 @@ contract cannot affect what an agent executes, decides, validates, or reports.
 State that conclusion in the final report. Never make a meaningless wording or
 timestamp change merely to touch the skill.
 
+When an agent parses inspection data instead of presenting it to a person, the
+skill MUST prefer the supported `--json` mode on `status`, `head list`, `head
+status`, `head path`, `doctor storage`, and `skill status`. It MUST NOT parse
+human-readable summaries when a versioned JSON contract exists, infer JSON on
+mutating commands, or treat JSON selection as authorization for an action.
+
 When `SKILL.md` changes, inspect `agents/openai.yaml` in the same task and
 regenerate it if the display name, short description, or default prompt is no
 longer aligned.

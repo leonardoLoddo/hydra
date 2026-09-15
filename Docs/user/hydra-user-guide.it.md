@@ -54,18 +54,18 @@ Il binario corrente espone:
 
 ```text
 hydra init [PATH]
-hydra status
+hydra status [--json]
 hydra repair
-hydra doctor storage
+hydra doctor storage [--json]
 hydra completions <SHELL>
 hydra skill install <PROVIDER> [--yes | --no]
-hydra skill status <PROVIDER>
+hydra skill status <PROVIDER> [--json]
 hydra skill update <PROVIDER> [--yes | --no]
 hydra skill remove <PROVIDER> [--yes | --no]
 hydra head create <NAME> [--from <REF>] [--target <BRANCH>]
-hydra head list
-hydra head status <NAME>
-hydra head path <NAME>
+hydra head list [--json]
+hydra head status <NAME> [--json]
+hydra head path <NAME> [--json]
 hydra head open <NAME>
 hydra head close <NAME>
 hydra head remove <NAME> [--force]
@@ -287,6 +287,11 @@ hydra skill status antigravity
 hydra skill update antigravity
 hydra skill remove antigravity
 ```
+
+Per automazione, `hydra skill status <PROVIDER> --json` restituisce provider,
+destinazione, versione installata e disponibile e lo stato `current` oppure
+`updateAvailable` in un singolo oggetto versionato. Installazioni mancanti,
+sconosciute o modificate restano errori non-zero con stdout vuoto.
 
 Anche aggiornamento e rimozione usano una conferma predefinita negativa quando
 devono modificare lo stato; `--yes` e `--no` sono disponibili per automazioni.
@@ -625,6 +630,15 @@ I quattro comandi di ispezione sono read-only: non creano il lock
 directory o una ref manca, `status` segnala l'incoerenza senza correggerla. Un
 percorso registrato che esce dalla directory delle Head posseduta viene
 rifiutato.
+
+Quando un agente o uno script deve elaborare questi dati, aggiungi `--json` a
+uno qualsiasi dei quattro comandi. Ogni successo emette un solo oggetto con
+`"schemaVersion": 1`: lo stato dettagliato separa intenzione `recorded`, stato
+`observed` e `consistency`, mentre valori osservati non disponibili sono
+`null`. La forma normale di `head path` rimane quella corretta dentro
+`cd "$(...)"`; la forma JSON include nome e percorso. Percorsi non Unicode
+vengono rifiutati senza conversione distruttiva. Gli errori restano non-zero,
+con stdout vuoto e diagnostica operativa su stderr.
 
 ### 4.6 Apri una Head
 
@@ -1290,6 +1304,10 @@ Per eseguire una diagnostica esplicita sul volume realmente gestito:
 ```bash
 hydra doctor storage
 ```
+
+Per automazione, `hydra doctor storage --json` restituisce la stessa prova
+completata in un oggetto versionato con backend, primitiva nativa, ambiente,
+filesystem, guida eventuale e flag relativi a fallback, hard link e isolamento.
 
 Il comando crea una directory temporanea dentro la directory delle Head,
 verifica i byte prodotti dal clone nativo e, separatamente quando necessario,

@@ -65,6 +65,11 @@ Check whether one provider copy is current and unmodified:
 hydra skill status gemini
 ```
 
+For automation, add `--json` to receive the provider, destination, installed
+and available Hydra versions, and the `current` or `updateAvailable` state as
+one versioned object. Unknown, missing, or modified installations remain
+non-zero errors with empty stdout.
+
 After upgrading the Hydra binary, update that independently managed copy:
 
 ```bash

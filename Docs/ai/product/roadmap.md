@@ -34,7 +34,7 @@ in advance as a post-1.0 roadmap of 0.x releases.
 | Immutable-content hard links | Only for content explicitly immutable and protected read-only; not a general materialization backend |
 | Lost-locator reconnection and installation relocation | Future explicit ownership-validated recovery, never silent path reinterpretation |
 | Additional crates or persistent content cache | Require demonstrated boundaries or reuse needs; no prebuilt architecture |
-| Short command aliases and JSON output | Potential interfaces, not current syntax contracts |
+| Short command aliases | Potential interfaces, not current syntax contracts |
 
 ## Locator reconnection and relocation proposal
 

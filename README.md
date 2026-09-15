@@ -215,6 +215,24 @@ hydra <command> --help
 
 Use these whenever you need to inspect available commands, options, or provider-specific behavior.
 
+### Inspect Hydra from automation
+
+Every read-only command that returns Hydra data supports a versioned JSON mode:
+
+```bash
+hydra status --json
+hydra head list --json
+hydra head status payment --json
+hydra head path payment --json
+hydra doctor storage --json
+hydra skill status codex --json
+```
+
+Each success emits one JSON object with `"schemaVersion": 1`. Human output is
+unchanged without the flag; inspection and validation failures remain non-zero
+with empty stdout and an actionable diagnostic on stderr. Lifecycle mutations,
+repair, and shell completion do not accept `--json`.
+
 ## Hydra Arts
 
 <p align="center">

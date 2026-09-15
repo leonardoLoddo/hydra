@@ -36,6 +36,10 @@ After initialization, run:
 hydra doctor storage
 ```
 
+For automation, `hydra doctor storage --json` returns the same completed probe
+as one versioned object with stable backend, primitive, environment, filesystem,
+guidance, fallback, hard-link, and isolation fields.
+
 Hydra creates a unique temporary directory inside the managed Heads directory,
 tests the native primitive, verifies the isolated full-copy fallback, and
 cleans up the exact probe files. A successful APFS result looks like:

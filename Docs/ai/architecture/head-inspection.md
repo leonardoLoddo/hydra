@@ -93,6 +93,21 @@ and pipelines. On a terminal, control characters are rendered as textual
 escapes. Human-readable status output always applies the same safe rendering
 to paths and persisted text.
 
+Each command also accepts `--json`. The CLI maps core inspection models into a
+versioned CLI-local schema instead of serializing core structs directly:
+
+- project status contains `repositoryRoot`, `headsDirectory`, `headCount`, and
+  ordered `heads` summaries;
+- Head list contains the ordered `heads` names;
+- Head path contains `name` and the validated `path`;
+- Head status contains `recorded`, `observed`, and `consistency` objects.
+
+Every JSON root contains `schemaVersion: 1`. Unavailable commit, change,
+ahead, and behind observations are `null`. `observed.worktreeHead.kind` is
+`branch`, `detached`, or `unavailable`; a branch includes `reference`.
+`consistency.status` is `ok` or `inconsistent` and `issues` retains the ordered
+diagnostics. A path that is not valid Unicode fails before stdout is written.
+
 `hydra status` returns:
 
 - the discovered repository root;
@@ -181,6 +196,9 @@ CLI integration tests use disposable Git repositories and prove:
 - observed branch and commit reporting after a direct Git branch switch;
 - deterministic comparison for abbreviated non-symbolic bases;
 - path-only output;
+- exact versioned JSON for project, list, detail, and path output;
+- empty stdout and unchanged actionable errors when inspection or JSON conversion
+  fails before terminal output begins;
 - safe terminal rendering with exact non-terminal path bytes;
 - unknown-name rejection;
 - missing worktree, base-ref, and target-ref diagnostics without repair;

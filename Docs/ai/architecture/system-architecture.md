@@ -71,7 +71,8 @@ coordination is useful. A crate opts into only the dependencies it uses.
 - the public command hierarchy and argument parsing;
 - documented command names, positional arguments, flags, and help output;
 - conversion from CLI values into calls to `hydra-core`;
-- human-readable stdout and stderr;
+- human-readable stdout and stderr, plus versioned CLI-local JSON projections for
+  supported read-only commands;
 - process exit status.
 
 The CLI should not own Git discovery, path policy, persistence, rollback, or

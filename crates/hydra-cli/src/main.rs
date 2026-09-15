@@ -17,6 +17,7 @@ use clap_complete::{
 mod guidance;
 mod head_create;
 mod inspection;
+mod json_output;
 mod output;
 mod repair;
 mod skill;
@@ -28,7 +29,7 @@ mod skill;
     version,
     about = "Git-native workspace manager for isolated development Heads",
     long_about = "Git-native workspace manager for isolated development Heads.\n\nHydra creates independent working directories while preserving familiar Git refs, branches, and repository workflows.",
-    after_help = "Command syntax:\n  hydra init [PATH]\n  hydra status\n  hydra repair\n  hydra doctor storage\n  hydra completions <SHELL>\n  hydra skill install <PROVIDER>\n  hydra skill status <PROVIDER>\n  hydra skill update <PROVIDER>\n  hydra skill remove <PROVIDER>\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head open <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra <command> --help' for details."
+    after_help = "Command syntax:\n  hydra init [PATH]\n  hydra status [--json]\n  hydra repair\n  hydra doctor storage [--json]\n  hydra completions <SHELL>\n  hydra skill install <PROVIDER>\n  hydra skill status <PROVIDER> [--json]\n  hydra skill update <PROVIDER>\n  hydra skill remove <PROVIDER>\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list [--json]\n  hydra head status <NAME> [--json]\n  hydra head path <NAME> [--json]\n  hydra head open <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra <command> --help' for details."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -45,7 +46,11 @@ enum Command {
         path: PathBuf,
     },
     /// Show the project and local Heads
-    Status,
+    Status {
+        /// Emit one versioned JSON object
+        #[arg(long)]
+        json: bool,
+    },
     /// Reconcile Hydra inventory with Git worktrees
     #[command(
         long_about = "Reconcile Hydra inventory with Git worktrees.\n\nHydra reports ambiguous inconsistencies without mutation and asks for confirmation before applying deterministic repairs.",
@@ -54,7 +59,7 @@ enum Command {
     Repair,
     /// Diagnose project capabilities
     #[command(
-        after_help = "Command syntax:\n  hydra doctor storage\n\nRun 'hydra doctor <command> --help' for details."
+        after_help = "Command syntax:\n  hydra doctor storage [--json]\n\nRun 'hydra doctor <command> --help' for details."
     )]
     Doctor {
         #[command(subcommand)]
@@ -72,7 +77,7 @@ enum Command {
     },
     /// Install and manage optional AI-agent skills
     #[command(
-        after_help = "Command syntax:\n  hydra skill install <PROVIDER>\n  hydra skill status <PROVIDER>\n  hydra skill update <PROVIDER>\n  hydra skill remove <PROVIDER>\n\nProviders: codex, gemini, agy, antigravity."
+        after_help = "Command syntax:\n  hydra skill install <PROVIDER>\n  hydra skill status <PROVIDER> [--json]\n  hydra skill update <PROVIDER>\n  hydra skill remove <PROVIDER>\n\nProviders: codex, gemini, agy, antigravity."
     )]
     Skill {
         #[command(subcommand)]
@@ -80,7 +85,7 @@ enum Command {
     },
     /// Create and manage Heads
     #[command(
-        after_help = "Command syntax:\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list\n  hydra head status <NAME>\n  hydra head path <NAME>\n  hydra head open <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra head <command> --help' for details."
+        after_help = "Command syntax:\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list [--json]\n  hydra head status <NAME> [--json]\n  hydra head path <NAME> [--json]\n  hydra head open <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra head <command> --help' for details."
     )]
     Head {
         #[command(subcommand)]
@@ -129,6 +134,9 @@ enum SkillCommand {
     Status {
         #[arg(value_enum)]
         provider: SkillProvider,
+        /// Emit one versioned JSON object
+        #[arg(long)]
+        json: bool,
     },
     /// Update an unmodified skill installed by Hydra
     Update {
@@ -173,7 +181,11 @@ enum DoctorCommand {
         long_about = "Run a real storage probe on the Heads volume.\n\nHydra verifies the native copy-on-write primitive and the isolated full-copy fallback with temporary files, then reports the execution environment and filesystem when available.",
         after_help = "Examples:\n  hydra doctor storage"
     )]
-    Storage,
+    Storage {
+        /// Emit one versioned JSON object
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -194,18 +206,28 @@ enum HeadCommand {
         target: Option<String>,
     },
     /// List local Heads
-    List,
+    List {
+        /// Emit one versioned JSON object
+        #[arg(long)]
+        json: bool,
+    },
     /// Show the state of a local Head
     Status {
         /// Name of an existing Head
         #[arg(add = ArgValueCompleter::new(complete_head_names))]
         name: String,
+        /// Emit one versioned JSON object
+        #[arg(long)]
+        json: bool,
     },
     /// Print the absolute path of a local Head
     Path {
         /// Name of an existing Head
         #[arg(add = ArgValueCompleter::new(complete_head_names))]
         name: String,
+        /// Emit one versioned JSON object
+        #[arg(long)]
+        json: bool,
     },
     /// Open a local Head with the configured command
     #[command(
@@ -270,25 +292,25 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
-        Command::Status => inspection::show_project_status(),
+        Command::Status { json } => inspection::show_project_status(json),
         Command::Repair => repair::run(),
         Command::Doctor {
-            command: DoctorCommand::Storage,
-        } => doctor_storage(),
+            command: DoctorCommand::Storage { json },
+        } => doctor_storage(json),
         Command::Completions { shell } => print_completions(shell),
         Command::Skill { command } => run_skill(&command),
         Command::Head {
             command: HeadCommand::Create { name, from, target },
         } => head_create::run(&name, from.as_deref(), target.as_deref()),
         Command::Head {
-            command: HeadCommand::List,
-        } => inspection::list_heads(),
+            command: HeadCommand::List { json },
+        } => inspection::list_heads(json),
         Command::Head {
-            command: HeadCommand::Status { name },
-        } => inspection::show_head_status(&name),
+            command: HeadCommand::Status { name, json },
+        } => inspection::show_head_status(&name, json),
         Command::Head {
-            command: HeadCommand::Path { name },
-        } => inspection::show_head_path(&name),
+            command: HeadCommand::Path { name, json },
+        } => inspection::show_head_path(&name, json),
         Command::Head {
             command: HeadCommand::Open { name },
         } => open_head(&name),
@@ -305,32 +327,36 @@ fn main() -> ExitCode {
 }
 
 fn run_skill(command: &SkillCommand) -> ExitCode {
-    let (action, provider, confirmation) = match command {
+    let (action, provider, confirmation, json) = match command {
         SkillCommand::Install { provider, yes, no } => (
             skill::Action::Install,
             (*provider).into(),
             skill::Confirmation { yes: *yes, no: *no },
+            false,
         ),
-        SkillCommand::Status { provider } => (
+        SkillCommand::Status { provider, json } => (
             skill::Action::Status,
             (*provider).into(),
             skill::Confirmation {
                 yes: false,
                 no: false,
             },
+            *json,
         ),
         SkillCommand::Update { provider, yes, no } => (
             skill::Action::Update,
             (*provider).into(),
             skill::Confirmation { yes: *yes, no: *no },
+            false,
         ),
         SkillCommand::Remove { provider, yes, no } => (
             skill::Action::Remove,
             (*provider).into(),
             skill::Confirmation { yes: *yes, no: *no },
+            false,
         ),
     };
-    match skill::run(action, provider, confirmation) {
+    match skill::run(action, provider, confirmation, json) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             guidance::report_skill_error(&error);
@@ -442,9 +468,66 @@ fn print_current_copy_on_write_guidance(backend: hydra_core::StorageBackend) {
     }
 }
 
-fn doctor_storage() -> ExitCode {
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StorageDiagnosticsJson<'a> {
+    schema_version: u32,
+    storage_backend: &'static str,
+    native_primitive: &'static str,
+    environment: &'static str,
+    filesystem: Option<&'a str>,
+    copy_on_write_guidance: Option<&'static str>,
+    full_copy_fallback_verified: bool,
+    mutable_hard_links_enabled: bool,
+    isolation_supported: bool,
+}
+
+fn doctor_storage(json: bool) -> ExitCode {
     match hydra_core::diagnose_storage(Path::new(".")) {
         Ok(diagnostics) => {
+            if json {
+                let report = StorageDiagnosticsJson {
+                    schema_version: 1,
+                    storage_backend: match diagnostics.storage_backend {
+                        hydra_core::StorageBackend::CopyOnWrite => "copyOnWrite",
+                        hydra_core::StorageBackend::FullCopy => "fullCopy",
+                    },
+                    native_primitive: match diagnostics.native_primitive {
+                        hydra_core::NativeStoragePrimitive::ApfsClone => "apfsClone",
+                        hydra_core::NativeStoragePrimitive::LinuxReflink => "linuxReflink",
+                        hydra_core::NativeStoragePrimitive::WindowsReFsBlockClone => {
+                            "windowsReFsBlockClone"
+                        }
+                        hydra_core::NativeStoragePrimitive::NativeClone => "nativeClone",
+                        hydra_core::NativeStoragePrimitive::Unavailable => "unavailable",
+                    },
+                    environment: match diagnostics.environment {
+                        hydra_core::StorageEnvironment::Native => "native",
+                        hydra_core::StorageEnvironment::WindowsSubsystemForLinux => {
+                            "windowsSubsystemForLinux"
+                        }
+                    },
+                    filesystem: diagnostics.filesystem.as_deref(),
+                    copy_on_write_guidance: copy_on_write_guidance(
+                        diagnostics.storage_backend,
+                        diagnostics.environment,
+                        current_storage_platform(),
+                    ),
+                    full_copy_fallback_verified: diagnostics.full_copy_fallback_verified,
+                    mutable_hard_links_enabled: diagnostics.mutable_hard_links_enabled,
+                    isolation_supported: diagnostics.isolation_supported,
+                };
+                return match json_output::write(&report) {
+                    Ok(()) => ExitCode::SUCCESS,
+                    Err(error) => {
+                        eprintln!("error: {error}");
+                        eprintln!(
+                            "next: Fix the reported JSON output problem and rerun `hydra doctor storage --json`."
+                        );
+                        ExitCode::FAILURE
+                    }
+                };
+            }
             match diagnostics.storage_backend {
                 hydra_core::StorageBackend::CopyOnWrite => {
                     println!("Storage backend: copy-on-write");

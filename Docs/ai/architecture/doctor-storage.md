@@ -112,6 +112,15 @@ prints `Docs/user/windows-copy-on-write.md`. Initialization and Head creation
 use the same platform-specific URLs. Guidance is informational and never
 substitutes an unverified backend.
 
+With `--json`, the same completed probe emits one versioned object containing
+`storageBackend`, `nativePrimitive`, `environment`, `filesystem`,
+`copyOnWriteGuidance`, `fullCopyFallbackVerified`,
+`mutableHardLinksEnabled`, and `isolationSupported`. The root contains
+`schemaVersion: 1`. Enum-like values use stable camel-case identifiers such as
+`copyOnWrite`, `fullCopy`, `linuxReflink`, and
+`windowsSubsystemForLinux`. Unavailable filesystem and guidance values are
+`null`. JSON selection does not change the probe, cleanup, or failure contract.
+
 ---
 
 ## Cleanup and Errors
@@ -147,6 +156,7 @@ CLI integration tests on the actual test volume prove:
 - WSL full-copy output links to its Linux reflink setup guide;
 - the Heads directory contains exactly the same entries before and after;
 - no Hydra mutation lock is created;
+- versioned JSON contains the same capability result and leaves the same clean state;
 - an uninitialized Git repository is rejected without Hydra artifacts;
 - nested command help documents the real Heads-volume test.
 

@@ -234,6 +234,9 @@ comparison.
 
 `hydra status`, `head list`, `head status`, and `head path` are read-only. They
 do not take the mutation lock, rewrite metadata, or perform implicit repair.
+Add `--json` to any of them when an agent or script needs one versioned JSON
+object instead of human-readable text. The plain `head path` form remains the
+right choice for `cd "$(...)"`; its JSON form includes the Head name and path.
 
 ## Open a Head with a configured program
 

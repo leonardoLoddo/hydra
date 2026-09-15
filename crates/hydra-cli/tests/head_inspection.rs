@@ -20,6 +20,14 @@ fn create_head(repository: &std::path::Path, name: &str) {
     );
 }
 
+fn assert_single_line_json_output(output: &[u8]) {
+    let (terminator, content) = output
+        .split_last()
+        .expect("JSON output should contain a value and a newline");
+    assert_eq!(*terminator, b'\n');
+    assert!(!content.contains(&b'\n'));
+}
+
 fn commit(repository: &std::path::Path, message: &str) {
     let output = run_git(repository, &["add", "."]);
     assert!(output.status.success());
@@ -130,6 +138,161 @@ fn project_status_and_head_list_report_local_heads_in_name_order_without_mutatio
     assert!(
         !head_state_lock_path(&repository).exists(),
         "read-only commands must not acquire the mutation lock"
+    );
+}
+
+#[test]
+fn project_status_and_head_list_emit_versioned_json_without_mutation() {
+    let directory = TestDirectory::new("head-list-json");
+    let repository = create_initialized_project(&directory);
+    create_head(&repository, "payment");
+    create_head(&repository, "auth");
+    let state_path = head_state_path(&repository);
+    let state_before = fs::read(&state_path).expect("state should be readable");
+
+    let list = hydra_command()
+        .args(["head", "list", "--json"])
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+    assert!(
+        list.status.success(),
+        "JSON Head list should succeed, stderr: {}",
+        String::from_utf8_lossy(&list.stderr)
+    );
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&list.stdout)
+            .expect("Head list should be valid JSON"),
+        serde_json::json!({
+            "schemaVersion": 1,
+            "heads": ["auth", "payment"]
+        })
+    );
+    assert_single_line_json_output(&list.stdout);
+
+    let status = hydra_command()
+        .args(["status", "--json"])
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+    assert!(
+        status.status.success(),
+        "JSON project status should succeed, stderr: {}",
+        String::from_utf8_lossy(&status.stderr)
+    );
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&status.stdout)
+            .expect("project status should be valid JSON"),
+        serde_json::json!({
+            "schemaVersion": 1,
+            "repositoryRoot": common::canonical_path(&repository)
+                .expect("repository should resolve")
+                .to_str()
+                .expect("test path should be Unicode"),
+            "headsDirectory": common::canonical_path(heads_directory(&repository))
+                .expect("Heads directory should resolve")
+                .to_str()
+                .expect("test path should be Unicode"),
+            "headCount": 2,
+            "heads": [
+                {"name": "auth", "status": "clean"},
+                {"name": "payment", "status": "clean"}
+            ]
+        })
+    );
+    assert_single_line_json_output(&status.stdout);
+    assert_eq!(
+        fs::read(&state_path).expect("state should remain readable"),
+        state_before
+    );
+    assert!(!head_state_lock_path(&repository).exists());
+}
+
+#[test]
+fn head_status_emits_recorded_observed_and_consistency_json() {
+    let directory = TestDirectory::new("head-status-json");
+    let repository = create_initialized_project(&directory);
+    let base_commit = revision(&repository, "HEAD");
+    create_head(&repository, "payment");
+    let head_path = common::canonical_path(heads_directory(&repository).join("payment"))
+        .expect("Head should resolve");
+    let state_path = head_state_path(&repository);
+    let state_before = fs::read(&state_path).expect("state should be readable");
+    let state: serde_json::Value =
+        serde_json::from_slice(&state_before).expect("state should be valid JSON");
+    let recorded = &state["heads"]["payment"];
+
+    let output = hydra_command()
+        .args(["head", "status", "payment", "--json"])
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+    assert!(
+        output.status.success(),
+        "JSON Head status should succeed, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&output.stdout)
+            .expect("Head status should be valid JSON"),
+        serde_json::json!({
+            "schemaVersion": 1,
+            "name": "payment",
+            "recorded": {
+                "path": head_path.to_str().expect("test path should be Unicode"),
+                "headRef": recorded["headRef"],
+                "baseRef": recorded["baseRef"],
+                "baseCommit": recorded["baseCommit"],
+                "targetRef": recorded["targetRef"],
+                "materializationBackend": recorded["materializationBackend"],
+                "createdAt": recorded["createdAt"]
+            },
+            "observed": {
+                "worktreeHead": {
+                    "kind": "branch",
+                    "reference": "refs/heads/hydra/payment"
+                },
+                "commit": base_commit,
+                "changes": {
+                    "modified": 0,
+                    "added": 0,
+                    "deleted": 0,
+                    "untracked": 0
+                },
+                "ahead": 0,
+                "behind": 0,
+                "worktreePresent": true
+            },
+            "consistency": {
+                "status": "ok",
+                "issues": []
+            }
+        })
+    );
+    assert_single_line_json_output(&output.stdout);
+    assert_eq!(
+        fs::read(&state_path).expect("state should remain readable"),
+        state_before
+    );
+    assert!(!head_state_lock_path(&repository).exists());
+}
+
+#[test]
+fn json_inspection_errors_keep_stdout_empty_and_human_guidance_on_stderr() {
+    let directory = TestDirectory::new("head-json-error");
+    let repository = create_initialized_project(&directory);
+
+    let output = hydra_command()
+        .args(["head", "status", "missing", "--json"])
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty());
+    assert_eq!(
+        String::from_utf8(output.stderr).expect("error output should be UTF-8"),
+        "error: Head \"missing\" does not exist\nnext: Run `hydra head list` and retry with an existing Head name.\n"
     );
 }
 
@@ -295,6 +458,34 @@ fn head_path_prints_only_the_recorded_absolute_path() {
     assert!(output.stderr.is_empty());
 }
 
+#[test]
+fn head_path_emits_a_versioned_json_object_when_requested() {
+    let directory = TestDirectory::new("head-path-json");
+    let repository = create_initialized_project(&directory);
+    create_head(&repository, "payment");
+    let head_path = common::canonical_path(heads_directory(&repository).join("payment"))
+        .expect("Head should resolve");
+
+    let output = hydra_command()
+        .args(["head", "path", "payment", "--json"])
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+
+    assert!(output.status.success());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&output.stdout)
+            .expect("Head path should be valid JSON"),
+        serde_json::json!({
+            "schemaVersion": 1,
+            "name": "payment",
+            "path": head_path.to_str().expect("test path should be Unicode")
+        })
+    );
+    assert!(output.stderr.is_empty());
+    assert_single_line_json_output(&output.stdout);
+}
+
 #[cfg(unix)]
 #[test]
 fn human_status_escapes_control_characters_in_paths() {
@@ -373,6 +564,26 @@ fn status_reports_a_missing_worktree_as_an_inconsistency_without_repairing_it() 
     assert!(stdout.contains("Changes: unavailable\n"));
     assert!(stdout.contains("Worktree: missing\n"));
     assert!(stdout.contains("Consistency: worktree path is missing\n"));
+
+    let json_output = hydra_command()
+        .args(["head", "status", "payment", "--json"])
+        .current_dir(&repository)
+        .output()
+        .expect("Hydra CLI should start");
+    assert!(json_output.status.success());
+    let json: serde_json::Value =
+        serde_json::from_slice(&json_output.stdout).expect("JSON status output should be valid");
+    assert_eq!(json["observed"]["worktreeHead"]["kind"], "unavailable");
+    assert!(json["observed"]["commit"].is_null());
+    assert!(json["observed"]["changes"].is_null());
+    assert!(json["observed"]["ahead"].is_null());
+    assert!(json["observed"]["behind"].is_null());
+    assert_eq!(json["observed"]["worktreePresent"], false);
+    assert_eq!(json["consistency"]["status"], "inconsistent");
+    assert_eq!(
+        json["consistency"]["issues"],
+        serde_json::json!(["worktree path is missing"])
+    );
     assert!(
         head_state_path(&repository).exists(),
         "status must not remove stale metadata"

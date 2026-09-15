@@ -264,6 +264,14 @@ that are not integrated, and its output must be reported.
   fails, resolve the reported prerequisite and rerun it.
 - Treat `hydra status`, `hydra head status <name>`, `hydra head list`, and
   `hydra head path <name>` as the read-only inspection surface.
+- When inspection data will be parsed by an agent, script, or tool, prefer
+  `--json` on `hydra status`, `hydra head list`, `hydra head status <name>`,
+  `hydra head path <name>`, `hydra doctor storage`, and `hydra skill status
+  <provider>`. Expect one object with `schemaVersion: 1` and a trailing newline.
+  Do not parse human summaries when versioned JSON is available. JSON mode does
+  not authorize mutation; `repair`, lifecycle mutations, and completions do not
+  accept it. Treat a non-zero exit with empty stdout and a `next:` diagnostic on
+  stderr as an operational failure, not as an incomplete JSON response.
 - Never edit `.git/hydra`, the Heads directory's `.hydra` files, locator,
   ownership marker, inventory, or lock by hand.
 - Never replace Hydra lifecycle commands with `rm`, recursive deletion, or

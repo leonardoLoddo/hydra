@@ -25,7 +25,7 @@ implemented commands and options are advertised.
 The current public command families are `init`, `status`, `head`, `completions`,
 `repair`, `doctor storage`, and provider-explicit `skill` management. The `head`
 group contains `create`, `list`, `status`, `path`, `open`, `close`, and `remove`.
-Do not infer short aliases, JSON output, runtime commands, or future features.
+Do not infer short aliases, runtime commands, or future features.
 Use the actual Clap hierarchy and targeted `--help` as syntax evidence.
 
 ## Output and confirmation
@@ -53,9 +53,30 @@ Creation phase progress goes only to interactive stderr, not redirected streams.
 Progress observers are informational and cannot interrupt the transaction.
 
 Human-facing paths and persisted values MUST neutralize terminal control characters.
-`head path` is the explicit machine-composition exception: non-terminal stdout
-preserves the exact validated path plus a newline; terminal output remains escaped.
-Do not add summaries to that path-only contract.
+Without `--json`, `head path` is the explicit machine-composition exception:
+non-terminal stdout preserves the exact validated path plus a newline; terminal
+output remains escaped. Do not add summaries to that path-only contract.
+
+## Versioned JSON output
+
+`--json` is available only on the read-only data commands `status`, `head list`,
+`head status`, `head path`, `doctor storage`, and `skill status`. Mutating commands,
+`repair`, and shell completion MUST NOT accept it. Human output remains unchanged
+when the option is absent.
+
+A successful JSON command emits exactly one compact object followed by one newline.
+Every root object contains `schemaVersion: 1`; keys use camel case, counts and flags
+use native JSON numbers and booleans, and unavailable observations use `null`.
+Head detail MUST keep recorded intent, observed state, and consistency separate.
+Storage and skill values use stable machine identifiers rather than rendered labels.
+
+JSON cannot represent a filesystem path that is not valid Unicode. Hydra MUST fail
+before writing stdout instead of applying lossy conversion. Operational,
+path-conversion, and serialization failures retain the normal non-zero exit status,
+empty stdout, and actionable human diagnostics on stderr. A terminal write failure
+also fails with guidance but can expose bytes already accepted by the operating
+system. JSON mode remains read-only and MUST NOT acquire mutation locks, repair
+state, or change diagnostic cleanup behavior.
 
 Informational summaries do not require confirmation. Full-copy overlay cost and
 persistent unsafe-symlink exclusion use distinct default-negative prompts defined

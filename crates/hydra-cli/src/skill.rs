@@ -157,6 +157,7 @@ pub enum SkillError {
         path: PathBuf,
         source: serde_json::Error,
     },
+    JsonOutput(String),
 }
 
 impl fmt::Display for SkillError {
@@ -203,6 +204,7 @@ impl fmt::Display for SkillError {
             Self::Manifest { path, source } => {
                 write!(formatter, "could not parse {}: {source}", path.display())
             }
+            Self::JsonOutput(error) => formatter.write_str(error),
         }
     }
 }
@@ -212,7 +214,11 @@ impl Error for SkillError {
         match self {
             Self::Io { source, .. } => Some(source),
             Self::Manifest { source, .. } => Some(source),
-            _ => None,
+            Self::HomeUnavailable(_)
+            | Self::AlreadyExists { .. }
+            | Self::NotInstalled { .. }
+            | Self::Modified { .. }
+            | Self::JsonOutput(_) => None,
         }
     }
 }
@@ -221,11 +227,12 @@ pub fn run(
     action: Action,
     provider: Provider,
     confirmation: Confirmation,
+    json: bool,
 ) -> Result<(), SkillError> {
     let destination = provider_destination(provider)?;
     match action {
         Action::Install => install(provider, &destination, confirmation),
-        Action::Status => status(provider, &destination),
+        Action::Status => status(provider, &destination, json),
         Action::Update => update(provider, &destination, confirmation),
         Action::Remove => remove(provider, &destination, confirmation),
     }
@@ -280,7 +287,19 @@ fn install(
     Ok(())
 }
 
-fn status(provider: Provider, destination: &Path) -> Result<(), SkillError> {
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SkillStatusJson<'a> {
+    schema_version: u32,
+    provider: &'static str,
+    display_name: &'static str,
+    destination: &'a str,
+    state: &'static str,
+    installed_hydra_version: &'a str,
+    available_hydra_version: &'static str,
+}
+
+fn status(provider: Provider, destination: &Path, json: bool) -> Result<(), SkillError> {
     match inspect(provider, destination)? {
         InstalledState::Absent => Err(SkillError::NotInstalled {
             provider,
@@ -292,6 +311,24 @@ fn status(provider: Provider, destination: &Path) -> Result<(), SkillError> {
             reason,
         }),
         InstalledState::Managed(manifest) => {
+            if json {
+                let destination =
+                    crate::json_output::path(destination).map_err(SkillError::JsonOutput)?;
+                return crate::json_output::write(&SkillStatusJson {
+                    schema_version: 1,
+                    provider: provider.id(),
+                    display_name: provider.display_name(),
+                    destination,
+                    state: if is_current(provider, &manifest) {
+                        "current"
+                    } else {
+                        "updateAvailable"
+                    },
+                    installed_hydra_version: &manifest.hydra_version,
+                    available_hydra_version: env!("CARGO_PKG_VERSION"),
+                })
+                .map_err(SkillError::JsonOutput);
+            }
             if is_current(provider, &manifest) {
                 println!(
                     "{} skill is current at {} (Hydra {}).",
