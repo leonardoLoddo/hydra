@@ -30,6 +30,10 @@ a versioned checksummed ZIP containing `hydra.exe` and as the stable
 with Git for Windows and Git Bash. Direct preview validation has also exercised
 a clean installation without Rust, the published Windows ZIP on Windows 11
 through Git for Windows and Git Bash, and the complete Homebrew workflow on WSL 2.
+The real Homebrew upgrade path from a previous published Formula to the current
+Formula has been exercised on a clean preview machine. Hydra is also used daily
+on large real repositories; broader tester diversity remains the reason for the
+preview maturity label.
 The intended audience remains a small group of colleagues who can exercise
 preview releases and report platform, installation, upgrade, and workflow
 defects before broader promotion.
@@ -364,13 +368,6 @@ verify at least:
 Preview limitations must be stated in the GitHub Release and README. WSL or a
 platform not directly exercised by the release matrix is not described as
 supported merely because a binary can start there.
-
-## Remaining Preview Evidence
-
-The following external evidence is still required before broader promotion:
-
-- verify the real Homebrew upgrade path from the previous published Formula to
-  the current Formula on a clean preview machine.
 
 ## Evidence and verification
 

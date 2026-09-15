@@ -13,7 +13,7 @@ files.
 > [!IMPORTANT]
 > Hydra 1.x is the current SemVer compatibility line for the documented core.
 > Distribution remains a public preview intended for a small group of testers
-> while real projects complete field validation. Use it on repositories whose
+> while broader tester feedback continues. Use it on repositories whose
 > important work is already committed or backed up, and report unexpected Git
 > or filesystem state before attempting manual repair.
 
@@ -169,13 +169,22 @@ Not every Head is meant to return.
 
 Experiments fail. Ideas change. Some paths are simply not worth keeping.
 
-When a Head should disappear without reconciling its work:
+Ordinary removal succeeds only when the Head is clean and its commits are
+already integrated into the recorded target:
 
 ```bash
 hydra head remove payment
 ```
 
-Its isolated work is discarded and the parent project remains untouched.
+To deliberately discard uncommitted work or remove a Head whose commits are
+not integrated, make that destructive choice explicit:
+
+```bash
+hydra head remove payment --force
+```
+
+Forced removal preserves an unintegrated private branch, but discards tracked,
+staged, and untracked worktree changes. The parent project remains untouched.
 
 ---
 
@@ -306,7 +315,7 @@ hydra skill install antigravity
 ```
 
 <p align="center">
-  <img src="assets/hydra-skill-arts.png" alt="Codex prompt using the Hydra skill to test a new feature trough Gauntlet art">
+  <img src="assets/hydra-skill-arts.png" alt="Codex prompt using the Hydra skill to test a new feature through Gauntlet art">
 </p>
 
 For unattended setup, make the choice explicit:

@@ -10,8 +10,8 @@ The documentation describes only behavior available in the current binary.
 
 > [!IMPORTANT]
 > Hydra 1.x is the current SemVer compatibility line for the documented core.
-> Distribution remains a public preview while supported systems and real
-> projects complete field validation. Use it on repositories whose important
+> Distribution remains a public preview while broader tester feedback
+> continues. Use it on repositories whose important
 > work is committed or backed up. When Git, filesystem, ownership, or recovery
 > state is unclear, stop and inspect it before attempting any manual repair.
 

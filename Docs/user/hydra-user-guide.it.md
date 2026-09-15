@@ -5,8 +5,8 @@ Questa guida descrive come usare Hydra e come personalizzarne il comportamento.
 devono esistere nel binario corrente.
 
 Hydra 1.x è l'attuale linea di compatibilità SemVer del nucleo documentato. La
-distribuzione rimane una public preview mentre i sistemi supportati e i
-progetti reali completano la validazione sul campo. Usa Hydra su repository il
+distribuzione rimane una public preview mentre continua la raccolta di feedback
+da una platea più ampia di tester. Usa Hydra su repository il
 cui lavoro importante è già committato o salvato altrove.
 
 La versione `1.0.0` stabilisce la baseline di compatibilità per CLI,
