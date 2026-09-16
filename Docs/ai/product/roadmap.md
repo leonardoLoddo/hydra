@@ -22,7 +22,7 @@ in advance as a post-1.0 roadmap of 0.x releases.
 | Direction | Boundary |
 |---|---|
 | Public editor schema through SchemaStore | No `$schema` annotation until a stable public schema exists |
-| Shareable Head Recipes | Portable intent, not a versioned physical Head |
+| Shareable Head Recipes | Shelved while Hydra remains local; safe completion would require shared lifecycle coordination |
 | Setup command or hooks | Requires explicit lifecycle and failure contracts |
 | Agent runtime adapters | Separate from the available instructional Hydra skill |
 | Runtime processes, ports, local dashboard, visual diff, embedded terminal | Built only on a reliable Head engine |
@@ -45,37 +45,21 @@ relocation, not silently resolving a new path. Current repair does not implement
 these operations; this proposal does not authorize manual metadata edits or relaxing
 project and installation identity checks.
 
-## Head Recipe proposal
+## Shareable Head Recipes
 
-A physical Head is local and not versioned. A future recipe could be authored
-directly or created by promoting a local Head through a dedicated command. It
-could transport a reproducible source, target, name, overlay profile, and lifecycle
-intent to another device. It MUST NOT transport local absolute paths, backend selection, locks,
-operational timestamps, uncommitted content, or overlay secrets.
+Shareable Head Recipes are not planned in the current product direction. Hydra
+remains local-first: each installation owns the lifecycle of its physical Heads,
+while Git transports commits and refs between collaborators.
 
-Promotion of a local Head would require proving that shared content is reachable
-through Git. Each recipient would materialize its own worktree, private branch,
-path, and storage backend. Git transports commits and refs; the recipe transports
-intent. No recipe command or schema is currently available.
+A shared recipe would outlive any one local materialization. Hydra could not
+safely remove or complete that artifact when one user closes a Head because
+other users might still depend on it. Solving that lifecycle requires shared
+completion state, concurrency rules, and cross-installation coordination. Those
+capabilities are outside Hydra's current local boundary.
 
-A future ephemeral recipe could request deletion after successful close. Because
-a versioned recipe is a Git file, that deletion would need an explicit close
-transaction: no dirtying another worktree silently, no deletion after failed close,
-and no unauthorized implicit commit.
-
-The original design sketch names the intended fields below. This is a proposed
-shape, not an accepted schema, supported configuration, or executable workflow:
-
-```json
-{
-  "version": 1,
-  "name": "payment",
-  "source": "feature/payment",
-  "target": "main",
-  "overlayProfile": "default",
-  "lifecycle": {"removeRecipeOnClose": true}
-}
-```
+No recipe command, schema, artifact, promotion flow, or shared-close behavior is
+approved. A future proposal MUST first justify a shared lifecycle model rather
+than treating portable Head intent as a standalone local feature.
 
 ## Product hypothesis and admission
 

@@ -20,6 +20,11 @@ replacement, cloud environment, full virtual machine, or runtime process manager
 The core requires no cloud service or daemon. It does not isolate databases,
 caches, containers, external services, or installed dependencies automatically.
 
+Hydra does not coordinate Head lifecycle state across users or installations.
+Each installation owns its local Heads, inventory, integration, and removal.
+Git may transport commits and refs between collaborators, but Hydra does not
+publish, claim, synchronize, or close a shared Head.
+
 ## Canonical terms
 
 | Term | Meaning |
