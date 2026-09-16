@@ -20,11 +20,10 @@ pub(super) fn path(path: &std::path::Path) -> Result<&str, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::path;
-
     #[cfg(unix)]
     #[test]
     fn rejects_non_unicode_paths_instead_of_serializing_a_lossy_value() {
+        use super::path;
         use std::{ffi::OsString, os::unix::ffi::OsStringExt as _, path::PathBuf};
 
         let value = PathBuf::from(OsString::from_vec(vec![b'/', 0xff]));
