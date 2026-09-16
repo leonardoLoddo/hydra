@@ -5,6 +5,20 @@ All notable changes to Hydra will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0](https://github.com/leonardoLoddo/hydra/compare/v1.1.0...v1.2.0) (2026-09-16)
+
+
+### Features
+
+* **cli:** add Head close preflight ([1afa543](https://github.com/leonardoLoddo/hydra/commit/1afa543fb51cdf400ba62a78e52d7e716d755fa6))
+* **cli:** add Head creation preflight ([354d04c](https://github.com/leonardoLoddo/hydra/commit/354d04ccda333c82d9ad0e7f86f0134bfb61916a))
+* **cli:** add versioned JSON inspection output ([9352641](https://github.com/leonardoLoddo/hydra/commit/935264131e1e24db95bbf2fe627e6e5869ea9098))
+
+
+### Bug Fixes
+
+* **cli:** restore Windows lint compatibility ([2af12e2](https://github.com/leonardoLoddo/hydra/commit/2af12e2bc7b7cbfafd201013a8e2b792fdab6824))
+
 ## [1.1.0](https://github.com/leonardoLoddo/hydra/compare/v1.0.0...v1.1.0) (2026-09-14)
 
 
