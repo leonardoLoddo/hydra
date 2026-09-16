@@ -28,12 +28,21 @@ summaries retain local visibility; the linked product rules own product policy.
 This document defines the implemented close workflow:
 
 ```text
-hydra head close <name>
+hydra head close <name> [--dry-run [--json]]
 ```
 
 Closing either integrates a clean private Head branch into its recorded target
 or executes the configured close-command adapter. Optional removal always
 delegates to the protected contract in [`head-removal.md`](head-removal.md).
+
+`--dry-run` validates the same invocation location, Head cleanliness,
+consistency, refs, and native target-worktree readiness as the real close. For
+native close it classifies the current graph as `already integrated`,
+`fast-forward`, or `merge commit` without invoking Git merge. It does not
+predict whether a merge commit will conflict. For configured close it expands
+and validates the program and arguments without starting the process. Neither
+path integrates, executes an adapter, or removes the Head. `--json` requires
+`--dry-run` and returns the same plan as structured data.
 
 ---
 
@@ -159,13 +168,14 @@ Close command completed for Head payment; Head removed
 
 ## Verification Contract
 
-Implementation evidence: `crates/hydra-core/src/head/close.rs`. CLI integration evidence: `head_close`
+Implementation evidence: `crates/hydra-core/src/head/close.rs`. CLI integration evidence: `head_close` and `head_dry_run`
 test targets under `crates/hydra-cli/tests/`. Run the affected targets with
 `cargo test -p hydra-cli --test <target>` and inspect the observable results below.
 A listed test contract is not evidence that every platform passed in this task.
 
 Disposable integration tests prove:
 
+- native and configured-command dry-run plans do not integrate, execute, or remove;
 - a Head ahead of its target fast-forwards the target and is removed;
 - diverged non-conflicting histories create a merge commit with target and
   Head parents in that order;

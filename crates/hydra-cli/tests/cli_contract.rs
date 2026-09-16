@@ -183,7 +183,6 @@ fn inspection_help_exposes_json_only_on_read_only_data_commands() {
         vec!["init", "--help"],
         vec!["repair", "--help"],
         vec!["head", "open", "--help"],
-        vec!["head", "close", "--help"],
         vec!["head", "remove", "--help"],
         vec!["skill", "install", "--help"],
         vec!["skill", "update", "--help"],
@@ -204,15 +203,20 @@ fn inspection_help_exposes_json_only_on_read_only_data_commands() {
         );
     }
 
-    let output = Command::new(env!("CARGO_BIN_EXE_hydra"))
-        .args(["head", "create", "--help"])
-        .output()
-        .expect("Hydra CLI should start");
-    assert!(output.status.success());
-    let stdout = String::from_utf8(output.stdout).expect("help output should be UTF-8");
-    assert!(stdout.contains("--dry-run"));
-    assert!(stdout.contains("--json"));
-    assert!(stdout.contains("requires --dry-run"));
+    for arguments in [
+        vec!["head", "create", "--help"],
+        vec!["head", "close", "--help"],
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_hydra"))
+            .args(&arguments)
+            .output()
+            .expect("Hydra CLI should start");
+        assert!(output.status.success());
+        let stdout = String::from_utf8(output.stdout).expect("help output should be UTF-8");
+        assert!(stdout.contains("--dry-run"));
+        assert!(stdout.contains("--json"));
+        assert!(stdout.contains("requires --dry-run"));
+    }
 }
 
 #[test]
@@ -258,7 +262,7 @@ fn head_close_help_documents_integration_and_protected_removal() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).expect("help output should be UTF-8");
-    assert!(stdout.contains("Usage: hydra head close <NAME>"));
+    assert!(stdout.contains("Usage: hydra head close [OPTIONS] <NAME>"));
     assert!(stdout.contains("must be clean"));
     assert!(stdout.contains("parent project worktree"));
     assert!(stdout.contains("target branch"));

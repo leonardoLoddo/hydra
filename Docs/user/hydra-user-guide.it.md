@@ -67,7 +67,7 @@ hydra head list [--json]
 hydra head status <NAME> [--json]
 hydra head path <NAME> [--json]
 hydra head open <NAME>
-hydra head close <NAME>
+hydra head close <NAME> [--dry-run [--json]]
 hydra head remove <NAME> [--force]
 ```
 
@@ -541,9 +541,8 @@ Anche `hydra init` lanciato da una Head riconosce l'inizializzazione del padre:
 segnala la configurazione canonica già esistente e non prova a trasformare la
 Head in un progetto Hydra separato.
 
-Se chiudi la Head dalla sua stessa directory, Hydra può rimuoverla in sicurezza
-ma la shell resta posizionata su un percorso ormai eliminato. Dopo il comando
-spostati nel progetto padre o in un'altra Head prima di eseguire altri comandi.
+`hydra head close` è l'eccezione: deve essere avviato dalla worktree padre
+canonica, anche quando usa un adapter configurato.
 
 ### 4.5 Elenca e ispeziona le Head
 
@@ -723,8 +722,16 @@ divergenti dai metadati o target scomparsi.
 Una Head pulita può essere integrata nel target registrato e rimossa:
 
 ```bash
+hydra head close payment --dry-run
 hydra head close payment
 ```
+
+Il dry run verifica gli stessi prerequisiti correnti senza integrare, eseguire
+adapter o rimuovere la Head. Per la chiusura nativa classifica il grafo come
+`already integrated`, `fast-forward` o `merge commit`, ma non prevede eventuali
+conflitti. Con `commands.close` mostra programma e argomenti già espansi senza
+avviarli. Aggiungi `--json` per il piano strutturato; `--json` senza `--dry-run`
+viene rifiutato.
 
 Esegui il comando dalla worktree padre canonica. Per la chiusura nativa, il
 target registrato, per esempio `main`, deve essere checkoutato lì. Se avvii il

@@ -106,6 +106,7 @@ the recorded target branch checked out, then explicitly integrate and remove
 the completed worktree:
 
 ```bash
+hydra head close payment --dry-run
 hydra head close payment
 ```
 
@@ -151,6 +152,7 @@ Hydra currently manages:
 - tracked-file and selected-overlay materialization;
 - read-only project and Head inspection;
 - versioned JSON output for project, Head, storage, and managed-skill inspection;
+- non-mutating creation and close preflight, with human or versioned JSON plans;
 - configured opening commands;
 - native or configured close workflows;
 - protected removal;

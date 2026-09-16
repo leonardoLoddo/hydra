@@ -27,7 +27,7 @@ hydra head list [--json]
 hydra head status <NAME> [--json]
 hydra head path <NAME> [--json]
 hydra head open <NAME>
-hydra head close <NAME>
+hydra head close <NAME> [--dry-run [--json]]
 hydra head remove <NAME> [--force]
 ```
 
@@ -129,6 +129,11 @@ waits for a conflicted merge to be committed or aborted, and then performs
 protected removal. A configured `commands.close` adapter still runs in the
 Head worktree. There is no force option.
 
+`--dry-run` validates and prints the close plan without merging, executing a
+configured adapter, or removing the Head. Native plans classify the current
+graph but do not predict merge conflicts. `--json` emits the plan as a
+versioned object and requires `--dry-run`.
+
 ### `hydra head remove <NAME>`
 
 Ordinary removal requires a clean Head and commits already integrated into the
@@ -160,8 +165,9 @@ Hydra versions, and a `current` or `updateAvailable` state.
 
 ## JSON output
 
-The six read-only data commands above accept `--json`. A successful command
-prints one compact JSON object followed by one newline. Every root object has
+The six read-only data commands above, plus the read-only
+`head create --dry-run` and `head close --dry-run` preflights, accept `--json`.
+A successful command prints one compact JSON object followed by one newline. Every root object has
 `"schemaVersion": 1`; field names use camel case, counts and flags retain their
 JSON types, and unavailable observations are `null`.
 
@@ -175,11 +181,14 @@ The root payloads are:
 | `head path <NAME> --json` | `name`, validated `path` |
 | `doctor storage --json` | backend, primitive, environment, filesystem, guidance, fallback and isolation flags |
 | `skill status <PROVIDER> --json` | provider, destination, state, installed and available versions |
+| `head create <NAME> --dry-run --json` | resolved creation refs, path, counts, storage policy and confirmations |
+| `head close <NAME> --dry-run --json` | commits, native integration classification or expanded configured adapter |
 
 JSON mode does not alter inspection, probing, cleanup, or skill validation.
 Operational failures remain non-zero, leave stdout empty, and print the normal
 actionable diagnostic on stderr. A path that is not valid Unicode cannot be
-represented in JSON and is rejected without lossy conversion. Mutating
+represented in JSON and is rejected without lossy conversion. The create and
+close forms reject `--json` unless `--dry-run` is also present. Other mutating
 commands, `repair`, and `completions` do not accept `--json`.
 
 ### `hydra skill update <PROVIDER>`

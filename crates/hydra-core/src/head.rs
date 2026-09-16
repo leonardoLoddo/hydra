@@ -18,8 +18,8 @@ use std::{
 };
 
 pub use close::{
-    CloseOutcome, ClosedHead, HeadCloseProgress, IntegrationResult, IntegrationStrategy,
-    close_head, close_head_with_progress,
+    CloseOutcome, ClosePlanStrategy, ClosedHead, HeadClosePlan, HeadCloseProgress,
+    IntegrationResult, IntegrationStrategy, close_head, close_head_with_progress, plan_head_close,
 };
 pub use error::HeadError;
 use git::{Repository, TrackedEntry};

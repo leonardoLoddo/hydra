@@ -288,8 +288,15 @@ Native close requires a clean, consistent Head. Run it from the canonical
 parent project worktree with the Head's recorded target branch checked out:
 
 ```bash
+hydra head close payment --dry-run
 hydra head close payment
 ```
+
+The dry run verifies the current close preconditions without integrating or
+removing anything. Native close reports `already integrated`, `fast-forward`,
+or `merge commit`; the last classification does not predict merge conflicts.
+For `commands.close`, the plan shows the expanded program and arguments but
+does not execute them. Add `--json` for structured output.
 
 By default Hydra runs a normal `git merge` of the validated Head commit in the
 parent worktree:

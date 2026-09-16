@@ -49,6 +49,29 @@ pub enum IntegrationResult {
     MergeCommit,
 }
 
+#[derive(Debug)]
+pub struct HeadClosePlan {
+    pub name: String,
+    pub target_ref: String,
+    pub target_commit: String,
+    pub head_commit: String,
+    pub strategy: ClosePlanStrategy,
+}
+
+#[derive(Debug)]
+pub enum ClosePlanStrategy {
+    TargetWorktree {
+        path: PathBuf,
+        integration_result: IntegrationResult,
+    },
+    Command {
+        program: String,
+        args: Vec<String>,
+        working_directory: PathBuf,
+        remove_on_success: bool,
+    },
+}
+
 #[derive(Clone, Debug)]
 pub enum HeadCloseProgress {
     WaitingForMergeResolution { path: PathBuf },
@@ -92,12 +115,62 @@ pub fn close_head_with_progress(
     close_with_merge(source_path, name, &repository, &mut report_progress)
 }
 
-fn close_with_merge(
+/// Validates and describes Head close without integrating, running adapters,
+/// or removing the Head.
+///
+/// # Errors
+///
+/// Returns [`HeadError`] when the Head cannot currently be closed.
+pub fn plan_head_close(source_path: &Path, name: &str) -> Result<HeadClosePlan, HeadError> {
+    validate_head_name(name)?;
+    let invocation = Repository::discover(source_path)?;
+    let repository = discover_project_repository(source_path)?;
+    if invocation.root != repository.root {
+        return Err(HeadError::HeadCloseRequiresParentWorktree {
+            parent: repository.root,
+        });
+    }
+    let snapshot = StateSnapshot::load(&repository)?;
+    let inspection = clean_close_inspection(source_path, name)?;
+    let head_commit =
+        inspection
+            .commit
+            .clone()
+            .ok_or_else(|| HeadError::HeadCloseInconsistent {
+                name: name.to_owned(),
+                reason: "worktree commit is unavailable".to_owned(),
+            })?;
+    let target_commit = git::commit_for_ref(&repository, &inspection.target_ref)?;
+    let strategy = if let Some(command) = snapshot.close_command() {
+        let (program, args, remove_on_success) =
+            expanded_close_command(name, &inspection, command)?;
+        ClosePlanStrategy::Command {
+            program,
+            args,
+            working_directory: inspection.path.clone(),
+            remove_on_success,
+        }
+    } else {
+        verify_target_worktree(&repository.root, &inspection.target_ref, &target_commit)?;
+        let integration_result = integration_result(&repository, &target_commit, &head_commit)?;
+        ClosePlanStrategy::TargetWorktree {
+            path: repository.root.clone(),
+            integration_result,
+        }
+    };
+    Ok(HeadClosePlan {
+        name: name.to_owned(),
+        target_ref: inspection.target_ref,
+        target_commit,
+        head_commit,
+        strategy,
+    })
+}
+
+fn clean_close_inspection(
     source_path: &Path,
     name: &str,
-    repository: &Repository,
-    report_progress: &mut impl FnMut(HeadCloseProgress),
-) -> Result<ClosedHead, HeadError> {
+) -> Result<super::HeadInspection, HeadError> {
     let inspection = inspect_head(source_path, name)?;
     if !inspection.consistency_issues.is_empty() {
         return Err(HeadError::HeadCloseInconsistent {
@@ -115,6 +188,30 @@ fn close_with_merge(
     if changes.modified > 0 || changes.added > 0 || changes.deleted > 0 || changes.untracked > 0 {
         return Err(HeadError::HeadCloseHasUncommittedChanges(name.to_owned()));
     }
+    Ok(inspection)
+}
+
+fn integration_result(
+    repository: &Repository,
+    target_commit: &str,
+    head_commit: &str,
+) -> Result<IntegrationResult, HeadError> {
+    if git::is_ancestor(repository, head_commit, target_commit)? {
+        Ok(IntegrationResult::AlreadyIntegrated)
+    } else if git::is_ancestor(repository, target_commit, head_commit)? {
+        Ok(IntegrationResult::FastForward)
+    } else {
+        Ok(IntegrationResult::MergeCommit)
+    }
+}
+
+fn close_with_merge(
+    source_path: &Path,
+    name: &str,
+    repository: &Repository,
+    report_progress: &mut impl FnMut(HeadCloseProgress),
+) -> Result<ClosedHead, HeadError> {
+    let inspection = clean_close_inspection(source_path, name)?;
     let head_commit = inspection
         .commit
         .ok_or_else(|| HeadError::HeadCloseInconsistent {
@@ -167,13 +264,7 @@ fn integrate_in_parent_worktree(
     report_progress: &mut impl FnMut(HeadCloseProgress),
 ) -> Result<(String, IntegrationStrategy, IntegrationResult), HeadError> {
     verify_target_worktree(&repository.root, target_ref, target_before)?;
-    let result = if git::is_ancestor(repository, head_commit, target_before)? {
-        IntegrationResult::AlreadyIntegrated
-    } else if git::is_ancestor(repository, target_before, head_commit)? {
-        IntegrationResult::FastForward
-    } else {
-        IntegrationResult::MergeCommit
-    };
+    let result = integration_result(repository, target_before, head_commit)?;
     let status = git::merge_in_worktree(&repository.root, head_commit)?;
     if !status.success() {
         if git::worktree_operation(&repository.root)? == Some("merge") {
@@ -281,50 +372,10 @@ fn close_with_command(
     repository: &Repository,
     command: &CloseCommandConfiguration,
 ) -> Result<ClosedHead, HeadError> {
-    let inspection = inspect_head(source_path, name)?;
-    if !inspection.consistency_issues.is_empty() {
-        return Err(HeadError::HeadCloseInconsistent {
-            name: name.to_owned(),
-            reason: inspection.consistency_issues.join(", "),
-        });
-    }
-    let changes = inspection
-        .changes
-        .as_ref()
-        .ok_or_else(|| HeadError::HeadCloseInconsistent {
-            name: name.to_owned(),
-            reason: "worktree status is unavailable".to_owned(),
-        })?;
-    if changes.modified > 0 || changes.added > 0 || changes.deleted > 0 || changes.untracked > 0 {
-        return Err(HeadError::HeadCloseHasUncommittedChanges(name.to_owned()));
-    }
+    let inspection = clean_close_inspection(source_path, name)?;
     let removal_source = repository.root.clone();
     let target_before = git::commit_for_ref(repository, &inspection.target_ref)?;
-    let path = inspection
-        .path
-        .to_str()
-        .ok_or_else(|| HeadError::HeadCloseInconsistent {
-            name: name.to_owned(),
-            reason: "worktree path is not valid UTF-8".to_owned(),
-        })?;
-    let placeholders = BTreeMap::from([
-        ("{name}", name),
-        ("{path}", path),
-        ("{headRef}", inspection.recorded_head_ref.as_str()),
-        ("{baseRef}", inspection.base_ref.as_str()),
-        ("{targetRef}", inspection.target_ref.as_str()),
-    ]);
-    let (program_template, argument_templates, remove_on_success) = command.command();
-    let program = expand(program_template, &placeholders)?;
-    if program.is_empty() {
-        return Err(HeadError::InvalidCloseCommand(
-            "program must not be empty".to_owned(),
-        ));
-    }
-    let args = argument_templates
-        .iter()
-        .map(|argument| expand(argument, &placeholders))
-        .collect::<Result<Vec<_>, _>>()?;
+    let (program, args, remove_on_success) = expanded_close_command(name, &inspection, command)?;
     let status = Command::new(&program)
         .args(args)
         .current_dir(&inspection.path)
@@ -370,6 +421,39 @@ fn close_with_command(
             removed: remove_on_success,
         },
     })
+}
+
+fn expanded_close_command(
+    name: &str,
+    inspection: &super::HeadInspection,
+    command: &CloseCommandConfiguration,
+) -> Result<(String, Vec<String>, bool), HeadError> {
+    let path = inspection
+        .path
+        .to_str()
+        .ok_or_else(|| HeadError::HeadCloseInconsistent {
+            name: name.to_owned(),
+            reason: "worktree path is not valid UTF-8".to_owned(),
+        })?;
+    let placeholders = BTreeMap::from([
+        ("{name}", name),
+        ("{path}", path),
+        ("{headRef}", inspection.recorded_head_ref.as_str()),
+        ("{baseRef}", inspection.base_ref.as_str()),
+        ("{targetRef}", inspection.target_ref.as_str()),
+    ]);
+    let (program_template, argument_templates, remove_on_success) = command.command();
+    let program = expand(program_template, &placeholders)?;
+    if program.is_empty() {
+        return Err(HeadError::InvalidCloseCommand(
+            "program must not be empty".to_owned(),
+        ));
+    }
+    let args = argument_templates
+        .iter()
+        .map(|argument| expand(argument, &placeholders))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok((program, args, remove_on_success))
 }
 
 fn target_commit_if_present(

@@ -226,12 +226,16 @@ hydra head status payment --json
 hydra head path payment --json
 hydra doctor storage --json
 hydra skill status codex --json
+hydra head create payment --from main --target main --dry-run --json
+hydra head close payment --dry-run --json
 ```
 
 Each success emits one JSON object with `"schemaVersion": 1`. Human output is
 unchanged without the flag; inspection and validation failures remain non-zero
-with empty stdout and an actionable diagnostic on stderr. Lifecycle mutations,
-repair, and shell completion do not accept `--json`.
+with empty stdout and an actionable diagnostic on stderr. Creation and close
+accept JSON only with `--dry-run`; that preflight validates and reports without
+performing the lifecycle mutation. Other lifecycle mutations, repair, and shell
+completion do not accept `--json`.
 
 ## Hydra Arts
 

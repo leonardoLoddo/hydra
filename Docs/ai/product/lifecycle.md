@@ -101,6 +101,12 @@ the validated Head commit in the clean parent target worktree: fast-forward when
 possible, otherwise a merge commit. It does not rebase, squash, or resolve conflicts.
 A dirty target or Git operation in progress blocks integration without mutation.
 
+`head close --dry-run` validates the current close preconditions and reports
+the native graph classification without invoking merge or removal. It MUST NOT
+claim conflict prediction. With `commands.close`, it reports validated expanded
+arguments without executing the adapter or removal. A later close MUST
+revalidate the plan.
+
 Conflicts remain normal Git state in the parent. Hydra waits without holding a
 project mutation lock. A clean resolution commit must have exactly the recorded
 target and Head snapshots as parents, in that order, before removal resumes.
@@ -134,7 +140,7 @@ comparison protect it. Close does not silently force removal.
 
 Inspect `crates/hydra-core/src/head/close.rs`, `head/open.rs`, `head/removal.rs`,
 and `head/inspection.rs` under the same source root. CLI `head_close`, `head_open`,
-`head_remove`, `head_inspection`, `init_success`, and `head_create_success` tests
+`head_remove`, `head_inspection`, `head_dry_run`, `init_success`, and `head_create_success` tests
 exercise these contracts using disposable repositories. Check actual refs,
 worktrees, metadata, refused actions, valid merge parents, and abort preservation.
 Select the corresponding Architecture leaves for transaction and failure details.

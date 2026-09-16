@@ -29,7 +29,7 @@ mod skill;
     version,
     about = "Git-native workspace manager for isolated development Heads",
     long_about = "Git-native workspace manager for isolated development Heads.\n\nHydra creates independent working directories while preserving familiar Git refs, branches, and repository workflows.",
-    after_help = "Command syntax:\n  hydra init [PATH]\n  hydra status [--json]\n  hydra repair\n  hydra doctor storage [--json]\n  hydra completions <SHELL>\n  hydra skill install <PROVIDER>\n  hydra skill status <PROVIDER> [--json]\n  hydra skill update <PROVIDER>\n  hydra skill remove <PROVIDER>\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list [--json]\n  hydra head status <NAME> [--json]\n  hydra head path <NAME> [--json]\n  hydra head open <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra <command> --help' for details."
+    after_help = "Command syntax:\n  hydra init [PATH]\n  hydra status [--json]\n  hydra repair\n  hydra doctor storage [--json]\n  hydra completions <SHELL>\n  hydra skill install <PROVIDER>\n  hydra skill status <PROVIDER> [--json]\n  hydra skill update <PROVIDER>\n  hydra skill remove <PROVIDER>\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>] [--dry-run [--json]]\n  hydra head list [--json]\n  hydra head status <NAME> [--json]\n  hydra head path <NAME> [--json]\n  hydra head open <NAME>\n  hydra head close <NAME> [--dry-run [--json]]\n  hydra head remove <NAME> [--force]\n\nRun 'hydra <command> --help' for details."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -85,7 +85,7 @@ enum Command {
     },
     /// Create and manage Heads
     #[command(
-        after_help = "Command syntax:\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>]\n  hydra head list [--json]\n  hydra head status <NAME> [--json]\n  hydra head path <NAME> [--json]\n  hydra head open <NAME>\n  hydra head close <NAME>\n  hydra head remove <NAME> [--force]\n\nRun 'hydra head <command> --help' for details."
+        after_help = "Command syntax:\n  hydra head create <NAME> [--from <REF>] [--target <BRANCH>] [--dry-run [--json]]\n  hydra head list [--json]\n  hydra head status <NAME> [--json]\n  hydra head path <NAME> [--json]\n  hydra head open <NAME>\n  hydra head close <NAME> [--dry-run [--json]]\n  hydra head remove <NAME> [--force]\n\nRun 'hydra head <command> --help' for details."
     )]
     Head {
         #[command(subcommand)]
@@ -261,12 +261,18 @@ enum HeadCommand {
     /// Integrate and remove a completed Head
     #[command(
         long_about = "Integrate or run the configured close adapter for a completed Head.\n\nRun this command from the parent project worktree. The Head must be clean. Native close also requires the Head's target branch to be checked out in a clean parent worktree with no Git operation active. It runs git merge there and shows the normal Git output. After a conflict, resolve and commit the merge in that worktree; Hydra waits and then performs protected removal automatically. Run git merge --abort to abort the close and preserve the Head. When .hydra.json defines commands.close, Hydra starts that adapter in the Head worktree instead; removeOnSuccess controls whether protected removal follows a successful command.",
-        after_help = "Examples:\n  hydra head close payment"
+        after_help = "Examples:\n  hydra head close payment\n  hydra head close payment --dry-run\n  hydra head close payment --dry-run --json"
     )]
     Close {
         /// Name of an existing Head
         #[arg(add = ArgValueCompleter::new(complete_head_names))]
         name: String,
+        /// Validate and print the close plan without making changes
+        #[arg(long)]
+        dry_run: bool,
+        /// Emit the dry-run plan as one versioned JSON object (requires --dry-run)
+        #[arg(long, requires = "dry_run")]
+        json: bool,
     },
 }
 
@@ -331,8 +337,13 @@ fn main() -> ExitCode {
             command: HeadCommand::Remove { name, force },
         } => remove_head(&name, force),
         Command::Head {
-            command: HeadCommand::Close { name },
-        } => close_head(&name),
+            command:
+                HeadCommand::Close {
+                    name,
+                    dry_run,
+                    json,
+                },
+        } => close_head(&name, dry_run, json),
         Command::Complete {
             command: CompletionCommand::Heads,
         } => print_head_candidates(),
@@ -612,7 +623,41 @@ fn open_head(name: &str) -> ExitCode {
     }
 }
 
-fn close_head(name: &str) -> ExitCode {
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HeadClosePlanJson<'a> {
+    schema_version: u32,
+    command: &'static str,
+    name: &'a str,
+    target_ref: &'a str,
+    target_commit: &'a str,
+    head_commit: &'a str,
+    strategy: HeadCloseStrategyJson<'a>,
+    integration_result: Option<&'static str>,
+}
+
+#[derive(serde::Serialize)]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+enum HeadCloseStrategyJson<'a> {
+    TargetWorktree {
+        path: &'a str,
+    },
+    Command {
+        program: &'a str,
+        args: &'a [String],
+        working_directory: &'a str,
+        remove_on_success: bool,
+    },
+}
+
+fn close_head(name: &str, dry_run: bool, json: bool) -> ExitCode {
+    if dry_run {
+        return show_close_plan(name, json);
+    }
     match hydra_core::close_head_with_progress(Path::new("."), name, |progress| match progress {
         hydra_core::HeadCloseProgress::WaitingForMergeResolution { path } => eprintln!(
             "Waiting for Git merge resolution in {}. Hydra will finish the close after commit or abort.",
@@ -663,6 +708,140 @@ fn close_head(name: &str) -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+fn show_close_plan(name: &str, json: bool) -> ExitCode {
+    match hydra_core::plan_head_close(Path::new("."), name) {
+        Ok(plan) => {
+            if json {
+                return show_close_plan_json(&plan);
+            }
+            show_close_plan_human(plan)
+        }
+        Err(error) => {
+            guidance::report_head_error(&error);
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn show_close_plan_json(plan: &hydra_core::HeadClosePlan) -> ExitCode {
+    let (strategy, integration_result) = match &plan.strategy {
+        hydra_core::ClosePlanStrategy::TargetWorktree {
+            path,
+            integration_result,
+        } => {
+            let path = match json_output::path(path) {
+                Ok(path) => path,
+                Err(error) => return report_json_error("head close --dry-run", &error),
+            };
+            (
+                HeadCloseStrategyJson::TargetWorktree { path },
+                Some(integration_result_json(integration_result)),
+            )
+        }
+        hydra_core::ClosePlanStrategy::Command {
+            program,
+            args,
+            working_directory,
+            remove_on_success,
+        } => {
+            let working_directory = match json_output::path(working_directory) {
+                Ok(path) => path,
+                Err(error) => return report_json_error("head close --dry-run", &error),
+            };
+            (
+                HeadCloseStrategyJson::Command {
+                    program,
+                    args,
+                    working_directory,
+                    remove_on_success: *remove_on_success,
+                },
+                None,
+            )
+        }
+    };
+    let report = HeadClosePlanJson {
+        schema_version: 1,
+        command: "headClose",
+        name: &plan.name,
+        target_ref: &plan.target_ref,
+        target_commit: &plan.target_commit,
+        head_commit: &plan.head_commit,
+        strategy,
+        integration_result,
+    };
+    match json_output::write(&report) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => report_json_error("head close --dry-run", &error),
+    }
+}
+
+fn show_close_plan_human(plan: hydra_core::HeadClosePlan) -> ExitCode {
+    println!("Head close plan for {}", plan.name);
+    println!("Target: {} at {}", plan.target_ref, plan.target_commit);
+    println!("Head commit: {}", plan.head_commit);
+    match plan.strategy {
+        hydra_core::ClosePlanStrategy::TargetWorktree {
+            path,
+            integration_result,
+        } => {
+            println!(
+                "Strategy: target worktree {}",
+                output::safe_path_label(&path)
+            );
+            println!(
+                "Integration result: {}",
+                integration_result_human(&integration_result)
+            );
+            if matches!(
+                integration_result,
+                hydra_core::IntegrationResult::MergeCommit
+            ) {
+                println!("Conflict prediction: not performed");
+            }
+            println!("Removal: protected after successful integration");
+        }
+        hydra_core::ClosePlanStrategy::Command {
+            program,
+            remove_on_success,
+            ..
+        } => {
+            println!("Strategy: configured command {program}");
+            println!(
+                "Removal: {}",
+                if remove_on_success {
+                    "protected after a successful command"
+                } else {
+                    "Head preserved after a successful command"
+                }
+            );
+        }
+    }
+    println!("No changes made");
+    ExitCode::SUCCESS
+}
+
+fn integration_result_json(result: &hydra_core::IntegrationResult) -> &'static str {
+    match result {
+        hydra_core::IntegrationResult::AlreadyIntegrated => "alreadyIntegrated",
+        hydra_core::IntegrationResult::FastForward => "fastForward",
+        hydra_core::IntegrationResult::MergeCommit => "mergeCommit",
+    }
+}
+
+fn integration_result_human(result: &hydra_core::IntegrationResult) -> &'static str {
+    match result {
+        hydra_core::IntegrationResult::AlreadyIntegrated => "already integrated",
+        hydra_core::IntegrationResult::FastForward => "fast-forward",
+        hydra_core::IntegrationResult::MergeCommit => "merge commit",
+    }
+}
+
+fn report_json_error(command: &str, error: &str) -> ExitCode {
+    eprintln!("error: {error}");
+    eprintln!("next: Fix the reported JSON output problem and rerun `hydra {command} --json`.");
+    ExitCode::FAILURE
 }
 
 fn remove_head(name: &str, force: bool) -> ExitCode {

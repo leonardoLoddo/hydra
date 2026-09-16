@@ -59,10 +59,13 @@ output remains escaped. Do not add summaries to that path-only contract.
 
 ## Versioned JSON output
 
-`--json` is available only on the read-only data commands `status`, `head list`,
-`head status`, `head path`, `doctor storage`, and `skill status`. Mutating commands,
-`repair`, and shell completion MUST NOT accept it. Human output remains unchanged
-when the option is absent.
+`--json` is available on the read-only data commands `status`, `head list`,
+`head status`, `head path`, `doctor storage`, and `skill status`. It is also
+available on `head create --dry-run` and `head close --dry-run`, because those
+invocations validate and report a plan without performing the lifecycle action.
+`head create --json` and `head close --json` MUST require `--dry-run`. Other
+mutating invocations, `repair`, and shell completion MUST NOT accept it. Human
+output remains unchanged when the option is absent.
 
 A successful JSON command emits exactly one compact object followed by one newline.
 Every root object contains `schemaVersion: 1`; keys use camel case, counts and flags
@@ -77,6 +80,15 @@ empty stdout, and actionable human diagnostics on stderr. A terminal write failu
 also fails with guidance but can expose bytes already accepted by the operating
 system. JSON mode remains read-only and MUST NOT acquire mutation locks, repair
 state, or change diagnostic cleanup behavior.
+
+Creation preflight reports resolved refs and commit, destination and private
+ref, tracked and overlay counts, configured storage mode, and any overlay
+full-copy confirmation requirement. It MUST NOT create a branch, worktree,
+inventory entry, mutation lock, or configuration change. Close preflight MUST
+validate the same clean and consistent Head and target-worktree preconditions
+as close. It reports either the native integration classification or the fully
+expanded configured adapter without merging, executing the adapter, or removing
+the Head. Native preflight MUST NOT claim that it predicts merge conflicts.
 
 Informational summaries do not require confirmation. Full-copy overlay cost and
 persistent unsafe-symlink exclusion use distinct default-negative prompts defined
