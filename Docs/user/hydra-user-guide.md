@@ -80,6 +80,7 @@ Create a Head from a local branch and record the branch that should later
 receive the work:
 
 ```bash
+hydra head create payment --from main --target main --dry-run
 hydra head create payment --from main --target main
 ```
 

@@ -83,6 +83,20 @@ Choose a source and target explicitly when possible:
 hydra head create payment --from beta --target main
 ```
 
+Preview the current pre-mutation validation and resolved plan before creating
+anything:
+
+```bash
+hydra head create payment --from beta --target main --dry-run
+```
+
+The plan includes the destination, private ref, resolved base commit, target,
+tracked and overlay counts, configured storage mode, and whether the current
+overlay plan would require full-copy confirmation. It creates no branch,
+worktree, inventory entry, mutation lock, prompt, or configuration change.
+Add `--json` for a versioned machine-readable plan. The actual creation
+revalidates everything, so a plan is a snapshot rather than a reservation.
+
 If `--from` resolves a local branch and `--target` is absent, that local branch
 becomes the target. A detached commit or other non-local source requires a
 target:

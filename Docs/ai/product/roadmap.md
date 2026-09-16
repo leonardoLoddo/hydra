@@ -23,7 +23,7 @@ in advance as a post-1.0 roadmap of 0.x releases.
 |---|---|
 | Public editor schema through SchemaStore | No `$schema` annotation until a stable public schema exists |
 | Shareable Head Recipes | Shelved while Hydra remains local; safe completion would require shared lifecycle coordination |
-| Setup command or hooks | Requires explicit lifecycle and failure contracts |
+| Head setup | Open hypothesis focused on per-Head Docker coexistence; generic bootstrap value is not demonstrated |
 | Agent runtime adapters | Separate from the available instructional Hydra skill |
 | Runtime processes, ports, local dashboard, visual diff, embedded terminal | Built only on a reliable Head engine |
 | Assisted merge/rebase and interactive resolution | Must not be advertised as current conflict automation |
@@ -60,6 +60,23 @@ capabilities are outside Hydra's current local boundary.
 No recipe command, schema, artifact, promotion flow, or shared-close behavior is
 approved. A future proposal MUST first justify a shared lifecycle model rather
 than treating portable Head intent as a standalone local feature.
+
+## Head setup hypothesis
+
+Head setup remains an open product hypothesis. Current field evidence indicates
+that overlays already supply the local files and configuration normally needed
+after creation. A generic dependency-installation or bootstrap hook therefore
+has no demonstrated recurring value and MUST NOT be treated as the default
+design.
+
+The demonstrated gap is per-Head Docker coexistence. Multiple Heads can require
+distinct Compose project names, host ports, URLs, volumes, cache prefixes,
+database names, or session identities before their stacks can run side by side.
+A future setup proposal SHOULD start from explicit, reviewable per-Head Docker
+configuration rather than arbitrary implicit hooks. It MUST define failure,
+retry, cleanup, configuration ownership, secret handling, and interaction with
+overlays before approval. Hydra still isolates Git and files only; this proposal
+does not imply current container, service, database, port, or cache isolation.
 
 ## Product hypothesis and admission
 

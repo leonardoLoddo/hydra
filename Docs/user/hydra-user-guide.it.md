@@ -62,7 +62,7 @@ hydra skill install <PROVIDER> [--yes | --no]
 hydra skill status <PROVIDER> [--json]
 hydra skill update <PROVIDER> [--yes | --no]
 hydra skill remove <PROVIDER> [--yes | --no]
-hydra head create <NAME> [--from <REF>] [--target <BRANCH>]
+hydra head create <NAME> [--from <REF>] [--target <BRANCH>] [--dry-run [--json]]
 hydra head list [--json]
 hydra head status <NAME> [--json]
 hydra head path <NAME> [--json]
@@ -453,6 +453,19 @@ Per creare una Head dal `HEAD` corrente:
 ```bash
 hydra head create payment
 ```
+
+Prima di creare branch o worktree puoi validare e vedere il piano:
+
+```bash
+hydra head create payment --dry-run
+```
+
+Il piano mostra percorso, ref privata, base e commit risolti, target, conteggi
+tracked e overlay, policy di storage e l'eventuale conferma full-copy richiesta
+dagli overlay. Non crea lock di mutazione, branch, worktree o inventario, non
+mostra prompt e non modifica `.hydra.json`. Aggiungi `--json` per un oggetto
+versionato. La creazione reale ricalcola e rivalida il piano: il dry run è una
+fotografia, non una prenotazione.
 
 Un risultato tipico è:
 

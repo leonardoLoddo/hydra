@@ -142,6 +142,16 @@ Create the Head with the syntax supported by the installed CLI:
 hydra head create <name> --from <source> --target <target>
 ```
 
+When the installed CLI advertises `--dry-run`, use it before creation when the
+resolved base, target, destination, overlay cost, or storage policy needs review:
+
+```bash
+hydra head create <name> --from <source> --target <target> --dry-run --json
+```
+
+Treat the plan as a current snapshot, not a reservation. It makes no durable
+change; the real create replans and can still fail if state changes.
+
 Before creation, review the canonical project's `.hydra.json`, when present.
 Pay particular attention to overlay policy and configured `open` or `close`
 commands. `storage.mode: "copy"` deliberately forces full copies of regular

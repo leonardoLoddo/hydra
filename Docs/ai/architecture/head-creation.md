@@ -31,7 +31,7 @@ summaries retain local visibility; the linked product rules own product policy.
 This document defines how the current implementation realizes:
 
 ```text
-hydra head create <name> [--from <ref>] [--target <ref>]
+hydra head create <name> [--from <ref>] [--target <ref>] [--dry-run [--json]]
 ```
 
 It owns the implemented orchestration, Git and filesystem boundaries,
@@ -45,8 +45,18 @@ An implementation gap recorded here does not relax the product requirement.
 
 ## CLI Contract
 
-`head create` is a nested command. `name` is required; `--from` and `--target`
-are optional.
+`head create` is a nested command. `name` is required; `--from`, `--target`, and
+`--dry-run` are optional. `--json` requires `--dry-run`.
+
+Dry-run creation loads a read-only state snapshot and performs the same name,
+destination, private-ref, base, target, tracked-entry, and overlay planning
+checks available before mutation. It reports the resolved plan and any current
+overlay full-copy confirmation requirement. It does not acquire the mutation
+lock, update `.hydra.json`, create Git refs or worktrees, write inventory, or
+prompt. An unsafe overlay symlink remains a validation error. Storage mode is
+reported as configured policy because the aggregate materialization backend is
+known only after real file operations. The real create replans and revalidates;
+the dry-run result is a snapshot, not an authorization token.
 
 If `--from` is absent, Hydra resolves `HEAD` in the canonical parent project.
 This remains true when the command is invoked from a managed Head: that Head's
@@ -167,7 +177,8 @@ outcome, displays usage and argument semantics, states meaningful defaults such
 as `HEAD`, and includes copyable examples. Help only advertises behavior
 implemented by the current binary. Both `hydra --help` and
 `hydra head --help` include a `Command syntax` index containing the complete
-`hydra head create <NAME> [--from <REF>] [--target <BRANCH>]` invocation, so a
+`hydra head create <NAME> [--from <REF>] [--target <BRANCH>] [--dry-run [--json]]`
+invocation, so a
 nested executable command is visible without traversing each help level.
 
 ---
@@ -416,7 +427,7 @@ would make the already-published state inconsistent.
 
 ## Verification Contract
 
-Implementation evidence: `crates/hydra-core/src/head.rs`. CLI integration evidence: `head_create_success`, `head_create_conflicts`, `head_create_overlay_failures`, and `head_create_state_failures`
+Implementation evidence: `crates/hydra-core/src/head.rs`. CLI integration evidence: `head_create_success`, `head_create_conflicts`, `head_create_overlay_failures`, `head_create_state_failures`, and `head_dry_run`
 test targets under `crates/hydra-cli/tests/`. Run the affected targets with
 `cargo test -p hydra-cli --test <target>` and inspect the observable results below.
 A listed test contract is not evidence that every platform passed in this task.
@@ -425,6 +436,7 @@ CLI integration tests use unique temporary directories and real disposable Git
 repositories. Current coverage proves:
 
 - the documented nested command and option syntax;
+- dry-run plan resolution with no branch, worktree, inventory, lock, or policy mutation;
 - default and explicit base/target resolution;
 - tracked content comes from `baseCommit`, not uncommitted source edits;
 - direct CoW reuse of clean tracked working files without per-file Git blob

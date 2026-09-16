@@ -60,6 +60,10 @@ Duplicate names, private branches, or destinations MUST fail before mutation.
 Source edits during copying MUST cause safe failure when destination identity
 no longer matches the plan.
 
+`head create --dry-run` validates and reports the current creation plan without
+creating a mutation lock, branch, worktree, inventory entry, prompt, or policy
+change. The plan is a snapshot and MUST be revalidated by a later create.
+
 ## Inspection
 
 `status`, `head list`, `head status`, and `head path` are read-only. They MUST NOT

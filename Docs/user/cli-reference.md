@@ -22,7 +22,7 @@ hydra skill status <PROVIDER> [--json]
 hydra skill update <PROVIDER> [--yes | --no]
 hydra skill remove <PROVIDER> [--yes | --no]
 
-hydra head create <NAME> [--from <REF>] [--target <BRANCH>]
+hydra head create <NAME> [--from <REF>] [--target <BRANCH>] [--dry-run [--json]]
 hydra head list [--json]
 hydra head status <NAME> [--json]
 hydra head path <NAME> [--json]
@@ -84,6 +84,8 @@ Creates an isolated Head.
 |---|---|
 | `--from <REF>` | Source ref or commit; defaults to canonical parent `HEAD` |
 | `--target <BRANCH>` | Existing local branch intended for integration |
+| `--dry-run` | Validate and print the creation plan without making changes |
+| `--json` | Emit the dry-run plan as versioned JSON; requires `--dry-run` |
 
 When the source is not a local branch, `--target` is required. Overlay
 symlinks and full-copy fallback can cause default-negative prompts. On native

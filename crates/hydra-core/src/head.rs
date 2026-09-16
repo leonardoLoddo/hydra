@@ -64,6 +64,64 @@ pub struct CreatedHead {
     pub overlay_bytes: u64,
 }
 
+#[derive(Debug)]
+pub struct HeadCreationPlan {
+    pub name: String,
+    pub path: PathBuf,
+    pub head_ref: String,
+    pub base_ref: String,
+    pub base_commit: String,
+    pub target_ref: String,
+    pub tracked_entries: usize,
+    pub overlay_files: usize,
+    pub overlay_bytes: u64,
+    pub overlay_full_copy_files: usize,
+    pub overlay_full_copy_bytes: u64,
+    pub force_full_copy: bool,
+}
+
+/// Validates and describes Head creation without changing Git or Hydra state.
+///
+/// # Errors
+///
+/// Returns [`HeadError`] when the requested Head cannot currently be created.
+pub fn plan_head_creation(
+    source_path: &Path,
+    options: &CreateHeadOptions,
+) -> Result<HeadCreationPlan, HeadError> {
+    validate_head_name(&options.name)?;
+    let repository = discover_project_repository(source_path)?;
+    let snapshot = StateSnapshot::load(&repository)?;
+    let heads_directory = snapshot.heads_directory()?;
+    let mut report_progress = ProgressReporter::new(|_| {});
+    let prepared = prepare_head_from_policy(
+        &repository,
+        snapshot.heads().contains_key(&options.name),
+        heads_directory,
+        snapshot.branch_prefix(),
+        snapshot.overlay_rules(),
+        snapshot.force_full_copy(),
+        options,
+        false,
+        &mut report_progress,
+    )?;
+
+    Ok(HeadCreationPlan {
+        name: options.name.clone(),
+        path: prepared.head_path,
+        head_ref: format!("refs/heads/{}", prepared.branch),
+        base_ref: prepared.base_ref,
+        base_commit: prepared.base_commit,
+        target_ref: prepared.target_ref,
+        tracked_entries: prepared.tracked_entries.len(),
+        overlay_files: prepared.overlay_plan.file_count(),
+        overlay_bytes: prepared.overlay_plan.total_bytes(),
+        overlay_full_copy_files: prepared.overlay_plan.full_copy_file_count(),
+        overlay_full_copy_bytes: prepared.overlay_plan.full_copy_bytes(),
+        force_full_copy: prepared.force_full_copy,
+    })
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum HeadCreationProgress {
@@ -296,15 +354,59 @@ fn prepare_head(
     options: &CreateHeadOptions,
     report_progress: &mut ProgressReporter<impl FnMut(HeadCreationProgress)>,
 ) -> Result<PreparedHead, HeadError> {
-    if transaction.contains_head(&options.name) {
+    let heads_directory = transaction.heads_directory()?;
+    let first_plan = prepare_head_from_policy(
+        repository,
+        transaction.contains_head(&options.name),
+        heads_directory.clone(),
+        transaction.branch_prefix(),
+        transaction.overlay_rules(),
+        transaction.force_full_copy(),
+        options,
+        true,
+        report_progress,
+    );
+    match first_plan {
+        Err(HeadError::UnsafeOverlaySymlinks { paths })
+            if options.exclude_unsafe_overlay_symlinks =>
+        {
+            transaction.exclude_unsafe_overlay_symlinks(&paths)?;
+            prepare_head_from_policy(
+                repository,
+                transaction.contains_head(&options.name),
+                heads_directory,
+                transaction.branch_prefix(),
+                transaction.overlay_rules(),
+                transaction.force_full_copy(),
+                options,
+                true,
+                report_progress,
+            )
+        }
+        result => result,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn prepare_head_from_policy(
+    repository: &Repository,
+    contains_head: bool,
+    heads_directory: PathBuf,
+    branch_prefix: &str,
+    overlay_rules: &[String],
+    force_full_copy: bool,
+    options: &CreateHeadOptions,
+    enforce_confirmation: bool,
+    report_progress: &mut ProgressReporter<impl FnMut(HeadCreationProgress)>,
+) -> Result<PreparedHead, HeadError> {
+    if contains_head {
         return Err(HeadError::HeadAlreadyExists(options.name.clone()));
     }
 
-    let heads_directory = transaction.heads_directory()?;
     let head_path = heads_directory.join(&options.name);
     ensure_destination_absent(&head_path)?;
 
-    let branch = format!("{}{}", transaction.branch_prefix(), options.name);
+    let branch = format!("{branch_prefix}{}", options.name);
     git::validate_branch_name(repository, &branch)?;
     git::ensure_branch_absent(repository, &branch)?;
 
@@ -318,31 +420,18 @@ fn prepare_head(
     )?;
     let target_ref = resolve_target_ref(repository, options.target.as_deref(), &base_ref)?;
     let tracked_entries = git::tracked_entries(repository, &base_commit)?;
-    let force_full_copy = transaction.force_full_copy();
     report_progress.report(HeadCreationProgress::PlanningOverlays);
     let overlay_plan = plan_overlays(
         &repository.root,
         &heads_directory,
-        transaction.overlay_rules(),
+        overlay_rules,
         &tracked_entries,
         force_full_copy,
-    );
-    let overlay_plan = match overlay_plan {
-        Err(HeadError::UnsafeOverlaySymlinks { paths })
-            if options.exclude_unsafe_overlay_symlinks =>
-        {
-            transaction.exclude_unsafe_overlay_symlinks(&paths)?;
-            plan_overlays(
-                &repository.root,
-                &heads_directory,
-                transaction.overlay_rules(),
-                &tracked_entries,
-                force_full_copy,
-            )?
-        }
-        result => result?,
-    };
-    if overlay_plan.full_copy_file_count() > 0 && !options.confirmed_full_copy {
+    )?;
+    if enforce_confirmation
+        && overlay_plan.full_copy_file_count() > 0
+        && !options.confirmed_full_copy
+    {
         return Err(HeadError::OverlayFullCopyConfirmationRequired {
             files: overlay_plan.full_copy_file_count(),
             bytes: overlay_plan.full_copy_bytes(),

@@ -182,7 +182,6 @@ fn inspection_help_exposes_json_only_on_read_only_data_commands() {
     for arguments in [
         vec!["init", "--help"],
         vec!["repair", "--help"],
-        vec!["head", "create", "--help"],
         vec!["head", "open", "--help"],
         vec!["head", "close", "--help"],
         vec!["head", "remove", "--help"],
@@ -204,6 +203,16 @@ fn inspection_help_exposes_json_only_on_read_only_data_commands() {
             "mutating command {arguments:?} must not advertise JSON, got: {stdout:?}"
         );
     }
+
+    let output = Command::new(env!("CARGO_BIN_EXE_hydra"))
+        .args(["head", "create", "--help"])
+        .output()
+        .expect("Hydra CLI should start");
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).expect("help output should be UTF-8");
+    assert!(stdout.contains("--dry-run"));
+    assert!(stdout.contains("--json"));
+    assert!(stdout.contains("requires --dry-run"));
 }
 
 #[test]

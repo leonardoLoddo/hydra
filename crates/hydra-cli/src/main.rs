@@ -193,7 +193,7 @@ enum HeadCommand {
     /// Create a new isolated Head
     #[command(
         long_about = "Create a new isolated Head.\n\nThe new Head starts at <REF> and uses <BRANCH> as its local integration branch. When invoked from an existing Hydra Head, configuration, HEAD defaults, and overlays come from the canonical parent project exactly as if the command ran there.",
-        after_help = "Examples:\n  hydra head create payment\n  hydra head create payment --from beta\n  hydra head create payment --from beta --target main"
+        after_help = "Examples:\n  hydra head create payment\n  hydra head create payment --from beta\n  hydra head create payment --from beta --target main\n  hydra head create payment --dry-run\n  hydra head create payment --dry-run --json"
     )]
     Create {
         /// Name for the new Head
@@ -204,6 +204,12 @@ enum HeadCommand {
         /// Set the local branch used for integration
         #[arg(long, value_name = "BRANCH")]
         target: Option<String>,
+        /// Validate and print the creation plan without making changes
+        #[arg(long)]
+        dry_run: bool,
+        /// Emit the dry-run plan as one versioned JSON object (requires --dry-run)
+        #[arg(long, requires = "dry_run")]
+        json: bool,
     },
     /// List local Heads
     List {
@@ -300,8 +306,15 @@ fn main() -> ExitCode {
         Command::Completions { shell } => print_completions(shell),
         Command::Skill { command } => run_skill(&command),
         Command::Head {
-            command: HeadCommand::Create { name, from, target },
-        } => head_create::run(&name, from.as_deref(), target.as_deref()),
+            command:
+                HeadCommand::Create {
+                    name,
+                    from,
+                    target,
+                    dry_run,
+                    json,
+                },
+        } => head_create::run(&name, from.as_deref(), target.as_deref(), dry_run, json),
         Command::Head {
             command: HeadCommand::List { json },
         } => inspection::list_heads(json),

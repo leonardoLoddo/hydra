@@ -6,7 +6,48 @@ use std::{
 
 use crate::output::safe_path_label;
 
-pub(super) fn run(name: &str, from: Option<&str>, target: Option<&str>) -> ExitCode {
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HeadCreationPlanJson<'a> {
+    schema_version: u32,
+    command: &'static str,
+    name: &'a str,
+    path: &'a str,
+    head_ref: &'a str,
+    base_ref: &'a str,
+    base_commit: &'a str,
+    target_ref: &'a str,
+    tracked_entries: usize,
+    overlay: OverlayPlanJson,
+    storage_mode: &'static str,
+    confirmations: ConfirmationPlanJson,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OverlayPlanJson {
+    files: usize,
+    bytes: u64,
+    full_copy_files: usize,
+    full_copy_bytes: u64,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ConfirmationPlanJson {
+    full_copy_required: bool,
+}
+
+pub(super) fn run(
+    name: &str,
+    from: Option<&str>,
+    target: Option<&str>,
+    dry_run: bool,
+    json: bool,
+) -> ExitCode {
+    if dry_run {
+        return show_plan(name, from, target, json);
+    }
     let progress_enabled = io::stderr().is_terminal();
     let create = |confirmed_full_copy, exclude_unsafe_overlay_symlinks| {
         hydra_core::create_head_with_progress(
@@ -84,6 +125,87 @@ pub(super) fn run(name: &str, from: Option<&str>, target: Option<&str>) -> ExitC
         }
         result => finish(result, false),
     }
+}
+
+fn show_plan(name: &str, from: Option<&str>, target: Option<&str>, json: bool) -> ExitCode {
+    let options = hydra_core::CreateHeadOptions {
+        name: name.to_owned(),
+        from: from.map(str::to_owned),
+        target: target.map(str::to_owned),
+        confirmed_full_copy: false,
+        exclude_unsafe_overlay_symlinks: false,
+    };
+    match hydra_core::plan_head_creation(Path::new("."), &options) {
+        Ok(plan) => {
+            if json {
+                let path = match crate::json_output::path(&plan.path) {
+                    Ok(path) => path,
+                    Err(error) => return report_json_error(name, &error),
+                };
+                let report = HeadCreationPlanJson {
+                    schema_version: 1,
+                    command: "headCreate",
+                    name: &plan.name,
+                    path,
+                    head_ref: &plan.head_ref,
+                    base_ref: &plan.base_ref,
+                    base_commit: &plan.base_commit,
+                    target_ref: &plan.target_ref,
+                    tracked_entries: plan.tracked_entries,
+                    overlay: OverlayPlanJson {
+                        files: plan.overlay_files,
+                        bytes: plan.overlay_bytes,
+                        full_copy_files: plan.overlay_full_copy_files,
+                        full_copy_bytes: plan.overlay_full_copy_bytes,
+                    },
+                    storage_mode: if plan.force_full_copy { "copy" } else { "auto" },
+                    confirmations: ConfirmationPlanJson {
+                        full_copy_required: plan.overlay_full_copy_files > 0,
+                    },
+                };
+                return match crate::json_output::write(&report) {
+                    Ok(()) => ExitCode::SUCCESS,
+                    Err(error) => report_json_error(name, &error),
+                };
+            }
+            println!("Head creation plan for {}", plan.name);
+            println!("Path: {}", safe_path_label(&plan.path));
+            println!("Private branch: {}", plan.head_ref);
+            println!("Base: {} at {}", plan.base_ref, plan.base_commit);
+            println!("Target: {}", plan.target_ref);
+            println!("Tracked entries: {}", plan.tracked_entries);
+            println!(
+                "Overlay: {} file(s), {} byte(s)",
+                plan.overlay_files, plan.overlay_bytes
+            );
+            println!(
+                "Storage mode: {}",
+                if plan.force_full_copy { "copy" } else { "auto" }
+            );
+            if plan.overlay_full_copy_files > 0 {
+                println!(
+                    "Full-copy confirmation: required for {} file(s), {} byte(s)",
+                    plan.overlay_full_copy_files, plan.overlay_full_copy_bytes
+                );
+            } else {
+                println!("Full-copy confirmation: not required by the current overlay plan");
+            }
+            println!("No changes made");
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            crate::guidance::report_head_error(&error);
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn report_json_error(name: &str, error: &str) -> ExitCode {
+    eprintln!("error: {error}");
+    eprintln!(
+        "next: Fix the reported JSON output problem and rerun `hydra head create {name} --dry-run --json`."
+    );
+    ExitCode::FAILURE
 }
 
 fn show_progress(progress: hydra_core::HeadCreationProgress) {

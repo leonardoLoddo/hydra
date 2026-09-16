@@ -163,6 +163,14 @@ impl StateSnapshot {
         self.configuration.branch_prefix()
     }
 
+    pub(super) fn overlay_rules(&self) -> &[String] {
+        self.configuration.overlay_rules()
+    }
+
+    pub(super) fn force_full_copy(&self) -> bool {
+        self.configuration.force_full_copy()
+    }
+
     pub(super) fn open_command(&self) -> Option<&OpenCommandConfiguration> {
         self.configuration.open_command()
     }
