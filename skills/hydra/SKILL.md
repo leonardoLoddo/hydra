@@ -1,6 +1,6 @@
 ---
 name: hydra
-description: Use Hydra's Git-native CLI to create and operate isolated development Heads, or apply Hydra Arts for competitive implementation, experimental design, and adversarial validation. Use when work needs an independent working tree and index, parallel or disposable exploration, safe lifecycle management, or evidence from multiple isolated realities.
+description: "Use Hydra for Git-native isolated Heads and parallel workflows, especially when multiple implementations are developed at the same time. Use its scoped Arts only in their cases: Arena compares materially different implementations, Augury tests consequential uncertainty with a disposable experiment, and Gauntlet adversarially validates existing work. Also trigger for independent working trees and indexes, disposable exploration, safe Head lifecycle management, or evidence from isolated realities."
 ---
 
 # Hydra

@@ -1,4 +1,7 @@
 interface:
   display_name: "Hydra"
-  short_description: "Run isolated work and Hydra Arts safely"
-  default_prompt: "Use $hydra to choose the lightest safe isolated workflow or Hydra Art for this task."
+  short_description: "Run parallel isolated work and scoped Hydra Arts"
+  default_prompt: "Use $hydra to run the lightest safe parallel or isolated workflow, and select an Art only when its specific case applies."
+
+policy:
+  allow_implicit_invocation: true
